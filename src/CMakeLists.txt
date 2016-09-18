@@ -158,11 +158,11 @@ endif(CURL_FOUND)
 #
 # Optionally, find 'Doxygen' and generate the API documentation
 #
-find_package(Doxygen OPTIONAL)
-if (DOXYGEN_FOUND)
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/Doxyfile.in ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile @ONLY)
-add_custom_target("api-doc" "${DOXYGEN_EXECUTABLE} ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}" COMMENT "Generating API documentation with Doxygen" VERBATIM)
-endif(DOXYGEN_FOUND)
+# find_package(Doxygen REQUIRED)
+# if (DOXYGEN_FOUND)
+# configure_file(${CMAKE_CURRENT_SOURCE_DIR}/Doxyfile.in ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile @ONLY)
+# add_custom_target("api-doc" "${DOXYGEN_EXECUTABLE} ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}" COMMENT "Generating API documentation with Doxygen" VERBATIM)
+# endif(DOXYGEN_FOUND)
 
 IF(CMAKE_BUILD_TYPE MATCHES "Debug")
     set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "./debug/bin")
