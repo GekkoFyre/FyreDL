@@ -1,0 +1,24 @@
+Project (name, author, <URL>, license)
+-----------------------------------------
+It is with the help and hard work of these libraries that Gecho was made possible. We owe our sincere thanks to the following authors, contributors, helpers, and communities below:
+
+
+Gettext by Daiki Ueno et al.
+	<https://www.gnu.org/software/gettext/>
+		Free Software Foundation, Inc.
+
+Boost C++ Libraries by various
+	<http://www.boost.org/>
+		Boost Software License, v1
+
+CMake (Cross Platform Makefile Generator) by Kitware
+	<https://cmake.org/>
+		BSD 3-clause License
+
+FindGettextTools.cmake by Jookia
+	<https://github.com/Jookia/GettextTools/>
+		Provided as-is
+
+LibFindMacros.cmake by Lasse Kärkkäinen
+	<https://github.com/Tronic/cmake-modules/>
+		Public Domain
