@@ -1,3 +1,6 @@
+# Personal settings
+build/
+
 # Compiled Object files
 *.slo
 *.lo

@@ -40,12 +40,18 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release")
 endif()
 
+# Instruct CMake to run moc automatically when needed.
+set(CMAKE_AUTOMOC ON)
+
+# https://cmake.org/cmake/help/v3.0/prop_tgt/AUTOUIC.html
+set(CMAKE_AUTOUIC ON)
+
+# https://wiki.qt.io/Using_CMake_build_system
+set(CMAKE_AUTORCC ON)
+
 # As moc files are generated in the binary dir, tell CMake
 # to always look for includes there
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
-
-# Instruct CMake to run moc automatically when needed.
-set(CMAKE_AUTOMOC ON)
 
 # Find the Qt libraries
 find_package(Qt5Core REQUIRED)
@@ -56,7 +62,16 @@ set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/Modules/")
 set(SOURCE_FILES
     cmnroutines.hpp
     cmnroutines.cpp
-    main.cpp)
+    main.cpp
+    mainwindow.hpp
+    mainwindow.cpp)
+
+# http://doc.qt.io/qt-5/cmake-manual.html
+# http://www.executionunit.com/blog/2014/01/22/moving-from-qmake-to-cmake/
+qt5_wrap_ui(UI_HEADERS
+            mainwindow.ui)
+
+# qt5_add_resources(UI_RESOURCES)
 
 # Create the main executable and name it depending on the operating system
 set(EXE_NAME "fyredl" CACHE STRING "The name of the executable.")
@@ -66,7 +81,7 @@ elseif (${CMAKE_SYSTEM_NAME} MATCHES "Windows" OR "mingw" OR "cygwin")
     set_property(CACHE EXE_NAME PROPERTY STRINGS "fyredl.exe")
 endif()
 
-add_executable("${EXE_NAME}" ${SOURCE_FILES})
+add_executable("${EXE_NAME}" ${SOURCE_FILES} ${UI_HEADERS})
 set_property(TARGET ${EXE_NAME} PROPERTY CXX_STANDARD 14)
 set_property(TARGET ${EXE_NAME} PROPERTY CXX_STANDARD_REQUIRED ON)
 
