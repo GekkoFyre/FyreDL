@@ -6,23 +6,107 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>400</width>
-    <height>300</height>
+    <width>1024</width>
+    <height>768</height>
    </rect>
   </property>
-  <property name="windowTitle">
-   <string>MainWindow</string>
+  <property name="minimumSize">
+   <size>
+    <width>1024</width>
+    <height>768</height>
+   </size>
   </property>
-  <widget class="QWidget" name="centralWidget"/>
+  <property name="windowTitle">
+   <string>FyreDL</string>
+  </property>
+  <widget class="QWidget" name="centralWidget">
+   <layout class="QVBoxLayout" name="verticalLayout_3">
+    <item>
+     <layout class="QVBoxLayout" name="verticalWidget">
+      <item>
+       <layout class="QHBoxLayout" name="horizontalWidget" stretch="30,70">
+        <item>
+         <layout class="QHBoxLayout" name="buttonPanel"/>
+        </item>
+        <item>
+         <layout class="QHBoxLayout" name="infoPanel">
+          <item>
+           <layout class="QVBoxLayout" name="infoVerticalWidget" stretch="60,40">
+            <item>
+             <layout class="QVBoxLayout" name="downloadList"/>
+            </item>
+            <item>
+             <layout class="QVBoxLayout" name="downloadInfo"/>
+            </item>
+           </layout>
+          </item>
+         </layout>
+        </item>
+       </layout>
+      </item>
+     </layout>
+    </item>
+   </layout>
+  </widget>
   <widget class="QMenuBar" name="menuBar">
    <property name="geometry">
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>400</width>
+     <width>1024</width>
      <height>24</height>
     </rect>
    </property>
+   <widget class="QMenu" name="menu_File">
+    <property name="title">
+     <string>&amp;File</string>
+    </property>
+    <addaction name="action_Open_a_File"/>
+    <addaction name="actionEnter_URL"/>
+    <addaction name="separator"/>
+    <addaction name="actionE_xit"/>
+   </widget>
+   <widget class="QMenu" name="menu_Edit">
+    <property name="title">
+     <string>&amp;Edit</string>
+    </property>
+    <addaction name="action_Resume"/>
+    <addaction name="action_Pause"/>
+    <addaction name="action_Cleanup_erroneous_tasks"/>
+    <addaction name="separator"/>
+    <addaction name="actionEdi_t"/>
+    <addaction name="action_Delete"/>
+    <addaction name="separator"/>
+    <addaction name="actionC_ut"/>
+    <addaction name="actionC_opy"/>
+    <addaction name="actionP_aste"/>
+    <addaction name="separator"/>
+    <addaction name="actionPreference_s"/>
+   </widget>
+   <widget class="QMenu" name="menu_Tools">
+    <property name="title">
+     <string>&amp;Tools</string>
+    </property>
+    <addaction name="action_Limit_Upload_Download"/>
+   </widget>
+   <widget class="QMenu" name="menu_Window">
+    <property name="title">
+     <string>&amp;Window</string>
+    </property>
+   </widget>
+   <widget class="QMenu" name="menu_Help">
+    <property name="title">
+     <string>&amp;Help</string>
+    </property>
+    <addaction name="action_Documentation"/>
+    <addaction name="separator"/>
+    <addaction name="action_About"/>
+   </widget>
+   <addaction name="menu_File"/>
+   <addaction name="menu_Edit"/>
+   <addaction name="menu_Tools"/>
+   <addaction name="menu_Window"/>
+   <addaction name="menu_Help"/>
   </widget>
   <widget class="QToolBar" name="mainToolBar">
    <attribute name="toolBarArea">
@@ -33,6 +117,81 @@
    </attribute>
   </widget>
   <widget class="QStatusBar" name="statusBar"/>
+  <action name="action_Open_a_File">
+   <property name="text">
+    <string>&amp;Open a File...</string>
+   </property>
+  </action>
+  <action name="actionEnter_URL">
+   <property name="text">
+    <string>Enter &amp;URL...</string>
+   </property>
+  </action>
+  <action name="actionE_xit">
+   <property name="text">
+    <string>E&amp;xit</string>
+   </property>
+  </action>
+  <action name="action_Resume">
+   <property name="text">
+    <string>&amp;Resume</string>
+   </property>
+  </action>
+  <action name="action_Pause">
+   <property name="text">
+    <string>&amp;Pause</string>
+   </property>
+  </action>
+  <action name="action_Cleanup_erroneous_tasks">
+   <property name="text">
+    <string>&amp;Cleanup erroneous tasks</string>
+   </property>
+  </action>
+  <action name="actionEdi_t">
+   <property name="text">
+    <string>Edi&amp;t</string>
+   </property>
+  </action>
+  <action name="action_Delete">
+   <property name="text">
+    <string>&amp;Delete</string>
+   </property>
+  </action>
+  <action name="actionC_ut">
+   <property name="text">
+    <string>C&amp;ut</string>
+   </property>
+  </action>
+  <action name="actionC_opy">
+   <property name="text">
+    <string>C&amp;opy</string>
+   </property>
+  </action>
+  <action name="actionP_aste">
+   <property name="text">
+    <string>P&amp;aste</string>
+   </property>
+  </action>
+  <action name="actionPreference_s">
+   <property name="text">
+    <string>Preference&amp;s...</string>
+   </property>
+  </action>
+  <action name="action_Documentation">
+   <property name="text">
+    <string>&amp;Documentation</string>
+   </property>
+  </action>
+  <action name="action_About">
+   <property name="text">
+    <string>&amp;About...</string>
+   </property>
+  </action>
+  <action name="action_Limit_Upload_Download">
+   <property name="text">
+    <string>&amp;Limit Upload/Download...</string>
+   </property>
+  </action>
  </widget>
  <layoutdefault spacing="6" margin="11"/>
  <resources/>
