@@ -24,7 +24,147 @@
     <item>
      <layout class="QVBoxLayout" name="verticalPlaceholder">
       <item>
-       <layout class="QHBoxLayout" name="horizBtnLayout"/>
+       <layout class="QHBoxLayout" name="horizBtnLayout">
+        <item>
+         <widget class="QToolButton" name="addfileToolBtn">
+          <property name="icon">
+           <iconset resource="assets.qrc">
+            <normaloff>:/icons/assets-img/edit-add-4.png</normaloff>:/icons/assets-img/edit-add-4.png</iconset>
+          </property>
+          <property name="iconSize">
+           <size>
+            <width>64</width>
+            <height>64</height>
+           </size>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QToolButton" name="addurlToolBtn">
+          <property name="icon">
+           <iconset resource="assets.qrc">
+            <normaloff>:/icons/assets-img/applications-internet-3.png</normaloff>:/icons/assets-img/applications-internet-3.png</iconset>
+          </property>
+          <property name="iconSize">
+           <size>
+            <width>64</width>
+            <height>64</height>
+           </size>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QToolButton" name="printToolBtn">
+          <property name="icon">
+           <iconset resource="assets.qrc">
+            <normaloff>:/icons/assets-img/printer-printing.png</normaloff>:/icons/assets-img/printer-printing.png</iconset>
+          </property>
+          <property name="iconSize">
+           <size>
+            <width>64</width>
+            <height>64</height>
+           </size>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QToolButton" name="dlstartToolBtn">
+          <property name="icon">
+           <iconset resource="assets.qrc">
+            <normaloff>:/icons/assets-img/media-playback-start-3.png</normaloff>:/icons/assets-img/media-playback-start-3.png</iconset>
+          </property>
+          <property name="iconSize">
+           <size>
+            <width>64</width>
+            <height>64</height>
+           </size>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QToolButton" name="dlpauseToolBtn">
+          <property name="icon">
+           <iconset resource="assets.qrc">
+            <normaloff>:/icons/assets-img/media-playback-pause-3.png</normaloff>:/icons/assets-img/media-playback-pause-3.png</iconset>
+          </property>
+          <property name="iconSize">
+           <size>
+            <width>64</width>
+            <height>64</height>
+           </size>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QToolButton" name="dlstopToolBtn">
+          <property name="icon">
+           <iconset resource="assets.qrc">
+            <normaloff>:/icons/assets-img/media-playback-stop-3.png</normaloff>:/icons/assets-img/media-playback-stop-3.png</iconset>
+          </property>
+          <property name="iconSize">
+           <size>
+            <width>64</width>
+            <height>64</height>
+           </size>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QToolButton" name="removeToolBtn">
+          <property name="icon">
+           <iconset resource="assets.qrc">
+            <normaloff>:/icons/assets-img/user-trash.png</normaloff>:/icons/assets-img/user-trash.png</iconset>
+          </property>
+          <property name="iconSize">
+           <size>
+            <width>64</width>
+            <height>64</height>
+           </size>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QToolButton" name="clearhistoryToolBtn">
+          <property name="icon">
+           <iconset resource="assets.qrc">
+            <normaloff>:/icons/assets-img/edit-clear-3.png</normaloff>:/icons/assets-img/edit-clear-3.png</iconset>
+          </property>
+          <property name="iconSize">
+           <size>
+            <width>64</width>
+            <height>64</height>
+           </size>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QToolButton" name="settingsToolBtn">
+          <property name="icon">
+           <iconset resource="assets.qrc">
+            <normaloff>:/icons/assets-img/applications-development-web.png</normaloff>:/icons/assets-img/applications-development-web.png</iconset>
+          </property>
+          <property name="iconSize">
+           <size>
+            <width>64</width>
+            <height>64</height>
+           </size>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <spacer name="horizontalSpacer">
+          <property name="orientation">
+           <enum>Qt::Horizontal</enum>
+          </property>
+          <property name="sizeHint" stdset="0">
+           <size>
+            <width>40</width>
+            <height>20</height>
+           </size>
+          </property>
+         </spacer>
+        </item>
+       </layout>
       </item>
       <item>
        <layout class="QVBoxLayout" name="verticalLayout" stretch="70,30">
@@ -40,7 +180,7 @@
           <item>
            <widget class="QTabWidget" name="tabStatusWidget">
             <property name="currentIndex">
-             <number>0</number>
+             <number>1</number>
             </property>
             <widget class="QWidget" name="tabGeneral">
              <attribute name="title">
@@ -232,6 +372,11 @@
              <attribute name="title">
               <string>Contents</string>
              </attribute>
+             <layout class="QVBoxLayout" name="verticalLayout_4">
+              <item>
+               <widget class="QTableView" name="tableView"/>
+              </item>
+             </layout>
             </widget>
            </widget>
           </item>
@@ -389,6 +534,8 @@
   </action>
  </widget>
  <layoutdefault spacing="6" margin="11"/>
- <resources/>
+ <resources>
+  <include location="assets.qrc"/>
+ </resources>
  <connections/>
 </ui>

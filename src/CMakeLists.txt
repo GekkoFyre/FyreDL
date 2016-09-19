@@ -71,7 +71,7 @@ set(SOURCE_FILES
 qt5_wrap_ui(UI_HEADERS
             mainwindow.ui)
 
-# qt5_add_resources(UI_RESOURCES)
+qt5_add_resources(UI_RESOURCES assets.qrc)
 
 # Create the main executable and name it depending on the operating system
 set(EXE_NAME "fyredl" CACHE STRING "The name of the executable.")
@@ -81,7 +81,7 @@ elseif (${CMAKE_SYSTEM_NAME} MATCHES "Windows" OR "mingw" OR "cygwin")
     set_property(CACHE EXE_NAME PROPERTY STRINGS "fyredl.exe")
 endif()
 
-add_executable("${EXE_NAME}" ${SOURCE_FILES} ${UI_HEADERS})
+add_executable("${EXE_NAME}" ${SOURCE_FILES} ${UI_HEADERS} ${UI_RESOURCES})
 set_property(TARGET ${EXE_NAME} PROPERTY CXX_STANDARD 14)
 set_property(TARGET ${EXE_NAME} PROPERTY CXX_STANDARD_REQUIRED ON)
 
