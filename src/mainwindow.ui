@@ -22,23 +22,218 @@
   <widget class="QWidget" name="centralWidget">
    <layout class="QVBoxLayout" name="verticalLayout_3">
     <item>
-     <layout class="QVBoxLayout" name="verticalWidget">
+     <layout class="QVBoxLayout" name="verticalPlaceholder">
       <item>
-       <layout class="QHBoxLayout" name="horizontalWidget" stretch="30,70">
+       <layout class="QHBoxLayout" name="horizBtnLayout"/>
+      </item>
+      <item>
+       <layout class="QVBoxLayout" name="verticalLayout" stretch="70,30">
         <item>
-         <layout class="QHBoxLayout" name="buttonPanel"/>
+         <layout class="QHBoxLayout" name="downloadListHolder">
+          <item>
+           <widget class="QTableView" name="downloadView"/>
+          </item>
+         </layout>
         </item>
         <item>
-         <layout class="QHBoxLayout" name="infoPanel">
+         <layout class="QHBoxLayout" name="downloadInfoHolder">
           <item>
-           <layout class="QVBoxLayout" name="infoVerticalWidget" stretch="60,40">
-            <item>
-             <layout class="QVBoxLayout" name="downloadList"/>
-            </item>
-            <item>
-             <layout class="QVBoxLayout" name="downloadInfo"/>
-            </item>
-           </layout>
+           <widget class="QTabWidget" name="tabStatusWidget">
+            <property name="currentIndex">
+             <number>0</number>
+            </property>
+            <widget class="QWidget" name="tabGeneral">
+             <attribute name="title">
+              <string>General</string>
+             </attribute>
+             <layout class="QVBoxLayout" name="verticalLayout_6">
+              <item>
+               <widget class="QScrollArea" name="generalScrollArea">
+                <property name="widgetResizable">
+                 <bool>true</bool>
+                </property>
+                <widget class="QWidget" name="generalScrollWidget">
+                 <property name="geometry">
+                  <rect>
+                   <x>0</x>
+                   <y>0</y>
+                   <width>962</width>
+                   <height>189</height>
+                  </rect>
+                 </property>
+                 <layout class="QVBoxLayout" name="verticalLayout_8">
+                  <item>
+                   <layout class="QFormLayout" name="generalFormLayout">
+                    <item row="0" column="0">
+                     <widget class="QLabel" name="labelFileName">
+                      <property name="text">
+                       <string>File name: </string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="1" column="0">
+                     <widget class="QLabel" name="labelFileDest">
+                      <property name="text">
+                       <string>File destination: </string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="2" column="0">
+                     <widget class="QLabel" name="labelTotDlSize">
+                      <property name="text">
+                       <string>Total download size: </string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="3" column="0">
+                     <widget class="QLabel" name="labelURL">
+                      <property name="text">
+                       <string>URL: </string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="4" column="0">
+                     <widget class="QLabel" name="labelCreatedTime">
+                      <property name="text">
+                       <string>Created time:</string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="5" column="0">
+                     <widget class="QLabel" name="labelCompTime">
+                      <property name="text">
+                       <string>Completed time: </string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="6" column="0">
+                     <widget class="QLabel" name="labelEstWaitTime">
+                      <property name="text">
+                       <string>Estimated wait time: </string>
+                      </property>
+                     </widget>
+                    </item>
+                   </layout>
+                  </item>
+                 </layout>
+                </widget>
+               </widget>
+              </item>
+             </layout>
+            </widget>
+            <widget class="QWidget" name="tabTransfer">
+             <attribute name="title">
+              <string>Transfer</string>
+             </attribute>
+             <layout class="QVBoxLayout" name="verticalLayout_2">
+              <item>
+               <widget class="QScrollArea" name="transferScrollArea">
+                <property name="widgetResizable">
+                 <bool>true</bool>
+                </property>
+                <widget class="QWidget" name="transferScrollWidget">
+                 <property name="geometry">
+                  <rect>
+                   <x>0</x>
+                   <y>0</y>
+                   <width>962</width>
+                   <height>289</height>
+                  </rect>
+                 </property>
+                 <layout class="QVBoxLayout" name="verticalLayout_5">
+                  <item>
+                   <layout class="QFormLayout" name="transFormLayout">
+                    <item row="0" column="0">
+                     <widget class="QLabel" name="labelStatus">
+                      <property name="text">
+                       <string>Status: </string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="1" column="0">
+                     <widget class="QLabel" name="labelTransUpl">
+                      <property name="text">
+                       <string>Transferred (upload): </string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="2" column="0">
+                     <widget class="QLabel" name="labelTransDl">
+                      <property name="text">
+                       <string>Transferred (download): </string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="3" column="0">
+                     <widget class="QLabel" name="labelProgress">
+                      <property name="text">
+                       <string>Progress: </string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="4" column="0">
+                     <widget class="QLabel" name="labelSpeed">
+                      <property name="text">
+                       <string>Speed: </string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="5" column="0">
+                     <widget class="QLabel" name="labelTotPeers">
+                      <property name="text">
+                       <string>Peers: </string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="6" column="0">
+                     <widget class="QLabel" name="labelConnPeers">
+                      <property name="text">
+                       <string>Connected peers: </string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="7" column="0">
+                     <widget class="QLabel" name="labelTotPieces">
+                      <property name="text">
+                       <string>Total pieces: </string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="8" column="0">
+                     <widget class="QLabel" name="labelDlPieces">
+                      <property name="text">
+                       <string>Downloaded pieces: </string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="9" column="0">
+                     <widget class="QLabel" name="labelStartTime">
+                      <property name="text">
+                       <string>Start time: </string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="10" column="0">
+                     <widget class="QLabel" name="labelTimeLeft">
+                      <property name="text">
+                       <string>Time left: </string>
+                      </property>
+                     </widget>
+                    </item>
+                   </layout>
+                  </item>
+                 </layout>
+                </widget>
+               </widget>
+              </item>
+             </layout>
+            </widget>
+            <widget class="QWidget" name="tabContents">
+             <attribute name="title">
+              <string>Contents</string>
+             </attribute>
+            </widget>
+           </widget>
           </item>
          </layout>
         </item>
