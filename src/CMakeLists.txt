@@ -56,12 +56,15 @@ set(CMAKE_INCLUDE_CURRENT_DIR ON)
 # Find the Qt libraries
 find_package(Qt5Core REQUIRED)
 find_package(Qt5Widgets REQUIRED)
+find_package(Qt5Gui REQUIRED)
 
 set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/Modules/")
 
 set(SOURCE_FILES
     cmnroutines.hpp
     cmnroutines.cpp
+    dl_view.hpp
+    dl_view.cpp
     main.cpp
     mainwindow.hpp
     mainwindow.cpp)
@@ -111,29 +114,6 @@ set(GK_NEEDED_FEATURES cxx_aggregate_default_initializers
                        cxx_static_assert
                        cxx_unicode_literals)
 target_compile_features("${EXE_NAME}" PRIVATE ${GK_NEEDED_FEATURES})
-
-#
-# Generate the 'GetText' translation files
-#
-find_package(GettextTools REQUIRED)
-if (GETTEXT_FOUND)
-    set(stockDir "${CMAKE_CURRENT_SOURCE_DIR}/i18n")
-    set(langDir "${CMAKE_CURRENT_BINARY_DIR}/lang")
-    set(outDir "${CMAKE_CURRENT_BINARY_DIR}/locale")
-    gettext_make_target("lang"
-      HIERARCHY "{1}/{2}/{3}/{4}.mo"
-      KEYWORDS  "_"
-      DOMAIN    "gettexttools-dom"
-      STOCK_DIR "${stockDir}"
-      LANG_DIR  "${langDir}"
-      OUT_DIR   "${outDir}"
-      SOURCE    "${SOURCE_FILES}")
-    list(APPEND makeCleanFiles ${outDir})
-    set_directory_properties(PROPERTIES ADDITIONAL_MAKE_CLEAN_FILES "locale") # CLEANUP
-    message(STATUS "Gettext processes successfully finished!")
-else()
-    message(SEND_ERROR "The 'Gettext' library could not be found!")
-endif (GETTEXT_FOUND)
 
 #
 # Find the correct Boost C++ packages
@@ -199,7 +179,7 @@ ENDIF()
 #
 # Link the (static?) executable with the other, required external libraries
 #
-target_link_libraries(fyredl Qt5::Core Qt5::Widgets ${LIBS})
+target_link_libraries(fyredl Qt5::Core Qt5::Widgets Qt5::Gui ${LIBS})
 
 INCLUDE(CMakeDetermineSystem)
 IF(${CMAKE_SYSTEM_NAME} MATCHES "Windows" OR "cygwin" OR "mingw") # Check if we are on Microsoft Windows

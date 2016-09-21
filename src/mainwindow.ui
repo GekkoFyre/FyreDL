@@ -27,6 +27,9 @@
        <layout class="QHBoxLayout" name="horizBtnLayout">
         <item>
          <widget class="QToolButton" name="addfileToolBtn">
+          <property name="toolTip">
+           <string>Open a file</string>
+          </property>
           <property name="icon">
            <iconset resource="assets.qrc">
             <normaloff>:/icons/assets-img/edit-add-4.png</normaloff>:/icons/assets-img/edit-add-4.png</iconset>
@@ -41,6 +44,9 @@
         </item>
         <item>
          <widget class="QToolButton" name="addurlToolBtn">
+          <property name="toolTip">
+           <string>Enter URL</string>
+          </property>
           <property name="icon">
            <iconset resource="assets.qrc">
             <normaloff>:/icons/assets-img/applications-internet-3.png</normaloff>:/icons/assets-img/applications-internet-3.png</iconset>
@@ -55,6 +61,9 @@
         </item>
         <item>
          <widget class="QToolButton" name="printToolBtn">
+          <property name="toolTip">
+           <string>Print</string>
+          </property>
           <property name="icon">
            <iconset resource="assets.qrc">
             <normaloff>:/icons/assets-img/printer-printing.png</normaloff>:/icons/assets-img/printer-printing.png</iconset>
@@ -69,6 +78,9 @@
         </item>
         <item>
          <widget class="QToolButton" name="dlstartToolBtn">
+          <property name="toolTip">
+           <string>Start</string>
+          </property>
           <property name="icon">
            <iconset resource="assets.qrc">
             <normaloff>:/icons/assets-img/media-playback-start-3.png</normaloff>:/icons/assets-img/media-playback-start-3.png</iconset>
@@ -83,6 +95,9 @@
         </item>
         <item>
          <widget class="QToolButton" name="dlpauseToolBtn">
+          <property name="toolTip">
+           <string>Pause</string>
+          </property>
           <property name="icon">
            <iconset resource="assets.qrc">
             <normaloff>:/icons/assets-img/media-playback-pause-3.png</normaloff>:/icons/assets-img/media-playback-pause-3.png</iconset>
@@ -97,6 +112,9 @@
         </item>
         <item>
          <widget class="QToolButton" name="dlstopToolBtn">
+          <property name="toolTip">
+           <string>Stop</string>
+          </property>
           <property name="icon">
            <iconset resource="assets.qrc">
             <normaloff>:/icons/assets-img/media-playback-stop-3.png</normaloff>:/icons/assets-img/media-playback-stop-3.png</iconset>
@@ -111,6 +129,9 @@
         </item>
         <item>
          <widget class="QToolButton" name="removeToolBtn">
+          <property name="toolTip">
+           <string>Delete download</string>
+          </property>
           <property name="icon">
            <iconset resource="assets.qrc">
             <normaloff>:/icons/assets-img/user-trash.png</normaloff>:/icons/assets-img/user-trash.png</iconset>
@@ -125,6 +146,9 @@
         </item>
         <item>
          <widget class="QToolButton" name="clearhistoryToolBtn">
+          <property name="toolTip">
+           <string>Cleanup completed downloads</string>
+          </property>
           <property name="icon">
            <iconset resource="assets.qrc">
             <normaloff>:/icons/assets-img/edit-clear-3.png</normaloff>:/icons/assets-img/edit-clear-3.png</iconset>
@@ -139,6 +163,9 @@
         </item>
         <item>
          <widget class="QToolButton" name="settingsToolBtn">
+          <property name="toolTip">
+           <string>Preferences</string>
+          </property>
           <property name="icon">
            <iconset resource="assets.qrc">
             <normaloff>:/icons/assets-img/applications-development-web.png</normaloff>:/icons/assets-img/applications-development-web.png</iconset>
@@ -196,7 +223,7 @@
                  <property name="geometry">
                   <rect>
                    <x>0</x>
-                   <y>-65</y>
+                   <y>0</y>
                    <width>962</width>
                    <height>189</height>
                   </rect>
@@ -296,7 +323,7 @@
                  <property name="geometry">
                   <rect>
                    <x>0</x>
-                   <y>-140</y>
+                   <y>0</y>
                    <width>962</width>
                    <height>289</height>
                   </rect>
