@@ -1,4 +1,13 @@
 /**
+ **  ______             ______ _
+ **  |  ___|            |  _  \ |
+ **  | |_ _   _ _ __ ___| | | | |
+ **  |  _| | | | '__/ _ \ | | | |
+ **  | | | |_| | | |  __/ |/ /| |____
+ **  \_|  \__, |_|  \___|___/ \_____/
+ **        __/ |
+ **       |___/
+ **
  **   Thank you for using "FyreDL" for your download management needs!
  **   Copyright (C) 2016. GekkoFyre.
  **
@@ -33,12 +42,15 @@
 
 #include "mainwindow.hpp"
 #include "ui_mainwindow.h"
+#include "cmnroutines.hpp"
 #include <QString>
 #include <QInputDialog>
 #include <QtWidgets/QFileDialog>
 #include <QModelIndex>
 #include <QStringList>
 #include <QMessageBox>
+#include <QList>
+#include <vector>
 
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
@@ -61,6 +73,10 @@ MainWindow::~MainWindow()
     delete ui;
 }
 
+/**
+ * @brief MainWindow::popupBoxURL
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ */
 void MainWindow::popupBoxURL()
 {
     QString urlInput = QInputDialog::getText(this, tr("Enter the URL to download"), tr("URL:"),
@@ -70,14 +86,78 @@ void MainWindow::popupBoxURL()
     // 2. Set new item at 'row', at column 0.
     // 3. Get the new row number of the newly set item at column 0.
     // 4. Set next item at /new row/, at column 1.
+    addDownload(urlInput);
 }
 
 void MainWindow::openFileBrowser()
 {}
 
+/**
+ * @brief MainWindow::addDownload adds a URL and its properties/information to the 'downloadView' TableView
+ * widget.
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @note   <http://doc.qt.io/qt-5/qtwidgets-itemviews-addressbook-example.html#addresswidget-class-implementation>
+ * @param  url The URL of the file you wish to add.
+ */
 void MainWindow::addDownload(const QString &url)
+{
+    QList<std::vector<QString>> list = dlModel->getList();
+    std::vector<QString> vector;
+
+    if (!list.contains(vector)) {
+        dlModel->insertRows(0, 1, QModelIndex());
+
+        QModelIndex index = dlModel->index(0, 0, QModelIndex());
+        dlModel->setData(index, GekkoFyre::CmnRoutines::extractFilename(url), Qt::DisplayRole);
+
+        index = dlModel->index(0, 1, QModelIndex());
+        dlModel->setData(index, url, Qt::DisplayRole);
+
+        index = dlModel->index(0, 2, QModelIndex());
+        dlModel->setData(index, url, Qt::DisplayRole);
+
+        index = dlModel->index(0, 3, QModelIndex());
+        dlModel->setData(index, url, Qt::DisplayRole);
+
+        index = dlModel->index(0, 4, QModelIndex());
+        dlModel->setData(index, url, Qt::DisplayRole);
+
+        index = dlModel->index(0, 5, QModelIndex());
+        dlModel->setData(index, url, Qt::DisplayRole);
+
+        index = dlModel->index(0, 6, QModelIndex());
+        dlModel->setData(index, url, Qt::DisplayRole);
+
+        index = dlModel->index(0, 7, QModelIndex());
+        dlModel->setData(index, url, Qt::DisplayRole);
+    } else {
+        QMessageBox::information(this, tr("Duplicate URL"), tr("The URL, %1, already exists!").arg(url));
+    }
+}
+
+/**
+ * @brief MainWindow::removeDownload
+ * @author    Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @param url
+ */
+void MainWindow::removeDownload(const QString &url)
 {}
 
+/**
+ * @brief MainWindow::readFromHistoryFile
+ * @author         Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @param fileName
+ */
+void MainWindow::readFromHistoryFile(const QString &fileName)
+{}
+
+/**
+ * @brief MainWindow::writeToHistoryFile
+ * @author         Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @param fileName
+ */
+void MainWindow::writeToHistoryFile(const QString &fileName)
+{}
 
 void MainWindow::on_action_Open_a_File_triggered()
 {

@@ -1,4 +1,13 @@
 /**
+ **  ______             ______ _
+ **  |  ___|            |  _  \ |
+ **  | |_ _   _ _ __ ___| | | | |
+ **  |  _| | | | '__/ _ \ | | | |
+ **  | | | |_| | | |  __/ |/ /| |____
+ **  \_|  \__, |_|  \___|___/ \_____/
+ **        __/ |
+ **       |___/
+ **
  **   Thank you for using "FyreDL" for your download management needs!
  **   Copyright (C) 2016. GekkoFyre.
  **
@@ -36,6 +45,7 @@
 
 #include "dl_view.hpp"
 #include <QMainWindow>
+#include <QString>
 
 namespace Ui {
 class MainWindow;
@@ -52,7 +62,11 @@ public:
 private:
     void popupBoxURL();
     void openFileBrowser();
+
     void addDownload(const QString &url);
+    void removeDownload(const QString &url);
+    void readFromHistoryFile(const QString &fileName);
+    void writeToHistoryFile(const QString &fileName);
 
     downloadModel *dlModel;
 

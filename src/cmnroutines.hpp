@@ -1,4 +1,13 @@
 /**
+ **  ______             ______ _
+ **  |  ___|            |  _  \ |
+ **  | |_ _   _ _ __ ___| | | | |
+ **  |  _| | | | '__/ _ \ | | | |
+ **  | | | |_| | | |  __/ |/ /| |____
+ **  \_|  \__, |_|  \___|___/ \_____/
+ **        __/ |
+ **       |___/
+ **
  **   Thank you for using "FyreDL" for your download management needs!
  **   Copyright (C) 2016. GekkoFyre.
  **
@@ -34,11 +43,56 @@
 #ifndef CMNROUTINES_HPP
 #define CMNROUTINES_HPP
 
+#include <cassert>
+#include <cstdio>
+#include <string>
+#include <QString>
+
+extern "C" {
+#include <curl/curl.h>
+}
+
 namespace GekkoFyre {
 class CmnRoutines
 {
 public:
     CmnRoutines();
+
+    /**
+     * @brief GekkoFyre::CmnRoutines::string_sprintf provides std::sprintf-like formatting with the use
+     * of std::string and all of its benefits instead.
+     * @author  user2622016 <http://stackoverflow.com/questions/2342162/stdstring-formatting-like-sprintf>
+     * @date    2015-09-28
+     */
+    template< typename... Args >
+    static std::string string_sprintf(const char* format, Args... args) {
+        int length = std::snprintf(nullptr, 0, format, args...);
+        assert(length >= 0);
+        length = length + 1;
+
+        char* buf = new char[(unsigned long)abs(length)]();
+        std::snprintf(buf, (unsigned long)abs(length), format, args...);
+
+        std::string str(buf);
+        delete[] buf;
+        return str;
+    }
+
+    static QString extractFilename(const QString &url);
+
+    struct CurlInfo {
+        bool status_ok;            // Whether 'CURLE_OK' was returned or not
+        std::string status_msg;    // The status message, if any, returned by the libcurl functions
+        long response_code;        // The HTTP/FTP response code
+        double elapsed;            // Total time in seconds for the previous transfer (including name resolving, TCP connect, etc.)
+        std::string effective_url; // In cases when you've asked libcurl to follow redirects, it may very well not be the same value you set with 'CURLOPT_URL'
+        double content_length;     // The size of the download, i.e. content length
+    };
+
+    CURL *curlInit(const std::string &url, const std::string &username, const std::string &password);
+    CurlInfo curlGrabInfo(const std::string &url);
+    void curlGetProgress(CURL *curl_pointer);
+    void curlCleanup(CURL *curl_pointer);
 };
 }
 
