@@ -63,6 +63,7 @@ set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/Modules/")
 set(SOURCE_FILES
     cmnroutines.hpp
     cmnroutines.cpp
+    default_var.hpp
     dl_view.hpp
     dl_view.cpp
     main.cpp

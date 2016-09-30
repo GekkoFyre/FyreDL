@@ -47,6 +47,9 @@
 GekkoFyre::CmnRoutines::CmnRoutines()
 {}
 
+GekkoFyre::CmnRoutines::~CmnRoutines()
+{}
+
 /**
  * @brief GekkoFyre::CmnRoutines::extractFilename
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
@@ -60,6 +63,36 @@ QString GekkoFyre::CmnRoutines::extractFilename(const QString &url)
     return url_parse.fileName();
 }
 
+GekkoFyre::CmnRoutines::CurlInfo GekkoFyre::CmnRoutines::verifyFileExists(const QString &url)
+{
+    // curl_easy_perform(), to initiate the request and fire any callbacks
+
+    CurlInfo info;
+    CurlInit curl_struct = curlInit(url, "", "");
+    if (curl_struct.curl_ptr != nullptr) {
+        curl_struct.curl_res = curl_easy_perform(curl_struct.curl_ptr);
+        if (curl_struct.curl_res != CURLE_OK) {
+            info.response_code = curl_struct.curl_res;
+            std::strcpy(info.effective_url, curl_struct.errbuf);
+            return info;
+        } else {
+            // https://curl.haxx.se/libcurl/c/curl_easy_getinfo.html
+            // http://stackoverflow.com/questions/14947821/how-do-i-use-strdup
+            long rescode;
+            std::string effec_url;
+            curl_easy_getinfo(curl_struct.curl_ptr, CURLINFO_RESPONSE_CODE, &rescode);
+            curl_easy_getinfo(curl_struct.curl_ptr, CURLINFO_EFFECTIVE_URL, &effec_url);
+
+            info.response_code = gk::anydup<long>(&rescode, sizeof(long));
+            std::strcpy(info.effective_url, effec_url.c_str());
+        }
+
+        curlCleanup(curl_struct);
+    }
+
+    return info;
+}
+
 /**
  * @brief GekkoFyre::CmnRoutines::curlInit
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
@@ -71,44 +104,70 @@ QString GekkoFyre::CmnRoutines::extractFilename(const QString &url)
  * @param password
  * @return
  */
-CURL *GekkoFyre::CmnRoutines::curlInit(const std::string &url, const std::string &username,
-                                      const std::string &password)
+GekkoFyre::CmnRoutines::CurlInit GekkoFyre::CmnRoutines::curlInit(const QString &url,
+                                                                  const std::string &username,
+                                                                  const std::string &password)
 {
     // curl_global_init(), to initialize the curl library (once per program)
     // curl_easy_init(), to create a context
     // curl_easy_setopt(), to configure that context
 
+    CurlInit curl_struct;
+    curl_struct.mem_chunk.memory = (char *)malloc(1); // Will be grown as needed by the realloc above
+    curl_struct.mem_chunk.size = 0; // No data at this point
     curl_global_init(CURL_GLOBAL_ALL);
-    CURL *curl = curl_easy_init();
-    if (curl) {
-        curl_easy_setopt(curl, CURLOPT_URL, url);
+    curl_struct.curl_ptr = curl_easy_init(); // Initiate the curl session
+
+    if (curl_struct.curl_ptr) {
+        curl_easy_setopt(curl_struct.curl_ptr, CURLOPT_URL, url.toStdString().c_str());
+
+        // Provide a buffer to store errors in (as a string)
+        // https://curl.haxx.se/libcurl/c/curl_easy_strerror.html
+        // https://curl.haxx.se/libcurl/c/CURLOPT_ERRORBUFFER.html
+        curl_easy_setopt(curl_struct.curl_ptr, CURLOPT_ERRORBUFFER, curl_struct.errbuf);
+
+        // Set the error buffer as empty before performing a request
+        curl_struct.errbuf[0] = 0;
+
+        // Send all data to this function
+        curl_easy_setopt(curl_struct.curl_ptr, CURLOPT_WRITEFUNCTION, curl_write_memory_callback);
+
+        // We pass our 'chunk' struct to the callback function
+        curl_easy_setopt(curl_struct.curl_ptr, CURLOPT_WRITEDATA, (void *)&curl_struct.mem_chunk);
 
         // A long parameter set to 1 tells the library to follow any Location: header that the server
         // sends as part of a HTTP header in a 3xx response. The Location: header can specify a relative
         // or an absolute URL to follow.
         // https://curl.haxx.se/libcurl/c/CURLOPT_FOLLOWLOCATION.html
-        curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+        curl_easy_setopt(curl_struct.curl_ptr, CURLOPT_FOLLOWLOCATION, 1L);
 
-        curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 1L); // Tells the library to shut off the progress meter completely for requests done with this handle
-        curl_easy_setopt(curl, CURLOPT_USERAGENT, "FyreDL/0.0.1");
-        curl_easy_setopt(curl, CURLOPT_MAXREDIRS, 12L);
+        curl_easy_setopt(curl_struct.curl_ptr, CURLOPT_NOPROGRESS, 1L); // Tells the library to shut off the progress meter completely for requests done with this handle
+
+        // Some servers don't like requests that are made without a user-agent field, so we provide one
+        curl_easy_setopt(curl_struct.curl_ptr, CURLOPT_USERAGENT, "FyreDL/0.0.1");
+
+        // The maximum redirection limit goes here
+        curl_easy_setopt(curl_struct.curl_ptr, CURLOPT_MAXREDIRS, 12L);
 
         // Enable TCP keep-alive for this transfer
         // https://curl.haxx.se/libcurl/c/CURLOPT_TCP_KEEPALIVE.html
-        curl_easy_setopt(curl, CURLOPT_TCP_KEEPALIVE, 1L);
-        curl_easy_setopt(curl, CURLOPT_TCP_KEEPIDLE, 120L); // Keep-alive idle time to 120 seconds
-        curl_easy_setopt(curl, CURLOPT_TCP_KEEPINTVL, 60L); // Interval time between keep-alive probes is 60 seconds
+        curl_easy_setopt(curl_struct.curl_ptr, CURLOPT_TCP_KEEPALIVE, 1L);
+        curl_easy_setopt(curl_struct.curl_ptr, CURLOPT_TCP_KEEPIDLE, 120L); // Keep-alive idle time to 120 seconds
+        curl_easy_setopt(curl_struct.curl_ptr, CURLOPT_TCP_KEEPINTVL, 60L); // Interval time between keep-alive probes is 60 seconds
 
         if (!username.empty() || !password.empty()) {
-            std::string userpassCombo = string_sprintf("%s:%s", username, password);
-            curl_easy_setopt(curl, CURLOPT_UNRESTRICTED_AUTH, 1L);
-            curl_easy_setopt(curl, CURLOPT_USERPWD, userpassCombo.c_str()); // user:pass
+            std::string userpassCombo = gk::string_sprintf("%s:%s", username, password);
+            curl_easy_setopt(curl_struct.curl_ptr, CURLOPT_UNRESTRICTED_AUTH, 1L);
+            curl_easy_setopt(curl_struct.curl_ptr, CURLOPT_USERPWD, userpassCombo.c_str()); // user:pass
         }
 
-        return curl;
+        return curl_struct;
     } else {
-        return nullptr;
+        throw std::runtime_error(tr("Unable to allocate memory for curl!").toStdString());
     }
+
+    curl_struct.curl_ptr = nullptr;
+    return curl_struct;
 }
 
 /**
@@ -117,32 +176,26 @@ CURL *GekkoFyre::CmnRoutines::curlInit(const std::string &url, const std::string
  * @param url
  * @return
  */
-GekkoFyre::CmnRoutines::CurlInfo GekkoFyre::CmnRoutines::curlGrabInfo(const std::string &url)
+GekkoFyre::CmnRoutines::CurlInfoExt GekkoFyre::CmnRoutines::curlGrabInfo(const QString &url)
 {
     // curl_easy_perform(), to initiate the request and fire any callbacks
 
-    CurlInfo info;
-    CURLcode curl_res;
-    CURL *curl = curlInit(url, "", "");
-    if (curl != nullptr) {
-        std::string response_string;
-        std::string header_string;
-        curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response_string);
-        curl_easy_setopt(curl, CURLOPT_HEADERDATA, &header_string);
-
-        curl_res = curl_easy_perform(curl);
-        if (curl_res != CURLE_OK) {
+    CurlInfoExt info;
+    CurlInit curl_struct = curlInit(url, "", "");
+    if (curl_struct.curl_ptr != nullptr) {
+        curl_struct.curl_res = curl_easy_perform(curl_struct.curl_ptr);
+        if (curl_struct.curl_res != CURLE_OK) {
             info.status_ok = false;
-            info.status_msg = curl_easy_strerror(curl_res);
+            info.status_msg = curl_easy_strerror(curl_struct.curl_res);
         } else {
             // https://curl.haxx.se/libcurl/c/curl_easy_getinfo.html
-            curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &info.response_code);
-            curl_easy_getinfo(curl, CURLINFO_TOTAL_TIME, &info.elapsed);
-            curl_easy_getinfo(curl, CURLINFO_EFFECTIVE_URL, &info.effective_url);
-            curl_easy_getinfo(curl, CURLINFO_CONTENT_LENGTH_DOWNLOAD, &info.content_length);
+            curl_easy_getinfo(curl_struct.curl_ptr, CURLINFO_RESPONSE_CODE, &info.response_code);
+            curl_easy_getinfo(curl_struct.curl_ptr, CURLINFO_TOTAL_TIME, &info.elapsed);
+            curl_easy_getinfo(curl_struct.curl_ptr, CURLINFO_EFFECTIVE_URL, &info.effective_url);
+            curl_easy_getinfo(curl_struct.curl_ptr, CURLINFO_CONTENT_LENGTH_DOWNLOAD, &info.content_length);
         }
 
-        curlCleanup(curl);
+        curlCleanup(curl_struct);
     }
 
     return info;
@@ -162,12 +215,43 @@ void GekkoFyre::CmnRoutines::curlGetProgress(CURL *curl_pointer)
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
  * @param curl_pointer
  */
-void GekkoFyre::CmnRoutines::curlCleanup(CURL *curl_pointer)
+void GekkoFyre::CmnRoutines::curlCleanup(CurlInit curl_init)
 {
     // curl_easy_cleanup(), to clean up the context
     // curl_global_cleanup(), to tear down the curl library (once per program)
 
-    curl_easy_cleanup(curl_pointer); // Always cleanup
+    curl_easy_cleanup(curl_init.curl_ptr); // Always cleanup
+    curl_init.mem_chunk.memory = nullptr;
     curl_global_cleanup(); // We're done with libcurl, globally, so clean it up!
-    curl_pointer = NULL;
+    curl_init.curl_ptr = NULL;
+    return;
+}
+
+/**
+ * @brief GekkoFyre::CmnRoutines::curl_write_memory_callback
+ * @author Daniel Stenberg <daniel@haxx.se>, et al.
+ * @note   <https://curl.haxx.se/libcurl/c/getinmemory.html>
+ * @param ptr
+ * @param size
+ * @param nmemb
+ * @param userp
+ * @return
+ */
+size_t GekkoFyre::CmnRoutines::curl_write_memory_callback(void *ptr, size_t size, size_t nmemb, void *userp)
+{
+    size_t realsize = (size * nmemb);
+    struct MemoryStruct *mem = (struct MemoryStruct *)userp;
+
+    mem->memory = (char *)realloc(mem->memory, mem->size + realsize + 1);
+    if (mem->memory == NULL) {
+        // Out of memory!
+        throw std::runtime_error(tr("Not enough memory (realloc returned NULL)!").toStdString());
+        return 0;
+    }
+
+    memcpy(&(mem->memory[mem->size]), ptr, realsize);
+    mem->size += realsize;
+    mem->memory[mem->size] = 0;
+
+    return realsize;
 }

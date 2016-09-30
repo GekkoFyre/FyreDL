@@ -42,7 +42,6 @@
 
 #include "mainwindow.hpp"
 #include "ui_mainwindow.h"
-#include "cmnroutines.hpp"
 #include <QString>
 #include <QInputDialog>
 #include <QtWidgets/QFileDialog>
@@ -61,6 +60,8 @@ MainWindow::MainWindow(QWidget *parent) :
     QMessageBox::warning(this, tr("FyreDL"), tr("FyreDL is currently under intense development at this "
                                                 "time! Please only use at your own risk."),
                          QMessageBox::Ok);
+
+    routines = new GekkoFyre::CmnRoutines();
 
     dlModel = new downloadModel(this);
     ui->downloadView->setModel(dlModel);
@@ -97,18 +98,19 @@ void MainWindow::openFileBrowser()
  * widget.
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
  * @note   <http://doc.qt.io/qt-5/qtwidgets-itemviews-addressbook-example.html#addresswidget-class-implementation>
+ *         <https://en.wikipedia.org/wiki/List_of_HTTP_status_codes#2xx_Success>
  * @param  url The URL of the file you wish to add.
  */
 void MainWindow::addDownload(const QString &url)
 {
-    QList<std::vector<QString>> list = dlModel->getList();
-    std::vector<QString> vector;
+    GekkoFyre::CmnRoutines::CurlInfo info;
+    info = routines->verifyFileExists(url);
 
-    if (!list.contains(vector)) {
+    if (info.response_code == 200) {
         dlModel->insertRows(0, 1, QModelIndex());
 
         QModelIndex index = dlModel->index(0, 0, QModelIndex());
-        dlModel->setData(index, GekkoFyre::CmnRoutines::extractFilename(url), Qt::DisplayRole);
+        dlModel->setData(index, routines->extractFilename(url), Qt::DisplayRole);
 
         index = dlModel->index(0, 1, QModelIndex());
         dlModel->setData(index, url, Qt::DisplayRole);
@@ -130,9 +132,13 @@ void MainWindow::addDownload(const QString &url)
 
         index = dlModel->index(0, 7, QModelIndex());
         dlModel->setData(index, url, Qt::DisplayRole);
+        return;
     } else {
-        QMessageBox::information(this, tr("Duplicate URL"), tr("The URL, %1, already exists!").arg(url));
+        QMessageBox::information(this, QString("Error!").arg(QString::number(info.response_code)),
+                                 tr("%1").arg(info.effective_url), QMessageBox::Ok);
     }
+
+    return;
 }
 
 /**

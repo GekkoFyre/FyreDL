@@ -34,62 +34,13 @@
  ********************************************************************************/
 
 /**
- * @file cmnroutines.hpp
+ * @file default_var.hpp
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
  * @date 2016-09
- * @brief The C++ code behind the, 'mainwindow.ui', designer file.
+ * @brief Default variables used throughout the program that the user may change to suit their preferences
  */
 
-#ifndef MAINWINDOW_HPP
-#define MAINWINDOW_HPP
+#ifndef DEFVAR_HPP
+#define DEFVAR_HPP
 
-#include "dl_view.hpp"
-#include "cmnroutines.hpp"
-#include <QMainWindow>
-#include <QString>
-
-namespace Ui {
-class MainWindow;
-}
-
-class MainWindow : public QMainWindow
-{
-    Q_OBJECT
-
-public:
-    explicit MainWindow(QWidget *parent = 0);
-    ~MainWindow();
-
-private:
-    void popupBoxURL();
-    void openFileBrowser();
-
-    void addDownload(const QString &url);
-    void removeDownload(const QString &url);
-    void readFromHistoryFile(const QString &fileName);
-    void writeToHistoryFile(const QString &fileName);
-
-    downloadModel *dlModel;
-    GekkoFyre::CmnRoutines *routines;
-
-private slots:
-    void on_action_Open_a_File_triggered();
-    void on_actionEnter_URL_triggered();
-    void on_actionE_xit_triggered();
-    void on_action_About_triggered();
-    void on_action_Documentation_triggered();
-    void on_addurlToolBtn_clicked();
-    void on_addfileToolBtn_clicked();
-    void on_printToolBtn_clicked();
-    void on_dlstartToolBtn_clicked();
-    void on_dlpauseToolBtn_clicked();
-    void on_dlstopToolBtn_clicked();
-    void on_removeToolBtn_clicked();
-    void on_clearhistoryToolBtn_clicked();
-    void on_settingsToolBtn_clicked();
-
-private:
-    Ui::MainWindow *ui;
-};
-
-#endif // MAINWINDOW_HPP
+#endif // DEFVAR_HPP
