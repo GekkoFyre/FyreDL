@@ -44,6 +44,7 @@
 #define CMNROUTINES_HPP
 
 #include <string>
+#include <cstdio>
 #include <QString>
 #include <QObject>
 
@@ -62,11 +63,17 @@ private:
         size_t size;
     };
 
+    struct FileStream {
+        const char *file_loc; // Name to store file as if download /and/ disk writing is successful
+        std::FILE *stream;
+    };
+
     struct CurlInit {
         char errbuf[CURL_ERROR_SIZE];
         CURLcode curl_res;
         CURL *curl_ptr;
         MemoryStruct mem_chunk;
+        FileStream file_buf;
     };
 
 public:
@@ -74,6 +81,8 @@ public:
     ~CmnRoutines();
 
     QString extractFilename(const QString &url);
+    double bytesToKilobytes(const double &content_length);
+    double percentDownloaded(const double &content_length, const double &amountDl);
 
     struct CurlInfo {
         long response_code;    // The HTTP/FTP response code
@@ -89,13 +98,23 @@ public:
         double content_length; // The size of the download, i.e. content length
     };
 
+    struct CurlDlInfo {
+        bool status_ok;        // Whether 'CURLE_OK' was returned or not
+        char *status_msg;      // The status message, if any, returned by the libcurl functions
+        char *file_loc;        // The location of the downloaded file being streamed towards
+    };
+
     CurlInfo verifyFileExists(const QString &url);
     CurlInfoExt curlGrabInfo(const QString &url);
+    bool fileStream(const QString &url, const QString &file_loc);
     void curlGetProgress(CURL *curl_pointer);
 
 private:
     static size_t curl_write_memory_callback(void *ptr, size_t size, size_t nmemb, void *userp);
-    CurlInit curlInit(const QString &url, const std::string &username, const std::string &password);
+    static size_t curl_write_file_callback(void *buffer, size_t size, size_t nmemb, void *stream);
+    CurlInit curlInit(const QString &url, const std::string &username, const std::string &password,
+                      bool grabHeaderOnly = false, bool writeToMemory = false,
+                      const QString &fileLoc = "");
     void curlCleanup(CurlInit curl_init);
 };
 }

@@ -118,25 +118,25 @@ void MainWindow::addDownload(const QString &url)
         info_ext = routines->curlGrabInfo(url);
 
         index = dlModel->index(0, 1, QModelIndex());
-        dlModel->setData(index, info_ext.content_length, Qt::DisplayRole);
+        dlModel->setData(index, QString::number(routines->bytesToKilobytes(info_ext.content_length)), Qt::DisplayRole);
 
         index = dlModel->index(0, 2, QModelIndex());
-        dlModel->setData(index, url, Qt::DisplayRole);
+        dlModel->setData(index, QString::number(0), Qt::DisplayRole);
 
         index = dlModel->index(0, 3, QModelIndex());
-        dlModel->setData(index, url, Qt::DisplayRole);
+        dlModel->setData(index, QString::number(0), Qt::DisplayRole);
 
         index = dlModel->index(0, 4, QModelIndex());
-        dlModel->setData(index, url, Qt::DisplayRole);
+        dlModel->setData(index, QString::number(0), Qt::DisplayRole);
 
         index = dlModel->index(0, 5, QModelIndex());
-        dlModel->setData(index, url, Qt::DisplayRole);
+        dlModel->setData(index, QString::number(0), Qt::DisplayRole);
 
         index = dlModel->index(0, 6, QModelIndex());
-        dlModel->setData(index, url, Qt::DisplayRole);
+        dlModel->setData(index, tr("Paused"), Qt::DisplayRole);
 
         index = dlModel->index(0, 7, QModelIndex());
-        dlModel->setData(index, url, Qt::DisplayRole);
+        dlModel->setData(index, "", Qt::DisplayRole);
 
         delete[] info.effective_url;
         delete[] info_ext.effective_url;

@@ -46,6 +46,9 @@
 #include <algorithm>
 #include <cstring>
 #include <cstdlib>
+#include <cmath>
+#include <fstream>
+#include <iostream>
 #include <QUrl>
 
 GekkoFyre::CmnRoutines::CmnRoutines()
@@ -57,6 +60,7 @@ GekkoFyre::CmnRoutines::~CmnRoutines()
 /**
  * @brief GekkoFyre::CmnRoutines::extractFilename
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @date   2016-09
  * @note   <http://stackoverflow.com/questions/39647342/extracting-the-filename-off-a-url-with-qregexp>
  * @param url
  * @return
@@ -67,12 +71,79 @@ QString GekkoFyre::CmnRoutines::extractFilename(const QString &url)
     return url_parse.fileName();
 }
 
+/**
+ * @brief GekkoFyre::CmnRoutines::bytesToKilobytes
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @date   2016-09
+ * @note   <http://stackoverflow.com/questions/7276826/c-format-number-with-commas>
+ * @param content_length
+ * @return
+ */
+double GekkoFyre::CmnRoutines::bytesToKilobytes(const double &content_length)
+{
+    return std::round((content_length / 1024));
+}
+
+/**
+ * @brief GekkoFyre::CmnRoutines::percentDownloaded
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @date   2016-09
+ * @param content_length
+ * @param amountDl
+ * @return
+ */
+double GekkoFyre::CmnRoutines::percentDownloaded(const double &content_length, const double &amountDl)
+{
+    double percent = ((amountDl / content_length) * 100);
+    if (percent >= 101) {
+        throw std::runtime_error(tr("Incorrect download percentage reported!").toStdString());
+    }
+
+    return percent;
+}
+
+/**
+ * @brief GekkoFyre::CmnRoutines::fileStream
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @date   2016-10
+ * @note   <http://stackoverflow.com/questions/195323/what-is-the-most-elegant-way-to-read-a-text-file-with-c>
+ *         <https://curl.haxx.se/libcurl/c/url2file.html>
+ *         <https://www.hackthissite.org/articles/read/1078>
+ * @param file_loc
+ * @return
+ */
+bool GekkoFyre::CmnRoutines::fileStream(const QString &url, const QString &file_loc)
+{
+    CurlInit curl_struct = curlInit(url, "", "", false, false, file_loc);
+
+    if (curl_struct.curl_ptr != nullptr) {
+        curl_struct.curl_res = curl_easy_perform(curl_struct.curl_ptr);
+
+        if (curl_struct.curl_res != CURLE_OK) {
+
+        } else {
+            if (file_loc.isEmpty()) {
+                return false;
+            } else {
+                if (curl_struct.file_buf.stream) {
+                    fclose(curl_struct.file_buf.stream);
+                    curlCleanup(curl_struct);
+                    return true;
+                }
+            }
+        }
+    }
+
+    curlCleanup(curl_struct);
+    return false;
+}
+
 GekkoFyre::CmnRoutines::CurlInfo GekkoFyre::CmnRoutines::verifyFileExists(const QString &url)
 {
     // curl_easy_perform(), to initiate the request and fire any callbacks
 
     CurlInfo info;
-    CurlInit curl_struct = curlInit(url, "", "");
+    CurlInit curl_struct = curlInit(url, "", "", true, true);
     if (curl_struct.curl_ptr != nullptr) {
         curl_struct.curl_res = curl_easy_perform(curl_struct.curl_ptr);
         if (curl_struct.curl_res != CURLE_OK) {
@@ -101,9 +172,11 @@ GekkoFyre::CmnRoutines::CurlInfo GekkoFyre::CmnRoutines::verifyFileExists(const 
 /**
  * @brief GekkoFyre::CmnRoutines::curlInit
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @date   2016-09
  * @note   <http://www.linuxdevcenter.com/pub/a/linux/2005/05/05/libcurl.html>
  *         <https://gist.github.com/whoshuu/2dc858b8730079602044>
  *         <http://stackoverflow.com/questions/16277894/curl-libhow-can-i-get-response-redirect-url>
+ *         <http://stackoverflow.com/questions/7677285/how-to-get-the-length-of-a-file-without-downloading-the-file-in-a-curl-binary-ge>
  * @param url
  * @param username
  * @param password
@@ -111,20 +184,25 @@ GekkoFyre::CmnRoutines::CurlInfo GekkoFyre::CmnRoutines::verifyFileExists(const 
  */
 GekkoFyre::CmnRoutines::CurlInit GekkoFyre::CmnRoutines::curlInit(const QString &url,
                                                                   const std::string &username,
-                                                                  const std::string &password)
+                                                                  const std::string &password,
+                                                                  bool grabHeaderOnly, bool writeToMemory,
+                                                                  const QString &fileLoc)
 {
     // curl_global_init(), to initialize the curl library (once per program)
     // curl_easy_init(), to create a context
     // curl_easy_setopt(), to configure that context
 
     CurlInit curl_struct;
-    curl_struct.mem_chunk.memory = (char *)malloc(1); // Will be grown as needed by the realloc above
-    curl_struct.mem_chunk.size = 0; // No data at this point
     curl_global_init(CURL_GLOBAL_ALL);
     curl_struct.curl_ptr = curl_easy_init(); // Initiate the curl session
 
     if (curl_struct.curl_ptr) {
         curl_easy_setopt(curl_struct.curl_ptr, CURLOPT_URL, url.toStdString().c_str());
+
+        if (grabHeaderOnly) {
+            curl_easy_setopt(curl_struct.curl_ptr, CURLOPT_HEADER, 1);
+            curl_easy_setopt(curl_struct.curl_ptr, CURLOPT_NOBODY, 1);
+        }
 
         // Provide a buffer to store errors in (as a string)
         // https://curl.haxx.se/libcurl/c/curl_easy_strerror.html
@@ -133,12 +211,6 @@ GekkoFyre::CmnRoutines::CurlInit GekkoFyre::CmnRoutines::curlInit(const QString 
 
         // Set the error buffer as empty before performing a request
         curl_struct.errbuf[0] = 0;
-
-        // Send all data to this function
-        curl_easy_setopt(curl_struct.curl_ptr, CURLOPT_WRITEFUNCTION, curl_write_memory_callback);
-
-        // We pass our 'chunk' struct to the callback function
-        curl_easy_setopt(curl_struct.curl_ptr, CURLOPT_WRITEDATA, (void *)&curl_struct.mem_chunk);
 
         // A long parameter set to 1 tells the library to follow any Location: header that the server
         // sends as part of a HTTP header in a 3xx response. The Location: header can specify a relative
@@ -167,6 +239,30 @@ GekkoFyre::CmnRoutines::CurlInit GekkoFyre::CmnRoutines::curlInit(const QString 
             curl_easy_setopt(curl_struct.curl_ptr, CURLOPT_USERPWD, oss.str().c_str()); // user:pass
         }
 
+        if (writeToMemory) {
+            curl_struct.mem_chunk.memory = (char *)malloc(1); // Will be grown as needed by the realloc above
+            curl_struct.mem_chunk.size = 0; // No data at this point
+            curl_struct.file_buf.file_loc = nullptr;
+            curl_struct.file_buf.stream = nullptr;
+
+            // Send all data to this function, via the computer's RAM
+            curl_easy_setopt(curl_struct.curl_ptr, CURLOPT_WRITEFUNCTION, curl_write_memory_callback);
+
+            // We pass our 'chunk' struct to the callback function
+            curl_easy_setopt(curl_struct.curl_ptr, CURLOPT_WRITEDATA, (void *)&curl_struct.mem_chunk);
+        } else {
+            curl_struct.file_buf.file_loc = fileLoc.toStdString().c_str();
+            curl_struct.file_buf.stream = nullptr;
+            curl_struct.mem_chunk.memory = nullptr;
+            curl_struct.mem_chunk.size = 0;
+
+            // Send all data to this function, via file streaming
+            curl_easy_setopt(curl_struct.curl_ptr, CURLOPT_WRITEFUNCTION, curl_write_file_callback);
+
+            // We pass our 'chunk' struct to the callback function
+            curl_easy_setopt(curl_struct.curl_ptr, CURLOPT_WRITEDATA, &curl_struct.file_buf);
+        }
+
         return curl_struct;
     } else {
         throw std::runtime_error(tr("Unable to allocate memory for curl!").toStdString());
@@ -179,6 +275,7 @@ GekkoFyre::CmnRoutines::CurlInit GekkoFyre::CmnRoutines::curlInit(const QString 
 /**
  * @brief GekkoFyre::CmnRoutines::curlGrabInfo
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @date   2016-09
  * @param url
  * @return
  */
@@ -187,7 +284,7 @@ GekkoFyre::CmnRoutines::CurlInfoExt GekkoFyre::CmnRoutines::curlGrabInfo(const Q
     // curl_easy_perform(), to initiate the request and fire any callbacks
 
     CurlInfoExt info;
-    CurlInit curl_struct = curlInit(url, "", "");
+    CurlInit curl_struct = curlInit(url, "", "", true, true);
     if (curl_struct.curl_ptr != nullptr) {
         curl_struct.curl_res = curl_easy_perform(curl_struct.curl_ptr);
         if (curl_struct.curl_res != CURLE_OK) {
@@ -223,6 +320,7 @@ GekkoFyre::CmnRoutines::CurlInfoExt GekkoFyre::CmnRoutines::curlGrabInfo(const Q
 /**
  * @brief GekkoFyre::CmnRoutines::curlGetProgress
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @date   2016-09
  * @note   <https://curl.haxx.se/libcurl/c/progressfunc.html>
  * @param curl_pointer
  */
@@ -232,6 +330,7 @@ void GekkoFyre::CmnRoutines::curlGetProgress(CURL *curl_pointer)
 /**
  * @brief GekkoFyre::CmnRoutines::curlCleanup
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @date   2016-09
  * @param curl_pointer
  */
 void GekkoFyre::CmnRoutines::curlCleanup(CurlInit curl_init)
@@ -241,17 +340,24 @@ void GekkoFyre::CmnRoutines::curlCleanup(CurlInit curl_init)
 
     curl_easy_cleanup(curl_init.curl_ptr); // Always cleanup
     curl_global_cleanup(); // We're done with libcurl, globally, so clean it up!
-    if (curl_init.mem_chunk.memory != NULL) {
+
+    if (curl_init.mem_chunk.memory != nullptr) {
         free(curl_init.mem_chunk.memory);
     }
 
-    // curl_init.curl_ptr = NULL;
+    if (curl_init.file_buf.stream != nullptr) {
+        fclose(curl_init.file_buf.stream);
+    }
+
+    curl_init.curl_ptr = nullptr;
     return;
 }
 
 /**
- * @brief GekkoFyre::CmnRoutines::curl_write_memory_callback
+ * @brief GekkoFyre::CmnRoutines::curl_write_memory_callback can be used to download data into a chunk of
+ * memory instead of storing it in a local file.
  * @author Daniel Stenberg <daniel@haxx.se>, et al.
+ * @date   2015
  * @note   <https://curl.haxx.se/libcurl/c/getinmemory.html>
  * @param ptr
  * @param size
@@ -275,4 +381,32 @@ size_t GekkoFyre::CmnRoutines::curl_write_memory_callback(void *ptr, size_t size
     mem->memory[mem->size] = 0;
 
     return realsize;
+}
+
+/**
+ * @brief GekkoFyre::CmnRoutines::curl_write_file_callback can be used to download data into a local file
+ * on the user's storage.
+ * @author Daniel Stenberg <daniel@haxx.se>, et al.
+ * @date   2015
+ * @note   <https://curl.haxx.se/libcurl/c/ftpget.html>
+ *         <https://curl.haxx.se/libcurl/c/url2file.html>
+ * @param ptr
+ * @param size
+ * @param nmemb
+ * @param stream
+ * @return
+ */
+size_t GekkoFyre::CmnRoutines::curl_write_file_callback(void *buffer, size_t size, size_t nmemb,
+                                                        void *stream)
+{
+    struct FileStream *out = (struct FileStream *)stream;
+    if(out && !out->stream) {
+        // Open file for writing
+        out->stream = fopen(out->file_loc, "wb");
+        if(!out->stream) {
+            return 0; // Failure, can't open file to write!
+        }
+    }
+
+    return fwrite(buffer, size, nmemb, out->stream);
 }
