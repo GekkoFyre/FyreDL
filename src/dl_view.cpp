@@ -105,7 +105,7 @@ QVariant downloadModel::data(const QModelIndex &index, int role) const
 
         for(int i = 0; i < 7; ++i) {
             if (index.column() == i) {
-                return vector.at(i);
+                return vector.at((size_t)i);
             }
         }
     }
