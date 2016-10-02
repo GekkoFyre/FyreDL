@@ -122,9 +122,7 @@ target_compile_features("${EXE_NAME}" PRIVATE ${GK_NEEDED_FEATURES})
 set(Boost_USE_MULTITHREADED TRUE)
 # set(Boost_USE_STATIC_LIBS TRUE)
 # set(Boost_USE_STATIC_RUNTIME FALSE)
-find_package(Boost 1.44.0 REQUIRED COMPONENTS "iostreams"
-                                              "program_options"
-                                              "date_time"
+find_package(Boost 1.44.0 REQUIRED COMPONENTS "date_time"
                                               "filesystem"
                                               "system")
 if (Boost_FOUND)
@@ -132,7 +130,7 @@ if (Boost_FOUND)
     set(LIBS ${LIBS} ${Boost_LIBRARIES})
     message(STATUS "Boost C++ libraries have been found.")
 else()
-    message(SEND_ERROR "The required 'Boost C++' libraries are either not installed, or not multithreaded and/or of not an up-to-date version.")
+    message(SEND_ERROR "The required 'Boost C++' libraries are either not installed, or not multithreaded and/or of not an up-to-date version. Boost C++ 1.44 is the minimally required version.")
 endif(Boost_FOUND)
 
 #

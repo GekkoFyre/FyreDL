@@ -42,6 +42,10 @@
 
 #include "cmnroutines.hpp"
 #include <exception>
+#include <sstream>
+#include <algorithm>
+#include <cstring>
+#include <cstdlib>
 #include <QUrl>
 
 GekkoFyre::CmnRoutines::CmnRoutines()
@@ -79,12 +83,13 @@ GekkoFyre::CmnRoutines::CurlInfo GekkoFyre::CmnRoutines::verifyFileExists(const 
             // https://curl.haxx.se/libcurl/c/curl_easy_getinfo.html
             // http://stackoverflow.com/questions/14947821/how-do-i-use-strdup
             long rescode;
-            std::string effec_url;
+            char *effec_url;
             curl_easy_getinfo(curl_struct.curl_ptr, CURLINFO_RESPONSE_CODE, &rescode);
             curl_easy_getinfo(curl_struct.curl_ptr, CURLINFO_EFFECTIVE_URL, &effec_url);
 
-            info.response_code = gk::anydup<long>(&rescode, sizeof(long));
-            std::strcpy(info.effective_url, effec_url.c_str());
+            std::memcpy(&info.response_code, &rescode, sizeof(unsigned long)); // Must be trivially copyable otherwise UB!
+            info.effective_url = new char[(strlen(effec_url) + 1)];
+            std::strcpy(info.effective_url, effec_url);
         }
 
         curlCleanup(curl_struct);
@@ -156,9 +161,10 @@ GekkoFyre::CmnRoutines::CurlInit GekkoFyre::CmnRoutines::curlInit(const QString 
         curl_easy_setopt(curl_struct.curl_ptr, CURLOPT_TCP_KEEPINTVL, 60L); // Interval time between keep-alive probes is 60 seconds
 
         if (!username.empty() || !password.empty()) {
-            std::string userpassCombo = gk::string_sprintf("%s:%s", username, password);
+            std::ostringstream oss;
+            oss << username << ":" << password;
             curl_easy_setopt(curl_struct.curl_ptr, CURLOPT_UNRESTRICTED_AUTH, 1L);
-            curl_easy_setopt(curl_struct.curl_ptr, CURLOPT_USERPWD, userpassCombo.c_str()); // user:pass
+            curl_easy_setopt(curl_struct.curl_ptr, CURLOPT_USERPWD, oss.str().c_str()); // user:pass
         }
 
         return curl_struct;
@@ -186,13 +192,26 @@ GekkoFyre::CmnRoutines::CurlInfoExt GekkoFyre::CmnRoutines::curlGrabInfo(const Q
         curl_struct.curl_res = curl_easy_perform(curl_struct.curl_ptr);
         if (curl_struct.curl_res != CURLE_OK) {
             info.status_ok = false;
-            info.status_msg = curl_easy_strerror(curl_struct.curl_res);
+            std::strcpy(info.status_msg, curl_struct.errbuf);
         } else {
             // https://curl.haxx.se/libcurl/c/curl_easy_getinfo.html
-            curl_easy_getinfo(curl_struct.curl_ptr, CURLINFO_RESPONSE_CODE, &info.response_code);
-            curl_easy_getinfo(curl_struct.curl_ptr, CURLINFO_TOTAL_TIME, &info.elapsed);
-            curl_easy_getinfo(curl_struct.curl_ptr, CURLINFO_EFFECTIVE_URL, &info.effective_url);
-            curl_easy_getinfo(curl_struct.curl_ptr, CURLINFO_CONTENT_LENGTH_DOWNLOAD, &info.content_length);
+            long rescode;
+            double elapsed, content_length;
+            char *effec_url;
+            curl_easy_getinfo(curl_struct.curl_ptr, CURLINFO_RESPONSE_CODE, &rescode);
+            curl_easy_getinfo(curl_struct.curl_ptr, CURLINFO_TOTAL_TIME, &elapsed);
+            curl_easy_getinfo(curl_struct.curl_ptr, CURLINFO_EFFECTIVE_URL, &effec_url);
+            curl_easy_getinfo(curl_struct.curl_ptr, CURLINFO_CONTENT_LENGTH_DOWNLOAD, &content_length);
+
+            // Must be trivially copyable otherwise UB!
+            info.effective_url = new char[(strlen(effec_url) + 1)];
+            info.status_msg = new char[(strlen(curl_struct.errbuf) + 1)];
+            std::memcpy(&info.response_code, &rescode, sizeof(unsigned long));
+            std::memcpy(&info.elapsed, &elapsed, sizeof(double));
+            std::memcpy(&info.content_length, &content_length, sizeof(double));
+            std::strcpy(info.effective_url, effec_url);
+            std::strcpy(info.status_msg, curl_struct.errbuf);
+            info.status_ok = true;
         }
 
         curlCleanup(curl_struct);
@@ -221,9 +240,12 @@ void GekkoFyre::CmnRoutines::curlCleanup(CurlInit curl_init)
     // curl_global_cleanup(), to tear down the curl library (once per program)
 
     curl_easy_cleanup(curl_init.curl_ptr); // Always cleanup
-    curl_init.mem_chunk.memory = nullptr;
     curl_global_cleanup(); // We're done with libcurl, globally, so clean it up!
-    curl_init.curl_ptr = NULL;
+    if (curl_init.mem_chunk.memory != NULL) {
+        free(curl_init.mem_chunk.memory);
+    }
+
+    // curl_init.curl_ptr = NULL;
     return;
 }
 
@@ -246,7 +268,6 @@ size_t GekkoFyre::CmnRoutines::curl_write_memory_callback(void *ptr, size_t size
     if (mem->memory == NULL) {
         // Out of memory!
         throw std::runtime_error(tr("Not enough memory (realloc returned NULL)!").toStdString());
-        return 0;
     }
 
     memcpy(&(mem->memory[mem->size]), ptr, realsize);

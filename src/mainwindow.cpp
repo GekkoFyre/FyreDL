@@ -71,6 +71,7 @@ MainWindow::MainWindow(QWidget *parent) :
 
 MainWindow::~MainWindow()
 {
+    delete routines;
     delete ui;
 }
 
@@ -99,6 +100,7 @@ void MainWindow::openFileBrowser()
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
  * @note   <http://doc.qt.io/qt-5/qtwidgets-itemviews-addressbook-example.html#addresswidget-class-implementation>
  *         <https://en.wikipedia.org/wiki/List_of_HTTP_status_codes#2xx_Success>
+ *         <http://mirror.internode.on.net/pub/test/>
  * @param  url The URL of the file you wish to add.
  */
 void MainWindow::addDownload(const QString &url)
@@ -112,8 +114,11 @@ void MainWindow::addDownload(const QString &url)
         QModelIndex index = dlModel->index(0, 0, QModelIndex());
         dlModel->setData(index, routines->extractFilename(url), Qt::DisplayRole);
 
+        GekkoFyre::CmnRoutines::CurlInfoExt info_ext;
+        info_ext = routines->curlGrabInfo(url);
+
         index = dlModel->index(0, 1, QModelIndex());
-        dlModel->setData(index, url, Qt::DisplayRole);
+        dlModel->setData(index, info_ext.content_length, Qt::DisplayRole);
 
         index = dlModel->index(0, 2, QModelIndex());
         dlModel->setData(index, url, Qt::DisplayRole);
@@ -132,6 +137,11 @@ void MainWindow::addDownload(const QString &url)
 
         index = dlModel->index(0, 7, QModelIndex());
         dlModel->setData(index, url, Qt::DisplayRole);
+
+        delete[] info.effective_url;
+        delete[] info_ext.effective_url;
+        delete[] info_ext.status_msg;
+
         return;
     } else {
         QMessageBox::information(this, QString("Error!").arg(QString::number(info.response_code)),
