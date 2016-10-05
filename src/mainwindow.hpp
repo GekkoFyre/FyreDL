@@ -61,10 +61,7 @@ public:
     ~MainWindow();
 
 private:
-    void popupBoxURL();
-    void openFileBrowser();
-
-    void addDownload(const QString &url);
+    void addDownload();
     void removeDownload(const QString &url);
     void readFromHistoryFile(const QString &fileName);
     void writeToHistoryFile(const QString &fileName);

@@ -42,12 +42,14 @@
 
 #include "mainwindow.hpp"
 #include "ui_mainwindow.h"
+#include "addurl.hpp"
 #include <QString>
 #include <QInputDialog>
 #include <QtWidgets/QFileDialog>
 #include <QModelIndex>
 #include <QStringList>
 #include <QMessageBox>
+#include <QFileDialog>
 #include <QList>
 #include <vector>
 
@@ -76,25 +78,6 @@ MainWindow::~MainWindow()
 }
 
 /**
- * @brief MainWindow::popupBoxURL
- * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
- */
-void MainWindow::popupBoxURL()
-{
-    QString urlInput = QInputDialog::getText(this, tr("Enter the URL to download"), tr("URL:"),
-                                             QLineEdit::Normal, "http://");
-
-    // 1. Insert a new row (say 'row')
-    // 2. Set new item at 'row', at column 0.
-    // 3. Get the new row number of the newly set item at column 0.
-    // 4. Set next item at /new row/, at column 1.
-    addDownload(urlInput);
-}
-
-void MainWindow::openFileBrowser()
-{}
-
-/**
  * @brief MainWindow::addDownload adds a URL and its properties/information to the 'downloadView' TableView
  * widget.
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
@@ -103,51 +86,12 @@ void MainWindow::openFileBrowser()
  *         <http://mirror.internode.on.net/pub/test/>
  * @param  url The URL of the file you wish to add.
  */
-void MainWindow::addDownload(const QString &url)
+void MainWindow::addDownload()
 {
-    GekkoFyre::CmnRoutines::CurlInfo info;
-    info = routines->verifyFileExists(url);
-
-    if (info.response_code == 200) {
-        dlModel->insertRows(0, 1, QModelIndex());
-
-        QModelIndex index = dlModel->index(0, 0, QModelIndex());
-        dlModel->setData(index, routines->extractFilename(url), Qt::DisplayRole);
-
-        GekkoFyre::CmnRoutines::CurlInfoExt info_ext;
-        info_ext = routines->curlGrabInfo(url);
-
-        index = dlModel->index(0, 1, QModelIndex());
-        dlModel->setData(index, QString::number(routines->bytesToKilobytes(info_ext.content_length)), Qt::DisplayRole);
-
-        index = dlModel->index(0, 2, QModelIndex());
-        dlModel->setData(index, QString::number(0), Qt::DisplayRole);
-
-        index = dlModel->index(0, 3, QModelIndex());
-        dlModel->setData(index, QString::number(0), Qt::DisplayRole);
-
-        index = dlModel->index(0, 4, QModelIndex());
-        dlModel->setData(index, QString::number(0), Qt::DisplayRole);
-
-        index = dlModel->index(0, 5, QModelIndex());
-        dlModel->setData(index, QString::number(0), Qt::DisplayRole);
-
-        index = dlModel->index(0, 6, QModelIndex());
-        dlModel->setData(index, tr("Paused"), Qt::DisplayRole);
-
-        index = dlModel->index(0, 7, QModelIndex());
-        dlModel->setData(index, "", Qt::DisplayRole);
-
-        delete[] info.effective_url;
-        delete[] info_ext.effective_url;
-        delete[] info_ext.status_msg;
-
-        return;
-    } else {
-        QMessageBox::information(this, QString("Error!").arg(QString::number(info.response_code)),
-                                 tr("%1").arg(info.effective_url), QMessageBox::Ok);
-    }
-
+    AddURL *add_url = new AddURL(this);
+    add_url->setAttribute(Qt::WA_DeleteOnClose, true);
+    add_url->open();
+    // delete add_url;
     return;
 }
 
@@ -177,12 +121,14 @@ void MainWindow::writeToHistoryFile(const QString &fileName)
 
 void MainWindow::on_action_Open_a_File_triggered()
 {
-    openFileBrowser();
+    addDownload();
+    return;
 }
 
 void MainWindow::on_actionEnter_URL_triggered()
 {
-    popupBoxURL();
+    addDownload();
+    return;
 }
 
 void MainWindow::on_actionE_xit_triggered()
@@ -196,12 +142,14 @@ void MainWindow::on_action_Documentation_triggered()
 
 void MainWindow::on_addurlToolBtn_clicked()
 {
-    popupBoxURL();
+    addDownload();
+    return;
 }
 
 void MainWindow::on_addfileToolBtn_clicked()
 {
-    openFileBrowser();
+    addDownload();
+    return;
 }
 
 void MainWindow::on_printToolBtn_clicked()

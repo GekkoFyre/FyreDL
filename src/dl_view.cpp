@@ -103,7 +103,7 @@ QVariant downloadModel::data(const QModelIndex &index, int role) const
     if (role == Qt::DisplayRole) {
         std::vector<QString> vector = vectorList.at(index.row());
 
-        for(int i = 0; i < 7; ++i) {
+        for(int i = 0; i <= 7; ++i) {
             if (index.column() == i) {
                 return vector.at((size_t)i);
             }

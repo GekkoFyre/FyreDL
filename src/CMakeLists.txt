@@ -61,6 +61,8 @@ find_package(Qt5Gui REQUIRED)
 set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/Modules/")
 
 set(SOURCE_FILES
+    addurl.hpp
+    addurl.cpp
     cmnroutines.hpp
     cmnroutines.cpp
     default_var.hpp
@@ -73,7 +75,8 @@ set(SOURCE_FILES
 # http://doc.qt.io/qt-5/cmake-manual.html
 # http://www.executionunit.com/blog/2014/01/22/moving-from-qmake-to-cmake/
 qt5_wrap_ui(UI_HEADERS
-            mainwindow.ui)
+            mainwindow.ui
+            addurl.ui)
 
 qt5_add_resources(UI_RESOURCES assets.qrc)
 

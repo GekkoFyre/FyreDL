@@ -162,10 +162,9 @@ GekkoFyre::CmnRoutines::CurlInfo GekkoFyre::CmnRoutines::verifyFileExists(const 
             info.effective_url = new char[(strlen(effec_url) + 1)];
             std::strcpy(info.effective_url, effec_url);
         }
-
-        curlCleanup(curl_struct);
     }
 
+    curlCleanup(curl_struct);
     return info;
 }
 
@@ -310,10 +309,9 @@ GekkoFyre::CmnRoutines::CurlInfoExt GekkoFyre::CmnRoutines::curlGrabInfo(const Q
             std::strcpy(info.status_msg, curl_struct.errbuf);
             info.status_ok = true;
         }
-
-        curlCleanup(curl_struct);
     }
 
+    curlCleanup(curl_struct);
     return info;
 }
 
