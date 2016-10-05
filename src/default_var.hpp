@@ -43,4 +43,21 @@
 #ifndef DEFVAR_HPP
 #define DEFVAR_HPP
 
+#include <locale>
+#include <string>
+#include <iosfwd>
+
+#define CFG_HISTORY_FILE "fyredl_history.xml"
+
+namespace GekkoFyre {
+enum DownloadStatus {
+    Downloading,
+    Completed,
+    Failed,
+    Paused,
+    Stopped,
+    Unknown
+};
+}
+
 #endif // DEFVAR_HPP

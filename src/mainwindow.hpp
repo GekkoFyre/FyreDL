@@ -43,10 +43,12 @@
 #ifndef MAINWINDOW_HPP
 #define MAINWINDOW_HPP
 
+#include "default_var.hpp"
 #include "dl_view.hpp"
 #include "cmnroutines.hpp"
 #include <QMainWindow>
 #include <QString>
+#include <unordered_set>
 
 namespace Ui {
 class MainWindow;
@@ -63,11 +65,12 @@ public:
 private:
     void addDownload();
     void removeDownload(const QString &url);
-    void readFromHistoryFile(const QString &fileName);
-    void writeToHistoryFile(const QString &fileName);
+    void readFromHistoryFile();
+    void modifyHistoryFile();
 
     downloadModel *dlModel;
     GekkoFyre::CmnRoutines *routines;
+    GekkoFyre::DownloadStatus status;
 
 private slots:
     void on_action_Open_a_File_triggered();
@@ -84,6 +87,7 @@ private slots:
     void on_removeToolBtn_clicked();
     void on_clearhistoryToolBtn_clicked();
     void on_settingsToolBtn_clicked();
+    void url_dialogIsFin(const int &ret_code);
 
 private:
     Ui::MainWindow *ui;

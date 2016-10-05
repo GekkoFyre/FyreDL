@@ -1,5 +1,6 @@
 #include "addurl.hpp"
 #include "ui_addurl.h"
+#include "default_var.hpp"
 #include "dl_view.hpp"
 #include <QMessageBox>
 #include <QFileDialog>
@@ -22,6 +23,7 @@ void AddURL::on_buttonBox_accepted()
 {
     GekkoFyre::CmnRoutines::CurlInfo info;
     GekkoFyre::CmnRoutines::CurlInfoExt info_ext;
+    GekkoFyre::CmnRoutines::CurlDlInfo dl_info;
     QString url_plaintext;
 
     switch (ui->inputTabWidget->currentIndex()) {
@@ -39,40 +41,18 @@ void AddURL::on_buttonBox_accepted()
             info = routines->verifyFileExists(url_plaintext);
 
             if (info.response_code == 200) {
-                downloadModel *dlModel = new downloadModel();
-                dlModel->insertRows(0, 1, QModelIndex());
-
-                QModelIndex index = dlModel->index(0, 0, QModelIndex());
-                dlModel->setData(index, routines->extractFilename(url_plaintext), Qt::DisplayRole);
-
                 info_ext = routines->curlGrabInfo(url_plaintext);
-
-                index = dlModel->index(0, 1, QModelIndex());
-                dlModel->setData(index, QString::number(routines->bytesToKilobytes(info_ext.content_length)), Qt::DisplayRole);
-
-                index = dlModel->index(0, 2, QModelIndex());
-                dlModel->setData(index, QString::number(0), Qt::DisplayRole);
-
-                index = dlModel->index(0, 3, QModelIndex());
-                dlModel->setData(index, QString::number(0), Qt::DisplayRole);
-
-                index = dlModel->index(0, 4, QModelIndex());
-                dlModel->setData(index, QString::number(0), Qt::DisplayRole);
-
-                index = dlModel->index(0, 5, QModelIndex());
-                dlModel->setData(index, QString::number(0), Qt::DisplayRole);
-
-                index = dlModel->index(0, 6, QModelIndex());
-                dlModel->setData(index, tr("Paused"), Qt::DisplayRole);
-
-                index = dlModel->index(0, 7, QModelIndex());
-                dlModel->setData(index, ui->url_dest_lineEdit->text(), Qt::DisplayRole);
+                dl_info.dlStatus = GekkoFyre::DownloadStatus::Unknown;
+                dl_info.file_loc = ui->file_dest_lineEdit->text();
+                dl_info.ext_info.content_length = info_ext.content_length;
+                dl_info.ext_info.effective_url = info_ext.effective_url;
+                dl_info.ext_info.response_code = info_ext.response_code;
+                dl_info.ext_info.status_ok = info_ext.status_ok;
+                routines->writeDownloadInfo(dl_info, CFG_HISTORY_FILE);
 
                 delete[] info.effective_url;
                 delete[] info_ext.effective_url;
                 delete[] info_ext.status_msg;
-                delete dlModel;
-
                 return;
             } else {
                 QMessageBox::information(this, tr("Error!"), QString("%1").arg(
@@ -91,6 +71,7 @@ void AddURL::on_buttonBox_accepted()
             // QModelIndex index = dlModel->index(0, 0, QModelIndex());
             // index = dlModel->index(0, 7, QModelIndex());
             // dlModel->setData(index, ui->file_dest_lineEdit->text(), Qt::DisplayRole);
+            return;
         }
     default:
         QMessageBox::warning(this, tr("Internal Error!"), tr("An error was encountered within the "

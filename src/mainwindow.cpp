@@ -43,6 +43,7 @@
 #include "mainwindow.hpp"
 #include "ui_mainwindow.h"
 #include "addurl.hpp"
+#include <boost/filesystem.hpp>
 #include <QString>
 #include <QInputDialog>
 #include <QtWidgets/QFileDialog>
@@ -53,6 +54,7 @@
 #include <QList>
 #include <vector>
 
+namespace fs = boost::filesystem;
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
     ui(new Ui::MainWindow)
@@ -84,11 +86,13 @@ MainWindow::~MainWindow()
  * @note   <http://doc.qt.io/qt-5/qtwidgets-itemviews-addressbook-example.html#addresswidget-class-implementation>
  *         <https://en.wikipedia.org/wiki/List_of_HTTP_status_codes#2xx_Success>
  *         <http://mirror.internode.on.net/pub/test/>
+ *         <http://doc.qt.io/qt-5/signalsandslots.html>
  * @param  url The URL of the file you wish to add.
  */
 void MainWindow::addDownload()
 {
     AddURL *add_url = new AddURL(this);
+    QObject::connect(add_url, SIGNAL(finished(int)), this, SLOT(url_dialogIsFin(int)));
     add_url->setAttribute(Qt::WA_DeleteOnClose, true);
     add_url->open();
     // delete add_url;
@@ -108,15 +112,69 @@ void MainWindow::removeDownload(const QString &url)
  * @author         Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
  * @param fileName
  */
-void MainWindow::readFromHistoryFile(const QString &fileName)
-{}
+void MainWindow::readFromHistoryFile()
+{
+    std::vector<GekkoFyre::CmnRoutines::CurlDlInfo> dl_history;
+    if (fs::exists(CFG_HISTORY_FILE) && fs::is_regular_file(CFG_HISTORY_FILE)) {
+        dl_history = routines->readDownloadInfo(CFG_HISTORY_FILE);
+    } else {
+        return;
+    }
+
+    for (size_t i = 0; i < dl_history.size(); ++i) {
+        if (dl_history.at(i).file_loc.isEmpty() || dl_history.at(i).ext_info.status_ok == true) {
+            if (dl_history.at(i).ext_info.content_length > 0) {
+                downloadModel *dlModel = new downloadModel();
+                dlModel->insertRows(0, 1, QModelIndex());
+
+                QModelIndex index = dlModel->index(0, 0, QModelIndex());
+                dlModel->setData(index, routines->extractFilename(dl_history.at(i).ext_info.effective_url), Qt::DisplayRole);
+
+                index = dlModel->index(0, 1, QModelIndex());
+                dlModel->setData(index, QString::number(routines->bytesToKilobytes(dl_history.at(i).ext_info.content_length)), Qt::DisplayRole);
+
+                index = dlModel->index(0, 2, QModelIndex());
+                dlModel->setData(index, QString::number(0), Qt::DisplayRole);
+
+                index = dlModel->index(0, 3, QModelIndex());
+                dlModel->setData(index, QString::number(0), Qt::DisplayRole);
+
+                index = dlModel->index(0, 4, QModelIndex());
+                dlModel->setData(index, QString::number(0), Qt::DisplayRole);
+
+                index = dlModel->index(0, 5, QModelIndex());
+                dlModel->setData(index, QString::number(0), Qt::DisplayRole);
+
+                index = dlModel->index(0, 6, QModelIndex());
+                dlModel->setData(index, routines->convDlStat_toString(dl_history.at(i).dlStatus), Qt::DisplayRole);
+
+                index = dlModel->index(0, 7, QModelIndex());
+                dlModel->setData(index, dl_history.at(i).file_loc, Qt::DisplayRole);
+                return;
+            } else {
+                QMessageBox::information(this, tr("Problem!"), tr("The size of the download could not be "
+                                                                  "determined. Please try again."),
+                                         QMessageBox::Ok);
+                return;
+            }
+        }
+    }
+
+    QMessageBox::warning(this, tr("Error!"), tr("An error was encountered within the internals of "
+                                                "the application! Please restart the program."),
+                         QMessageBox::Ok);
+    return;
+}
 
 /**
- * @brief MainWindow::writeToHistoryFile
- * @author         Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
- * @param fileName
+ * @brief MainWindow::modifyHistoryFile
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @date   2016-10-06
+ * @note   <http://stackoverflow.com/questions/4807709/how-can-i-change-the-value-of-the-elements-in-a-vector>
+ *         <http://stackoverflow.com/questions/1453333/how-to-make-elements-of-vector-unique-remove-non-adjacent-duplicates>
+ * @param xmlCfgFile
  */
-void MainWindow::writeToHistoryFile(const QString &fileName)
+void MainWindow::modifyHistoryFile()
 {}
 
 void MainWindow::on_action_Open_a_File_triggered()
@@ -172,3 +230,19 @@ void MainWindow::on_clearhistoryToolBtn_clicked()
 
 void MainWindow::on_settingsToolBtn_clicked()
 {}
+
+/**
+ * @brief MainWindow::url_dialogIsFin
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @note   <http://stackoverflow.com/questions/12470806/qdialog-exec-and-getting-result-value>
+ * @param ret_code
+ */
+void MainWindow::url_dialogIsFin(const int &ret_code)
+{
+    if (ret_code == QDialog::Accepted) {
+        readFromHistoryFile();
+        return;
+    }
+
+    return;
+}

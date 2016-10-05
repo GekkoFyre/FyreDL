@@ -41,6 +41,12 @@
  */
 
 #include "cmnroutines.hpp"
+#include <boost/property_tree/ptree.hpp>
+#include <boost/property_tree/xml_parser.hpp>
+#include <boost/asio.hpp>
+#include <boost/exception/all.hpp>
+#include <boost/filesystem.hpp>
+#include <boost/optional.hpp>
 #include <exception>
 #include <sstream>
 #include <algorithm>
@@ -51,8 +57,36 @@
 #include <iostream>
 #include <QUrl>
 
+#ifdef _WIN32
+#define NTDDI_VERSION NTDDI_VISTASP1
+#define WINVER 0x0600
+#define _WIN32_WINNT 0x0600
+#include <SDKDDKVer.h>
+#include <Windows.h>
+
+#elif __linux__
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+
+extern "C" {
+#include <unistd.h>
+#include <sys/types.h>
+#include <pwd.h>
+}
+
+#else
+#error "Platform not supported!"
+#endif
+
+namespace pt = boost::property_tree;
+namespace sys = boost::system;
+namespace fs = boost::filesystem;
+
 GekkoFyre::CmnRoutines::CmnRoutines()
-{}
+{
+    setlocale (LC_ALL, "");
+}
 
 GekkoFyre::CmnRoutines::~CmnRoutines()
 {}
@@ -100,6 +134,205 @@ double GekkoFyre::CmnRoutines::percentDownloaded(const double &content_length, c
     }
 
     return percent;
+}
+
+std::string GekkoFyre::CmnRoutines::findCfgFile(const std::string &cfgFileName)
+{
+    fs::path home_dir;
+    #ifdef _WIN32
+    #elif __linux__
+    struct passwd *pw = getpwuid(getuid()); // NOTE: If you need this in a threaded application, you'll want to use getpwuid_r instead
+    const char *home_dir_char = pw->pw_dir;
+    home_dir = home_dir_char;
+    #endif
+
+    // http://theboostcpplibraries.com/boost.filesystem-paths
+    std::ostringstream oss;
+    if (fs::is_directory(home_dir)) {
+        oss << home_dir.string() << fs::path::preferred_separator << cfgFileName;
+    }
+
+    return oss.str();
+}
+
+/**
+ * @brief GekkoFyre::CmnRoutines::readDownloadInfo
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @date   2016-10
+ * @note   <https://akrzemi1.wordpress.com/2011/07/13/parsing-xml-with-boost/>56
+ * @param xmlCfgFile
+ * @return
+ */
+std::vector<GekkoFyre::CmnRoutines::CurlDlInfo> GekkoFyre::CmnRoutines::readDownloadInfo(const std::string &xmlCfgFile)
+{
+    fs::path xmlCfgFile_loc = findCfgFile(xmlCfgFile);
+    sys::error_code ec;
+    if (fs::exists(xmlCfgFile_loc, ec) && fs::is_regular_file(xmlCfgFile_loc)) {
+        std::vector<GekkoFyre::CmnRoutines::CurlDlInfo> dl_info_list;
+        pt::ptree pt;
+        pt::read_xml(xmlCfgFile, pt);
+
+        // Traverse ptree
+        for (auto &child : pt.get_child("download-history-db")) {
+            if (child.first == "file") {
+                GekkoFyre::CmnRoutines::CurlDlInfo i;
+                i.cId = child.second.get<unsigned int>("content-id");
+                i.file_loc.toStdString() = child.second.get<std::string>("file-loc");
+                i.dlStatus = convDlStat_toEnum(child.second.get<short>("status"));
+                i.timestamp = child.second.get<uint>("insert-date");
+                i.ext_info.status_ok = child.second.get<bool>("status-ok");
+                i.ext_info.status_msg = child.second.get<char *>("status-msg");
+                i.ext_info.effective_url = child.second.get<char *>("effec-url");
+                i.ext_info.response_code = child.second.get<long>("resp-code");
+                i.ext_info.content_length = child.second.get<double>("content-length");
+                dl_info_list.push_back(i);
+            }
+        }
+
+        return dl_info_list;
+    }
+
+    return std::vector<GekkoFyre::CmnRoutines::CurlDlInfo>();
+}
+
+/**
+ * @brief GekkoFyre::CmnRoutines::writeDownloadInfo
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @date   2016-10
+ * @param dl_info
+ * @param xmlCfgFile
+ * @return
+ */
+bool GekkoFyre::CmnRoutines::writeDownloadInfo(GekkoFyre::CmnRoutines::CurlDlInfo dl_info,
+                                               const std::string &xmlCfgFile)
+{
+    fs::path xmlCfgFile_loc = findCfgFile(xmlCfgFile);
+    sys::error_code ec;
+    std::vector<GekkoFyre::CmnRoutines::CurlDlInfo> dl_info_list;
+    if (fs::exists(xmlCfgFile_loc, ec) && fs::is_regular_file(xmlCfgFile_loc)) {
+        if (dl_info.ext_info.status_ok == true) {
+            if (!dl_info.file_loc.isEmpty()) {
+                switch (dl_info.dlStatus) {
+                case GekkoFyre::DownloadStatus::Unknown:
+                {
+                    dl_info_list = readDownloadInfo(xmlCfgFile_loc.string());
+                    unsigned int cId = 0;
+
+                    // Finds the largest 'dl_info_list.cId' value and then increments by +1, ready for
+                    // assignment to a new download entry.
+                    for (size_t i = 0; i < dl_info_list.size(); ++i) {
+                        unsigned int tmp = 0;
+                        tmp = dl_info_list.at(i).cId;
+                        if (tmp > cId) {
+                            cId = tmp;
+                        }
+                    }
+
+                    dl_info.cId = cId;
+                    dl_info.dlStatus = GekkoFyre::DownloadStatus::Unknown;
+                    QDateTime now = QDateTime::currentDateTime();
+                    dl_info.timestamp = now.toTime_t();
+                    dl_info_list.push_back(dl_info);
+
+                    pt::ptree pt;
+                    pt.add("download-history-db.version", 3);
+                    for (GekkoFyre::CmnRoutines::CurlDlInfo d: dl_info_list) {
+                        pt::ptree & node = pt.add("download-history-db.file", "");
+                        node.put("content-id", d.cId);
+                        node.put("file-loc", d.file_loc.toStdString());
+                        node.put("status", convDlStat_toInt(d.dlStatus));
+                        node.put("insert-date", d.timestamp);
+                        node.put("status-ok", d.ext_info.status_ok);
+                        node.put("status-msg", d.ext_info.status_msg);
+                        node.put("effec-url", d.ext_info.effective_url);
+                        node.put("resp-code", d.ext_info.response_code);
+                        node.put("content-length", d.ext_info.content_length);
+                    }
+                    pt::write_xml(xmlCfgFile, pt, std::locale());
+                }
+                default:
+                    throw std::runtime_error(tr("You should not be seeing this!").toStdString());
+                }
+                return true;
+            }
+        }
+
+        return false;
+    } else {
+        throw std::invalid_argument(tr("Location of XML configuration file either not given or "
+                                       "is invalid! Error: "
+                                       "%1").arg(ec.category().name()).toStdString());
+    }
+
+    return false;
+}
+
+short GekkoFyre::CmnRoutines::convDlStat_toInt(const GekkoFyre::DownloadStatus &status)
+{
+    switch (status) {
+    case GekkoFyre::DownloadStatus::Downloading:
+        return 0;
+    case GekkoFyre::DownloadStatus::Completed:
+        return 1;
+    case GekkoFyre::DownloadStatus::Failed:
+        return 2;
+    case GekkoFyre::DownloadStatus::Paused:
+        return 3;
+    case GekkoFyre::DownloadStatus::Stopped:
+        return 4;
+    case GekkoFyre::DownloadStatus::Unknown:
+        return 5;
+    default:
+        return -1;
+    }
+}
+
+GekkoFyre::DownloadStatus GekkoFyre::CmnRoutines::convDlStat_toEnum(const short &s)
+{
+    GekkoFyre::DownloadStatus ds_enum;
+    switch (s) {
+    case 0:
+        ds_enum = GekkoFyre::DownloadStatus::Downloading;
+        return ds_enum;
+    case 1:
+        ds_enum = GekkoFyre::DownloadStatus::Completed;
+        return ds_enum;
+    case 2:
+        ds_enum = GekkoFyre::DownloadStatus::Failed;
+        return ds_enum;
+    case 3:
+        ds_enum = GekkoFyre::DownloadStatus::Paused;
+        return ds_enum;
+    case 4:
+        ds_enum = GekkoFyre::DownloadStatus::Stopped;
+        return ds_enum;
+    case 5:
+        ds_enum = GekkoFyre::DownloadStatus::Unknown;
+        return ds_enum;
+    default:
+        ds_enum = GekkoFyre::DownloadStatus::Unknown;
+        return ds_enum;
+    }
+}
+
+QString GekkoFyre::CmnRoutines::convDlStat_toString(const GekkoFyre::DownloadStatus &status)
+{
+    switch (status) {
+    case GekkoFyre::DownloadStatus::Downloading:
+        return tr("Downloading");
+    case GekkoFyre::DownloadStatus::Completed:
+        return tr("Completed");
+    case GekkoFyre::DownloadStatus::Failed:
+        return tr("Failed");
+    case GekkoFyre::DownloadStatus::Paused:
+        return tr("Paused");
+    case GekkoFyre::DownloadStatus::Stopped:
+        return tr("Stopped");
+    case GekkoFyre::DownloadStatus::Unknown:
+        return tr("Unknown");
+    default:
+        return tr("Unknown");
+    }
 }
 
 /**

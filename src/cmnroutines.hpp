@@ -43,6 +43,10 @@
 #ifndef CMNROUTINES_HPP
 #define CMNROUTINES_HPP
 
+#include "default_var.hpp"
+#include <boost/optional.hpp>
+#include <QDateTime>
+#include <exception>
 #include <string>
 #include <cstdio>
 #include <QString>
@@ -80,10 +84,6 @@ public:
     CmnRoutines();
     ~CmnRoutines();
 
-    QString extractFilename(const QString &url);
-    double bytesToKilobytes(const double &content_length);
-    double percentDownloaded(const double &content_length, const double &amountDl);
-
     struct CurlInfo {
         long response_code;    // The HTTP/FTP response code
         char *effective_url;   // In cases when you've asked libcurl to follow redirects, it may very well not be the same value you set with 'CURLOPT_URL'
@@ -99,10 +99,22 @@ public:
     };
 
     struct CurlDlInfo {
-        bool status_ok;        // Whether 'CURLE_OK' was returned or not
-        char *status_msg;      // The status message, if any, returned by the libcurl functions
-        char *file_loc;        // The location of the downloaded file being streamed towards
+        QString file_loc;                   // The location of the downloaded file being streamed towards
+        unsigned int cId;                   // Automatically incremented Content ID for each download/file
+        uint timestamp;                     // The date/time of the download/file having been inserted into the history file
+        GekkoFyre::DownloadStatus dlStatus; // Status of the downloading file(s) in question
+        CurlInfoExt ext_info;               // Extended info about the file(s) themselves
     };
+
+    QString extractFilename(const QString &url);
+    double bytesToKilobytes(const double &content_length);
+    double percentDownloaded(const double &content_length, const double &amountDl);
+    std::string findCfgFile(const std::string &cfgFileName);
+    std::vector<CurlDlInfo> readDownloadInfo(const std::string &xmlCfgFile);
+    bool writeDownloadInfo(CurlDlInfo dl_info, const std::string &xmlCfgFile);
+    short convDlStat_toInt(const GekkoFyre::DownloadStatus &status);
+    GekkoFyre::DownloadStatus convDlStat_toEnum(const short &s);
+    QString convDlStat_toString(const GekkoFyre::DownloadStatus &status);
 
     CurlInfo verifyFileExists(const QString &url);
     CurlInfoExt curlGrabInfo(const QString &url);

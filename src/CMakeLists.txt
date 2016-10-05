@@ -53,10 +53,15 @@ set(CMAKE_AUTORCC ON)
 # to always look for includes there
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
+set_directory_properties(PROPERTIES CLEAN_NO_CUSTOM 1)
+
+# http://doc.qt.io/qt-5/cmake-manual.html
+# https://gist.github.com/02JanDal/70a39f2cc3d2002b3588
 # Find the Qt libraries
 find_package(Qt5Core REQUIRED)
 find_package(Qt5Widgets REQUIRED)
 find_package(Qt5Gui REQUIRED)
+find_package(Qt5LinguistTools REQUIRED)
 
 set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/Modules/")
 
@@ -72,7 +77,6 @@ set(SOURCE_FILES
     mainwindow.hpp
     mainwindow.cpp)
 
-# http://doc.qt.io/qt-5/cmake-manual.html
 # http://www.executionunit.com/blog/2014/01/22/moving-from-qmake-to-cmake/
 qt5_wrap_ui(UI_HEADERS
             mainwindow.ui
@@ -125,7 +129,8 @@ target_compile_features("${EXE_NAME}" PRIVATE ${GK_NEEDED_FEATURES})
 set(Boost_USE_MULTITHREADED TRUE)
 # set(Boost_USE_STATIC_LIBS TRUE)
 # set(Boost_USE_STATIC_RUNTIME FALSE)
-find_package(Boost 1.44.0 REQUIRED COMPONENTS "date_time"
+find_package(Boost 1.44.0 REQUIRED COMPONENTS "iostreams"
+                                              "program_options"
                                               "filesystem"
                                               "system")
 if (Boost_FOUND)
@@ -151,6 +156,15 @@ find_package(CURL REQUIRED)
 if (CURL_FOUND)
     set(LIBS ${LIBS} ${CURL_LIBRARIES})
 endif(CURL_FOUND)
+
+#
+# Qt5 translation routines
+#
+file(GLOB TRANSLATION_FILES ${CMAKE_CURRENT_LIST_DIR}/*.ts)
+qt5_create_translation(TRANSLATION_MESSAGES ${FILES_TO_TRANSLATE} ${TRANSLATION_FILES})
+qt5_add_translation(TRANSLATION_QM ${TRANSLATION_FILES})
+add_custom_target(translations_update DEPENDS ${TRANSLATION_MESSAGES})
+add_custom_target(translations DEPENDS ${TRANSLATION_QM})
 
 #
 # Optionally, find 'Doxygen' and generate the API documentation
@@ -204,6 +218,7 @@ IF(${CMAKE_SYSTEM_NAME} MATCHES "Windows" OR "cygwin" OR "mingw") # Check if we 
         # TODO: Add support for 'mingw'!
     endif()
 elseif(${CMAKE_SYSTEM_NAME} MATCHES "Linux") # Check if we are on Linux
+    install(FILES ${TRANSLATION_QM} DESTINATION translations)
     if (CMAKE_BUILD_TYPE MATCHES "Debug")
         if("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
             # https://spin.atomicobject.com/2013/10/20/clang-compiler/
