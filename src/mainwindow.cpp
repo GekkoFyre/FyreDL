@@ -71,6 +71,8 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->downloadView->setModel(dlModel);
     ui->downloadView->horizontalHeader()->setStretchLastSection(true); // http://stackoverflow.com/questions/16931569/qstandarditemmodel-inside-qtableview
     // QModelIndex downloadIndex = downloadModel->index(QModelIndex());
+
+    readFromHistoryFile();
 }
 
 MainWindow::~MainWindow()
@@ -115,20 +117,20 @@ void MainWindow::removeDownload(const QString &url)
 void MainWindow::readFromHistoryFile()
 {
     std::vector<GekkoFyre::CmnRoutines::CurlDlInfo> dl_history;
-    if (fs::exists(CFG_HISTORY_FILE) && fs::is_regular_file(CFG_HISTORY_FILE)) {
+    if (fs::exists(routines->findCfgFile(CFG_HISTORY_FILE)) &&
+            fs::is_regular_file(routines->findCfgFile(CFG_HISTORY_FILE))) {
         dl_history = routines->readDownloadInfo(CFG_HISTORY_FILE);
     } else {
         return;
     }
 
     for (size_t i = 0; i < dl_history.size(); ++i) {
-        if (dl_history.at(i).file_loc.isEmpty() || dl_history.at(i).ext_info.status_ok == true) {
+        if (!dl_history.at(i).file_loc.empty() || dl_history.at(i).ext_info.status_ok == true) {
             if (dl_history.at(i).ext_info.content_length > 0) {
-                downloadModel *dlModel = new downloadModel();
                 dlModel->insertRows(0, 1, QModelIndex());
 
                 QModelIndex index = dlModel->index(0, 0, QModelIndex());
-                dlModel->setData(index, routines->extractFilename(dl_history.at(i).ext_info.effective_url), Qt::DisplayRole);
+                dlModel->setData(index, routines->extractFilename(QString::fromStdString(dl_history.at(i).ext_info.effective_url)), Qt::DisplayRole);
 
                 index = dlModel->index(0, 1, QModelIndex());
                 dlModel->setData(index, QString::number(routines->bytesToKilobytes(dl_history.at(i).ext_info.content_length)), Qt::DisplayRole);
@@ -149,7 +151,7 @@ void MainWindow::readFromHistoryFile()
                 dlModel->setData(index, routines->convDlStat_toString(dl_history.at(i).dlStatus), Qt::DisplayRole);
 
                 index = dlModel->index(0, 7, QModelIndex());
-                dlModel->setData(index, dl_history.at(i).file_loc, Qt::DisplayRole);
+                dlModel->setData(index, QString::fromStdString(dl_history.at(i).file_loc), Qt::DisplayRole);
                 return;
             } else {
                 QMessageBox::information(this, tr("Problem!"), tr("The size of the download could not be "

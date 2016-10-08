@@ -43,10 +43,8 @@
 #include "cmnroutines.hpp"
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/xml_parser.hpp>
-#include <boost/asio.hpp>
 #include <boost/exception/all.hpp>
 #include <boost/filesystem.hpp>
-#include <boost/optional.hpp>
 #include <exception>
 #include <sstream>
 #include <algorithm>
@@ -163,26 +161,27 @@ std::string GekkoFyre::CmnRoutines::findCfgFile(const std::string &cfgFileName)
  * @param xmlCfgFile
  * @return
  */
-std::vector<GekkoFyre::CmnRoutines::CurlDlInfo> GekkoFyre::CmnRoutines::readDownloadInfo(const std::string &xmlCfgFile)
+std::vector<GekkoFyre::CmnRoutines::CurlDlInfo> GekkoFyre::CmnRoutines::readDownloadInfo(
+        const std::string &xmlCfgFile)
 {
     fs::path xmlCfgFile_loc = findCfgFile(xmlCfgFile);
     sys::error_code ec;
     if (fs::exists(xmlCfgFile_loc, ec) && fs::is_regular_file(xmlCfgFile_loc)) {
         std::vector<GekkoFyre::CmnRoutines::CurlDlInfo> dl_info_list;
         pt::ptree pt;
-        pt::read_xml(xmlCfgFile, pt);
+        pt::read_xml(xmlCfgFile_loc.string(), pt);
 
         // Traverse ptree
         for (auto &child : pt.get_child("download-history-db")) {
             if (child.first == "file") {
                 GekkoFyre::CmnRoutines::CurlDlInfo i;
                 i.cId = child.second.get<unsigned int>("content-id");
-                i.file_loc.toStdString() = child.second.get<std::string>("file-loc");
+                i.file_loc = child.second.get<std::string>("file-loc");
                 i.dlStatus = convDlStat_toEnum(child.second.get<short>("status"));
                 i.timestamp = child.second.get<uint>("insert-date");
                 i.ext_info.status_ok = child.second.get<bool>("status-ok");
-                i.ext_info.status_msg = child.second.get<char *>("status-msg");
-                i.ext_info.effective_url = child.second.get<char *>("effec-url");
+                i.ext_info.status_msg = child.second.get<std::string>("status-msg");
+                i.ext_info.effective_url = child.second.get<std::string>("effec-url");
                 i.ext_info.response_code = child.second.get<long>("resp-code");
                 i.ext_info.content_length = child.second.get<double>("content-length");
                 dl_info_list.push_back(i);
@@ -199,6 +198,7 @@ std::vector<GekkoFyre::CmnRoutines::CurlDlInfo> GekkoFyre::CmnRoutines::readDown
  * @brief GekkoFyre::CmnRoutines::writeDownloadInfo
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
  * @date   2016-10
+ * @note   <http://stackoverflow.com/questions/6656380/boost-1-46-1-property-tree-how-to-iterate-through-ptree-receiving-sub-ptrees>
  * @param dl_info
  * @param xmlCfgFile
  * @return
@@ -209,59 +209,58 @@ bool GekkoFyre::CmnRoutines::writeDownloadInfo(GekkoFyre::CmnRoutines::CurlDlInf
     fs::path xmlCfgFile_loc = findCfgFile(xmlCfgFile);
     sys::error_code ec;
     std::vector<GekkoFyre::CmnRoutines::CurlDlInfo> dl_info_list;
-    if (fs::exists(xmlCfgFile_loc, ec) && fs::is_regular_file(xmlCfgFile_loc)) {
-        if (dl_info.ext_info.status_ok == true) {
-            if (!dl_info.file_loc.isEmpty()) {
-                switch (dl_info.dlStatus) {
-                case GekkoFyre::DownloadStatus::Unknown:
-                {
-                    dl_info_list = readDownloadInfo(xmlCfgFile_loc.string());
-                    unsigned int cId = 0;
+    if (dl_info.ext_info.status_ok == true) {
+        if (!xmlCfgFile_loc.string().empty()) {
+            switch (dl_info.dlStatus) {
+            case GekkoFyre::DownloadStatus::Unknown:
+            {
+                dl_info_list = readDownloadInfo(xmlCfgFile_loc.string());
+                unsigned int cId = 0;
 
-                    // Finds the largest 'dl_info_list.cId' value and then increments by +1, ready for
-                    // assignment to a new download entry.
-                    for (size_t i = 0; i < dl_info_list.size(); ++i) {
-                        unsigned int tmp = 0;
-                        tmp = dl_info_list.at(i).cId;
-                        if (tmp > cId) {
-                            cId = tmp;
-                        }
+                // Finds the largest 'dl_info_list.cId' value and then increments by +1, ready for
+                // assignment to a new download entry.
+                for (size_t i = 0; i < dl_info_list.size(); ++i) {
+                    unsigned int tmp = 0;
+                    tmp = dl_info_list.at(i).cId;
+                    if (tmp > cId) {
+                        cId = tmp;
                     }
-
-                    dl_info.cId = cId;
-                    dl_info.dlStatus = GekkoFyre::DownloadStatus::Unknown;
-                    QDateTime now = QDateTime::currentDateTime();
-                    dl_info.timestamp = now.toTime_t();
-                    dl_info_list.push_back(dl_info);
-
-                    pt::ptree pt;
-                    pt.add("download-history-db.version", 3);
-                    for (GekkoFyre::CmnRoutines::CurlDlInfo d: dl_info_list) {
-                        pt::ptree & node = pt.add("download-history-db.file", "");
-                        node.put("content-id", d.cId);
-                        node.put("file-loc", d.file_loc.toStdString());
-                        node.put("status", convDlStat_toInt(d.dlStatus));
-                        node.put("insert-date", d.timestamp);
-                        node.put("status-ok", d.ext_info.status_ok);
-                        node.put("status-msg", d.ext_info.status_msg);
-                        node.put("effec-url", d.ext_info.effective_url);
-                        node.put("resp-code", d.ext_info.response_code);
-                        node.put("content-length", d.ext_info.content_length);
-                    }
-                    pt::write_xml(xmlCfgFile, pt, std::locale());
                 }
-                default:
-                    throw std::runtime_error(tr("You should not be seeing this!").toStdString());
+
+                dl_info.cId = cId;
+                dl_info.dlStatus = GekkoFyre::DownloadStatus::Unknown;
+                QDateTime now = QDateTime::currentDateTime();
+                dl_info.timestamp = now.toTime_t();
+                dl_info_list.push_back(dl_info);
+
+                for (size_t i = 0; i < dl_info_list.size(); ++i) {
+                    dl_info_list.at(i).ext_info.status_msg = "";
                 }
+
+                pt::ptree pt;
+                pt.add("download-history-db.version", 3);
+                for (const auto &d: dl_info_list) {
+                    pt::ptree & node = pt.add("download-history-db.file", "");
+                    node.put("content-id", d.cId);
+                    node.put("file-loc", d.file_loc);
+                    node.put("status", convDlStat_toInt(d.dlStatus));
+                    node.put("insert-date", d.timestamp);
+                    node.put("status-ok", d.ext_info.status_ok);
+                    node.put("status-msg", d.ext_info.status_msg);
+                    node.put("effec-url", d.ext_info.effective_url);
+                    node.put("resp-code", d.ext_info.response_code);
+                    node.put("content-length", d.ext_info.content_length);
+                }
+                pt::write_xml(xmlCfgFile_loc.string(), pt, std::locale());
                 return true;
             }
+            default:
+                throw std::runtime_error(tr("You should not be seeing this!").toStdString());
+            }
+        } else {
+            throw std::invalid_argument(tr("Internal error: no path has been given for the XML "
+                                           "configuration file!").toStdString());
         }
-
-        return false;
-    } else {
-        throw std::invalid_argument(tr("Location of XML configuration file either not given or "
-                                       "is invalid! Error: "
-                                       "%1").arg(ec.category().name()).toStdString());
     }
 
     return false;
@@ -381,7 +380,7 @@ GekkoFyre::CmnRoutines::CurlInfo GekkoFyre::CmnRoutines::verifyFileExists(const 
         curl_struct.curl_res = curl_easy_perform(curl_struct.curl_ptr);
         if (curl_struct.curl_res != CURLE_OK) {
             info.response_code = curl_struct.curl_res;
-            std::strcpy(info.effective_url, curl_struct.errbuf);
+            info.effective_url = curl_struct.errbuf;
             return info;
         } else {
             // https://curl.haxx.se/libcurl/c/curl_easy_getinfo.html
@@ -392,8 +391,7 @@ GekkoFyre::CmnRoutines::CurlInfo GekkoFyre::CmnRoutines::verifyFileExists(const 
             curl_easy_getinfo(curl_struct.curl_ptr, CURLINFO_EFFECTIVE_URL, &effec_url);
 
             std::memcpy(&info.response_code, &rescode, sizeof(unsigned long)); // Must be trivially copyable otherwise UB!
-            info.effective_url = new char[(strlen(effec_url) + 1)];
-            std::strcpy(info.effective_url, effec_url);
+            info.effective_url = effec_url;
         }
     }
 
@@ -521,7 +519,7 @@ GekkoFyre::CmnRoutines::CurlInfoExt GekkoFyre::CmnRoutines::curlGrabInfo(const Q
         curl_struct.curl_res = curl_easy_perform(curl_struct.curl_ptr);
         if (curl_struct.curl_res != CURLE_OK) {
             info.status_ok = false;
-            std::strcpy(info.status_msg, curl_struct.errbuf);
+            info.status_msg = curl_struct.errbuf;
         } else {
             // https://curl.haxx.se/libcurl/c/curl_easy_getinfo.html
             long rescode;
@@ -533,13 +531,11 @@ GekkoFyre::CmnRoutines::CurlInfoExt GekkoFyre::CmnRoutines::curlGrabInfo(const Q
             curl_easy_getinfo(curl_struct.curl_ptr, CURLINFO_CONTENT_LENGTH_DOWNLOAD, &content_length);
 
             // Must be trivially copyable otherwise UB!
-            info.effective_url = new char[(strlen(effec_url) + 1)];
-            info.status_msg = new char[(strlen(curl_struct.errbuf) + 1)];
             std::memcpy(&info.response_code, &rescode, sizeof(unsigned long));
             std::memcpy(&info.elapsed, &elapsed, sizeof(double));
             std::memcpy(&info.content_length, &content_length, sizeof(double));
-            std::strcpy(info.effective_url, effec_url);
-            std::strcpy(info.status_msg, curl_struct.errbuf);
+            info.effective_url = effec_url;
+            info.status_msg = curl_struct.errbuf;
             info.status_ok = true;
         }
     }

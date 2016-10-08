@@ -43,20 +43,19 @@ void AddURL::on_buttonBox_accepted()
             if (info.response_code == 200) {
                 info_ext = routines->curlGrabInfo(url_plaintext);
                 dl_info.dlStatus = GekkoFyre::DownloadStatus::Unknown;
-                dl_info.file_loc = ui->file_dest_lineEdit->text();
+                dl_info.file_loc = ui->url_dest_lineEdit->text().toStdString().c_str();
                 dl_info.ext_info.content_length = info_ext.content_length;
                 dl_info.ext_info.effective_url = info_ext.effective_url;
                 dl_info.ext_info.response_code = info_ext.response_code;
                 dl_info.ext_info.status_ok = info_ext.status_ok;
-                routines->writeDownloadInfo(dl_info, CFG_HISTORY_FILE);
+                routines->writeDownloadInfo(dl_info);
 
-                delete[] info.effective_url;
-                delete[] info_ext.effective_url;
-                delete[] info_ext.status_msg;
+                AddURL::done(QDialog::Accepted);
                 return;
             } else {
                 QMessageBox::information(this, tr("Error!"), QString("%1").arg(
-                                             info.effective_url), QMessageBox::Ok);
+                                             QString::fromStdString(info.effective_url)), QMessageBox::Ok);
+                AddURL::done(QDialog::Rejected);
                 return;
             }
         }
@@ -64,6 +63,7 @@ void AddURL::on_buttonBox_accepted()
         if (ui->file_dest_lineEdit->text().isEmpty()) {
             QMessageBox::information(this, tr("Problem!"), tr("You must specify a destination directory."),
                                      QMessageBox::Ok);
+            AddURL::done(QDialog::Rejected);
             return;
         } else {
             // info = routines->verifyFileExists(ui->file_dest_lineEdit->text());
@@ -78,6 +78,7 @@ void AddURL::on_buttonBox_accepted()
                                                              "internals of the application! Please "
                                                              "restart the program."),
                              QMessageBox::Ok);
+        AddURL::done(QDialog::Rejected);
         return;
     }
 
@@ -86,7 +87,7 @@ void AddURL::on_buttonBox_accepted()
 
 void AddURL::on_buttonBox_rejected()
 {
-    AddURL::done(1);
+    AddURL::done(QDialog::Rejected);
 }
 
 void AddURL::on_file_dest_toolButton_clicked()
