@@ -199,6 +199,7 @@ std::vector<GekkoFyre::CmnRoutines::CurlDlInfo> GekkoFyre::CmnRoutines::readDown
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
  * @date   2016-10
  * @note   <http://stackoverflow.com/questions/6656380/boost-1-46-1-property-tree-how-to-iterate-through-ptree-receiving-sub-ptrees>
+ *         <http://www.boost.org/doc/libs/1_58_0/doc/html/property_tree/tutorial.html>
  * @param dl_info
  * @param xmlCfgFile
  * @return
@@ -214,7 +215,7 @@ bool GekkoFyre::CmnRoutines::writeDownloadInfo(GekkoFyre::CmnRoutines::CurlDlInf
             switch (dl_info.dlStatus) {
             case GekkoFyre::DownloadStatus::Unknown:
             {
-                dl_info_list = readDownloadInfo(xmlCfgFile_loc.string());
+                dl_info_list = readDownloadInfo(xmlCfgFile);
                 unsigned int cId = 0;
 
                 // Finds the largest 'dl_info_list.cId' value and then increments by +1, ready for

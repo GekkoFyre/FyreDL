@@ -46,6 +46,7 @@
 #include "default_var.hpp"
 #include "dl_view.hpp"
 #include "cmnroutines.hpp"
+#include "addurl.hpp"
 #include <QMainWindow>
 #include <QString>
 #include <unordered_set>
@@ -67,6 +68,9 @@ private:
     void removeDownload(const QString &url);
     void readFromHistoryFile();
     void modifyHistoryFile();
+    void insertNewRow(const std::string &fileName, const double &fileSize, const int &downloaded,
+                      const double &progress, const int &upSpeed, const int &downSpeed,
+                      const GekkoFyre::DownloadStatus &status, const std::string &destination);
 
     downloadModel *dlModel;
     GekkoFyre::CmnRoutines *routines;
@@ -87,7 +91,9 @@ private slots:
     void on_removeToolBtn_clicked();
     void on_clearhistoryToolBtn_clicked();
     void on_settingsToolBtn_clicked();
-    void url_dialogIsFin(const int &ret_code);
+    void sendDetails(const std::string &fileName, const double &fileSize, const int &downloaded,
+                     const double &progress, const int &upSpeed, const int &downSpeed,
+                     const GekkoFyre::DownloadStatus &status, const std::string &destination);
 
 private:
     Ui::MainWindow *ui;

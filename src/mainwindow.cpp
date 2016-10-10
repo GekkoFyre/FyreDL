@@ -42,7 +42,6 @@
 
 #include "mainwindow.hpp"
 #include "ui_mainwindow.h"
-#include "addurl.hpp"
 #include <boost/filesystem.hpp>
 #include <QString>
 #include <QInputDialog>
@@ -94,7 +93,11 @@ MainWindow::~MainWindow()
 void MainWindow::addDownload()
 {
     AddURL *add_url = new AddURL(this);
-    QObject::connect(add_url, SIGNAL(finished(int)), this, SLOT(url_dialogIsFin(int)));
+    QObject::connect(add_url, SIGNAL(sendDetails(std::string,double,int,double,int,int,
+                                                 GekkoFyre::DownloadStatus,std::string)), this,
+                     SLOT(sendDetails(std::string,double,int,double,int,int,
+                                      GekkoFyre::DownloadStatus,std::string)));
+
     add_url->setAttribute(Qt::WA_DeleteOnClose, true);
     add_url->open();
     // delete add_url;
@@ -124,35 +127,13 @@ void MainWindow::readFromHistoryFile()
         return;
     }
 
+    dlModel->removeRows(0, (int)dl_history.size(), QModelIndex());
     for (size_t i = 0; i < dl_history.size(); ++i) {
         if (!dl_history.at(i).file_loc.empty() || dl_history.at(i).ext_info.status_ok == true) {
             if (dl_history.at(i).ext_info.content_length > 0) {
-                dlModel->insertRows(0, 1, QModelIndex());
-
-                QModelIndex index = dlModel->index(0, 0, QModelIndex());
-                dlModel->setData(index, routines->extractFilename(QString::fromStdString(dl_history.at(i).ext_info.effective_url)), Qt::DisplayRole);
-
-                index = dlModel->index(0, 1, QModelIndex());
-                dlModel->setData(index, QString::number(routines->bytesToKilobytes(dl_history.at(i).ext_info.content_length)), Qt::DisplayRole);
-
-                index = dlModel->index(0, 2, QModelIndex());
-                dlModel->setData(index, QString::number(0), Qt::DisplayRole);
-
-                index = dlModel->index(0, 3, QModelIndex());
-                dlModel->setData(index, QString::number(0), Qt::DisplayRole);
-
-                index = dlModel->index(0, 4, QModelIndex());
-                dlModel->setData(index, QString::number(0), Qt::DisplayRole);
-
-                index = dlModel->index(0, 5, QModelIndex());
-                dlModel->setData(index, QString::number(0), Qt::DisplayRole);
-
-                index = dlModel->index(0, 6, QModelIndex());
-                dlModel->setData(index, routines->convDlStat_toString(dl_history.at(i).dlStatus), Qt::DisplayRole);
-
-                index = dlModel->index(0, 7, QModelIndex());
-                dlModel->setData(index, QString::fromStdString(dl_history.at(i).file_loc), Qt::DisplayRole);
-                return;
+                insertNewRow(dl_history.at(i).ext_info.effective_url,
+                             dl_history.at(i).ext_info.content_length, 0, 0, 0, 0,
+                             dl_history.at(i).dlStatus, dl_history.at(i).file_loc);
             } else {
                 QMessageBox::information(this, tr("Problem!"), tr("The size of the download could not be "
                                                                   "determined. Please try again."),
@@ -162,9 +143,6 @@ void MainWindow::readFromHistoryFile()
         }
     }
 
-    QMessageBox::warning(this, tr("Error!"), tr("An error was encountered within the internals of "
-                                                "the application! Please restart the program."),
-                         QMessageBox::Ok);
     return;
 }
 
@@ -178,6 +156,38 @@ void MainWindow::readFromHistoryFile()
  */
 void MainWindow::modifyHistoryFile()
 {}
+
+void MainWindow::insertNewRow(const std::string &fileName, const double &fileSize, const int &downloaded,
+                              const double &progress, const int &upSpeed, const int &downSpeed,
+                              const GekkoFyre::DownloadStatus &status, const std::string &destination)
+{
+    dlModel->insertRows(0, 1, QModelIndex());
+
+    QModelIndex index = dlModel->index(0, 0, QModelIndex());
+    dlModel->setData(index, routines->extractFilename(QString::fromStdString(fileName)), Qt::DisplayRole);
+
+    index = dlModel->index(0, 1, QModelIndex());
+    dlModel->setData(index, QString::number(routines->bytesToKilobytes(fileSize)), Qt::DisplayRole);
+
+    index = dlModel->index(0, 2, QModelIndex());
+    dlModel->setData(index, QString::number(downloaded), Qt::DisplayRole);
+
+    index = dlModel->index(0, 3, QModelIndex());
+    dlModel->setData(index, QString::number(progress), Qt::DisplayRole);
+
+    index = dlModel->index(0, 4, QModelIndex());
+    dlModel->setData(index, QString::number(upSpeed), Qt::DisplayRole);
+
+    index = dlModel->index(0, 5, QModelIndex());
+    dlModel->setData(index, QString::number(downSpeed), Qt::DisplayRole);
+
+    index = dlModel->index(0, 6, QModelIndex());
+    dlModel->setData(index, routines->convDlStat_toString(status), Qt::DisplayRole);
+
+    index = dlModel->index(0, 7, QModelIndex());
+    dlModel->setData(index, QString::fromStdString(destination), Qt::DisplayRole);
+    return;
+}
 
 void MainWindow::on_action_Open_a_File_triggered()
 {
@@ -207,10 +217,7 @@ void MainWindow::on_addurlToolBtn_clicked()
 }
 
 void MainWindow::on_addfileToolBtn_clicked()
-{
-    addDownload();
-    return;
-}
+{}
 
 void MainWindow::on_printToolBtn_clicked()
 {}
@@ -233,16 +240,19 @@ void MainWindow::on_clearhistoryToolBtn_clicked()
 void MainWindow::on_settingsToolBtn_clicked()
 {}
 
-/**
- * @brief MainWindow::url_dialogIsFin
- * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
- * @note   <http://stackoverflow.com/questions/12470806/qdialog-exec-and-getting-result-value>
- * @param ret_code
- */
-void MainWindow::url_dialogIsFin(const int &ret_code)
+void MainWindow::sendDetails(const std::string &fileName, const double &fileSize, const int &downloaded,
+                             const double &progress, const int &upSpeed, const int &downSpeed,
+                             const GekkoFyre::DownloadStatus &status, const std::string &destination)
 {
-    if (ret_code == QDialog::Accepted) {
-        readFromHistoryFile();
+    QList<std::vector<QString>> list = dlModel->getList();
+    std::vector<QString> fileNameVector;
+    fileNameVector.push_back(QString::fromStdString(fileName));
+    if (!list.contains(fileNameVector) && !list.contains(std::vector<QString>())) {
+        insertNewRow(fileName, fileSize, downloaded, progress, upSpeed, downSpeed, status, destination);
+        return;
+    } else {
+        QMessageBox::information(this, tr("Duplicate entry"), tr("A duplicate of, \"%1\", was entered!")
+                                 .arg(QString::fromStdString(fileName)), QMessageBox::Ok);
         return;
     }
 

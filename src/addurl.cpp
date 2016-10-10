@@ -31,11 +31,11 @@ void AddURL::on_buttonBox_accepted()
         if (ui->url_dest_lineEdit->text().isEmpty()) {
             QMessageBox::information(this, tr("Problem!"), tr("You must specify a destination directory."),
                                      QMessageBox::Ok);
-            return;
+            return AddURL::done(QDialog::Rejected);
         } else if (ui->url_plainTextEdit->toPlainText().isEmpty()) {
             QMessageBox::information(this, tr("Problem!"), tr("You must specify a URL to grab."),
                                      QMessageBox::Ok);
-            return;
+            return AddURL::done(QDialog::Rejected);
         } else {
             url_plaintext = ui->url_plainTextEdit->toPlainText();
             info = routines->verifyFileExists(url_plaintext);
@@ -50,44 +50,43 @@ void AddURL::on_buttonBox_accepted()
                 dl_info.ext_info.status_ok = info_ext.status_ok;
                 routines->writeDownloadInfo(dl_info);
 
-                AddURL::done(QDialog::Accepted);
-                return;
+                emit sendDetails(dl_info.ext_info.effective_url, dl_info.ext_info.content_length, 0, 0, 0,
+                                 0, dl_info.dlStatus, dl_info.file_loc);
+                return AddURL::done(QDialog::Accepted);
             } else {
                 QMessageBox::information(this, tr("Error!"), QString("%1").arg(
                                              QString::fromStdString(info.effective_url)), QMessageBox::Ok);
-                AddURL::done(QDialog::Rejected);
-                return;
+                return AddURL::done(QDialog::Rejected);
             }
         }
     case 1:
         if (ui->file_dest_lineEdit->text().isEmpty()) {
             QMessageBox::information(this, tr("Problem!"), tr("You must specify a destination directory."),
                                      QMessageBox::Ok);
-            AddURL::done(QDialog::Rejected);
-            return;
+            return AddURL::done(QDialog::Rejected);
         } else {
             // info = routines->verifyFileExists(ui->file_dest_lineEdit->text());
 
             // QModelIndex index = dlModel->index(0, 0, QModelIndex());
             // index = dlModel->index(0, 7, QModelIndex());
             // dlModel->setData(index, ui->file_dest_lineEdit->text(), Qt::DisplayRole);
-            return;
+            return AddURL::done(QDialog::Accepted);
         }
     default:
         QMessageBox::warning(this, tr("Internal Error!"), tr("An error was encountered within the "
                                                              "internals of the application! Please "
                                                              "restart the program."),
                              QMessageBox::Ok);
-        AddURL::done(QDialog::Rejected);
-        return;
+        return AddURL::done(QDialog::Rejected);
     }
 
-    return;
+    return AddURL::done(QDialog::Rejected);
 }
 
 void AddURL::on_buttonBox_rejected()
 {
-    AddURL::done(QDialog::Rejected);
+    this->close();
+    return;
 }
 
 void AddURL::on_file_dest_toolButton_clicked()

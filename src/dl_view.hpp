@@ -71,6 +71,7 @@ public:
     QList<std::vector<QString>> getList();
 
 private:
+    // http://stackoverflow.com/questions/23870396/qt-list-clear-does-it-destroy-the-objects
     QList<std::vector<QString>> vectorList;
 };
 

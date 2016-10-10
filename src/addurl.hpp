@@ -23,6 +23,11 @@ private slots:
     void on_file_import_toolButton_clicked();
     void on_url_dest_toolButton_clicked();
 
+signals:
+    void sendDetails(const std::string &fileName, const double &fileSize, const int &downloaded,
+                     const double &progress, const int &upSpeed, const int &downSpeed,
+                     const GekkoFyre::DownloadStatus &status, const std::string &destination);
+
 private:
     Ui::AddURL *ui;
     GekkoFyre::CmnRoutines *routines;

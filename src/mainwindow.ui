@@ -207,7 +207,7 @@
           <item>
            <widget class="QTabWidget" name="tabStatusWidget">
             <property name="currentIndex">
-             <number>1</number>
+             <number>0</number>
             </property>
             <widget class="QWidget" name="tabGeneral">
              <attribute name="title">
@@ -225,7 +225,7 @@
                    <x>0</x>
                    <y>0</y>
                    <width>962</width>
-                   <height>189</height>
+                   <height>196</height>
                   </rect>
                  </property>
                  <layout class="QVBoxLayout" name="verticalLayout_8">
@@ -325,7 +325,7 @@
                    <x>0</x>
                    <y>0</y>
                    <width>962</width>
-                   <height>289</height>
+                   <height>300</height>
                   </rect>
                  </property>
                  <layout class="QVBoxLayout" name="verticalLayout_5">
@@ -459,6 +459,29 @@
               </item>
              </layout>
             </widget>
+            <widget class="QWidget" name="tabLogging">
+             <attribute name="title">
+              <string>Log</string>
+             </attribute>
+             <layout class="QVBoxLayout" name="verticalLayout_7">
+              <item>
+               <widget class="QPlainTextEdit" name="logPlainText">
+                <property name="verticalScrollBarPolicy">
+                 <enum>Qt::ScrollBarAlwaysOn</enum>
+                </property>
+                <property name="horizontalScrollBarPolicy">
+                 <enum>Qt::ScrollBarAlwaysOff</enum>
+                </property>
+                <property name="readOnly">
+                 <bool>true</bool>
+                </property>
+                <property name="textInteractionFlags">
+                 <set>Qt::LinksAccessibleByMouse|Qt::TextSelectableByMouse</set>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </widget>
            </widget>
           </item>
          </layout>
@@ -475,7 +498,7 @@
      <x>0</x>
      <y>0</y>
      <width>1024</width>
-     <height>24</height>
+     <height>25</height>
     </rect>
    </property>
    <widget class="QMenu" name="menu_File">
