@@ -41,26 +41,30 @@ void AddURL::on_buttonBox_accepted()
                                      QMessageBox::Ok);
             return AddURL::done(QDialog::Rejected);
         } else {
-            url_plaintext = ui->url_plainTextEdit->toPlainText();
-            info = routines->verifyFileExists(url_plaintext);
+            try {
+                url_plaintext = ui->url_plainTextEdit->toPlainText();
+                info = routines->verifyFileExists(url_plaintext);
 
-            if (info.response_code == 200) {
-                info_ext = routines->curlGrabInfo(url_plaintext);
-                dl_info.dlStatus = GekkoFyre::DownloadStatus::Unknown;
-                dl_info.file_loc = ui->url_dest_lineEdit->text().toStdString().c_str();
-                dl_info.ext_info.content_length = info_ext.content_length;
-                dl_info.ext_info.effective_url = info_ext.effective_url;
-                dl_info.ext_info.response_code = info_ext.response_code;
-                dl_info.ext_info.status_ok = info_ext.status_ok;
-                routines->writeDownloadInfo(dl_info);
+                if (info.response_code == 200) {
+                    info_ext = routines->curlGrabInfo(url_plaintext);
+                    dl_info.dlStatus = GekkoFyre::DownloadStatus::Unknown;
+                    dl_info.file_loc = ui->url_dest_lineEdit->text().toStdString().c_str();
+                    dl_info.ext_info.content_length = info_ext.content_length;
+                    dl_info.ext_info.effective_url = info_ext.effective_url;
+                    dl_info.ext_info.response_code = info_ext.response_code;
+                    dl_info.ext_info.status_ok = info_ext.status_ok;
+                    routines->writeDownloadInfo(dl_info);
 
-                emit sendDetails(dl_info.ext_info.effective_url, dl_info.ext_info.content_length, 0, 0, 0,
-                                 0, dl_info.dlStatus, dl_info.file_loc);
-                return AddURL::done(QDialog::Accepted);
-            } else {
-                QMessageBox::information(this, tr("Error!"), QString("%1").arg(
-                                             QString::fromStdString(info.effective_url)), QMessageBox::Ok);
-                return AddURL::done(QDialog::Rejected);
+                    emit sendDetails(dl_info.ext_info.effective_url, dl_info.ext_info.content_length, 0, 0, 0,
+                                     0, dl_info.dlStatus, dl_info.file_loc);
+                    return AddURL::done(QDialog::Accepted);
+                } else {
+                    QMessageBox::information(this, tr("Error!"), QString("%1").arg(
+                                                 QString::fromStdString(info.effective_url)), QMessageBox::Ok);
+                    return AddURL::done(QDialog::Rejected);
+                }
+            } catch (const std::exception &e) {
+                QMessageBox::warning(this, tr("Error!"), tr("%1").arg(e.what()), QMessageBox::Ok);
             }
         }
     case 1:

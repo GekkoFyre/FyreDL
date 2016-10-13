@@ -44,7 +44,7 @@
 #define CMNROUTINES_HPP
 
 #include "default_var.hpp"
-#include <boost/optional.hpp>
+#include <pugixml.hpp>
 #include <QDateTime>
 #include <string>
 #include <cstdio>
@@ -111,6 +111,7 @@ public:
     std::string findCfgFile(const std::string &cfgFileName);
     std::vector<CurlDlInfo> readDownloadInfo(const std::string &xmlCfgFile = CFG_HISTORY_FILE);
     bool writeDownloadInfo(CurlDlInfo dl_info_list, const std::string &xmlCfgFile = CFG_HISTORY_FILE);
+    pugi::xml_node createNewXmlFile(const std::string &xmlCfgFile = CFG_HISTORY_FILE);
     int convDlStat_toInt(const GekkoFyre::DownloadStatus &status);
     GekkoFyre::DownloadStatus convDlStat_toEnum(const int &s);
     QString convDlStat_toString(const GekkoFyre::DownloadStatus &status);

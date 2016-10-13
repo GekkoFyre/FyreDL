@@ -43,7 +43,6 @@
 #include "cmnroutines.hpp"
 #include <boost/exception/all.hpp>
 #include <boost/filesystem.hpp>
-#include <pugixml.hpp>
 #include <exception>
 #include <sstream>
 #include <algorithm>
@@ -155,8 +154,7 @@ std::string GekkoFyre::CmnRoutines::findCfgFile(const std::string &cfgFileName)
  * @brief GekkoFyre::CmnRoutines::readDownloadInfo
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
  * @date   2016-10
- * @note   <https://akrzemi1.wordpress.com/2011/07/13/parsing-xml-with-boost/>56
- *         <http://pugixml.org/docs/samples/load_file.cpp>
+ * @note   <http://www.gerald-fahrnholz.eu/sw/DocGenerated/HowToUse/html/group___grp_pugi_xml.html>
  * @param xmlCfgFile
  * @return
  */
@@ -212,26 +210,13 @@ bool GekkoFyre::CmnRoutines::writeDownloadInfo(GekkoFyre::CmnRoutines::CurlDlInf
 {
     fs::path xmlCfgFile_loc = findCfgFile(xmlCfgFile);
     sys::error_code ec;
-    std::vector<GekkoFyre::CmnRoutines::CurlDlInfo> dl_info_list;
     if (dl_info.ext_info.status_ok == true) {
         if (!xmlCfgFile_loc.string().empty()) {
             switch (dl_info.dlStatus) {
             case GekkoFyre::DownloadStatus::Unknown:
             {
-                dl_info_list = readDownloadInfo(xmlCfgFile);
+                pugi::xml_node root;
                 unsigned int cId = 0;
-
-                // Finds the largest 'dl_info_list.cId' value and then increments by +1, ready for
-                // assignment to a new download entry.
-                for (size_t i = 0; i < dl_info_list.size(); ++i) {
-                    unsigned int tmp = 0;
-                    tmp = dl_info_list.at(i).cId;
-                    if (tmp > cId) {
-                        cId = tmp;
-                    }
-                }
-
-                dl_info.cId = cId;
                 dl_info.dlStatus = GekkoFyre::DownloadStatus::Unknown;
                 QDateTime now = QDateTime::currentDateTime();
                 dl_info.timestamp = now.toTime_t();
@@ -243,24 +228,21 @@ bool GekkoFyre::CmnRoutines::writeDownloadInfo(GekkoFyre::CmnRoutines::CurlDlInf
                 // time or multiple client calls:
                 // std::shared_ptr<pugi::xml_document> spDoc = std::make_shared<pugi::xml_document>();
 
-                pugi::xml_node root;
-
                 if (!fs::exists(xmlCfgFile_loc, ec) && !fs::is_regular_file(xmlCfgFile_loc)) {
-                    // Generate XML declaration
-                    auto declarNode = doc.append_child(pugi::node_declaration);
-                    declarNode.append_attribute("version") = "1.0";
-                    declarNode.append_attribute("encoding") = "ISO-8859-1";;
-                    declarNode.append_attribute("standalone") = "yes";
+                    root = createNewXmlFile(xmlCfgFile);
+                } else {
+                    std::vector<CurlDlInfo> existing_info = readDownloadInfo(xmlCfgFile);
 
-                    // A valid XML doc must contain a single root node of any name
-                    root = doc.append_child("file");
-
-                    // Save XML tree to file.
-                    // Remark: second optional param is indent string to be used;
-                    // default indentation is tab character.
-                    bool saveSucceed = doc.save_file(xmlCfgFile_loc.string().c_str(), PUGIXML_TEXT("  "));
-                    if (saveSucceed == false) {
-                        throw std::runtime_error(tr("Error with saving XML config file!").toStdString());
+                    // Finds the largest 'existing_info.cId' value and then increments by +1, ready for
+                    // assignment to a new download entry.
+                    for (size_t i = 0; i < existing_info.size(); ++i) {
+                        static unsigned int tmp;
+                        tmp = existing_info.at(i).cId;
+                        if (tmp > cId) {
+                            cId = tmp;
+                        } else {
+                            ++cId;
+                        }
                     }
                 }
 
@@ -273,10 +255,12 @@ bool GekkoFyre::CmnRoutines::writeDownloadInfo(GekkoFyre::CmnRoutines::CurlDlInf
                                                      QString::number(result.offset)).toStdString());
                 }
 
-                // A valid XML document must have a single root node
-                pugi::xml_node rootExisting = doc.document_element();
+                dl_info.cId = cId;
 
-                pugi::xml_node nodeChild = rootExisting.append_child("file");
+                // A valid XML document must have a single root node
+                root = doc.document_element();
+
+                pugi::xml_node nodeChild = root.append_child("file");
                 nodeChild.append_attribute("content-id") = dl_info.cId;
                 nodeChild.append_attribute("file-loc") = dl_info.file_loc.c_str();
                 nodeChild.append_attribute("status") = convDlStat_toInt(dl_info.dlStatus);
@@ -286,8 +270,8 @@ bool GekkoFyre::CmnRoutines::writeDownloadInfo(GekkoFyre::CmnRoutines::CurlDlInf
                 nodeChild.append_attribute("resp-code") = dl_info.ext_info.response_code;
                 nodeChild.append_attribute("content-length") = dl_info.ext_info.content_length;
 
-                bool saveSucceed_sec = doc.save_file(xmlCfgFile_loc.string().c_str(), PUGIXML_TEXT("  "));
-                if (saveSucceed_sec == false) {
+                bool saveSucceed = doc.save_file(xmlCfgFile_loc.string().c_str(), PUGIXML_TEXT("    "));
+                if (saveSucceed == false) {
                     throw std::runtime_error(tr("Error with saving XML config file!").toStdString());
                 }
                 return true;
@@ -302,6 +286,31 @@ bool GekkoFyre::CmnRoutines::writeDownloadInfo(GekkoFyre::CmnRoutines::CurlDlInf
     }
 
     return false;
+}
+
+pugi::xml_node GekkoFyre::CmnRoutines::createNewXmlFile(const std::string &xmlCfgFile)
+{
+    fs::path xmlCfgFile_loc = findCfgFile(xmlCfgFile);
+    pugi::xml_document doc;
+
+    // Generate XML declaration
+    auto declarNode = doc.append_child(pugi::node_declaration);
+    declarNode.append_attribute("version") = "1.0";
+    declarNode.append_attribute("encoding") = "ISO-8859-1";;
+    declarNode.append_attribute("standalone") = "yes";
+
+    // A valid XML doc must contain a single root node of any name
+    pugi::xml_node root = doc.append_child("file");
+
+    // Save XML tree to file.
+    // Remark: second optional param is indent string to be used;
+    // default indentation is tab character.
+   bool saveSucceed = doc.save_file(xmlCfgFile_loc.string().c_str(), PUGIXML_TEXT("    "));
+   if (saveSucceed == false) {
+       throw std::runtime_error(tr("Error with saving XML config file!").toStdString());
+   }
+
+   return root;
 }
 
 int GekkoFyre::CmnRoutines::convDlStat_toInt(const GekkoFyre::DownloadStatus &status)

@@ -114,7 +114,11 @@ void MainWindow::readFromHistoryFile()
     std::vector<GekkoFyre::CmnRoutines::CurlDlInfo> dl_history;
     if (fs::exists(routines->findCfgFile(CFG_HISTORY_FILE)) &&
             fs::is_regular_file(routines->findCfgFile(CFG_HISTORY_FILE))) {
-        dl_history = routines->readDownloadInfo(CFG_HISTORY_FILE);
+        try {
+            dl_history = routines->readDownloadInfo(CFG_HISTORY_FILE);
+        } catch (const std::exception &e) {
+            QMessageBox::warning(this, tr("Error!"), tr("%1").arg(e.what()), QMessageBox::Ok);
+        }
     } else {
         return;
     }
