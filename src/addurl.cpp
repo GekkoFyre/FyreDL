@@ -4,6 +4,7 @@
 #include "dl_view.hpp"
 #include <QMessageBox>
 #include <QFileDialog>
+#include <QDir>
 
 AddURL::AddURL(QWidget *parent) :
     QDialog(parent),
@@ -11,6 +12,9 @@ AddURL::AddURL(QWidget *parent) :
 {
     ui->setupUi(this);
     routines = new GekkoFyre::CmnRoutines();
+
+    ui->url_dest_lineEdit->setText(QDir::homePath());
+    ui->file_dest_lineEdit->setText(QDir::homePath());
 }
 
 AddURL::~AddURL()

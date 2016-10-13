@@ -3,6 +3,7 @@
 
 #include "cmnroutines.hpp"
 #include <QDialog>
+#include <QString>
 
 namespace Ui {
 class AddURL;

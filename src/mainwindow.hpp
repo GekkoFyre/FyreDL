@@ -49,7 +49,6 @@
 #include "addurl.hpp"
 #include <QMainWindow>
 #include <QString>
-#include <unordered_set>
 
 namespace Ui {
 class MainWindow;
@@ -65,12 +64,12 @@ public:
 
 private:
     void addDownload();
-    void removeDownload(const QString &url);
     void readFromHistoryFile();
     void modifyHistoryFile();
     void insertNewRow(const std::string &fileName, const double &fileSize, const int &downloaded,
                       const double &progress, const int &upSpeed, const int &downSpeed,
                       const GekkoFyre::DownloadStatus &status, const std::string &destination);
+    void removeSelRows();
 
     downloadModel *dlModel;
     GekkoFyre::CmnRoutines *routines;

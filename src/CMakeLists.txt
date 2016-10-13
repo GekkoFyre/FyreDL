@@ -158,6 +158,17 @@ if (CURL_FOUND)
 endif(CURL_FOUND)
 
 #
+# Find 'pugixml'
+#
+find_package(PugiXML REQUIRED)
+if (GkPugiXML_FOUND)
+    include_directories(${GkPugiXML_INCLUDE_DIR})
+    set(LIBS ${LIBS} ${GkPugiXML_LIBRARY})
+else()
+    message(SEND_ERROR "The 'pugixml' library could not be found!")
+endif(GkPugiXML_FOUND)
+
+#
 # Qt5 translation routines
 #
 file(GLOB TRANSLATION_FILES ${CMAKE_CURRENT_LIST_DIR}/*.ts)

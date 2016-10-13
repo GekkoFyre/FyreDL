@@ -45,7 +45,6 @@
 
 #include <locale>
 #include <string>
-#include <iosfwd>
 
 #define CFG_HISTORY_FILE "fyredl_history.xml"
 

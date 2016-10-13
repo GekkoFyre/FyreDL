@@ -41,10 +41,9 @@
  */
 
 #include "cmnroutines.hpp"
-#include <boost/property_tree/ptree.hpp>
-#include <boost/property_tree/xml_parser.hpp>
 #include <boost/exception/all.hpp>
 #include <boost/filesystem.hpp>
+#include <pugixml.hpp>
 #include <exception>
 #include <sstream>
 #include <algorithm>
@@ -77,7 +76,6 @@ extern "C" {
 #error "Platform not supported!"
 #endif
 
-namespace pt = boost::property_tree;
 namespace sys = boost::system;
 namespace fs = boost::filesystem;
 
@@ -158,6 +156,7 @@ std::string GekkoFyre::CmnRoutines::findCfgFile(const std::string &cfgFileName)
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
  * @date   2016-10
  * @note   <https://akrzemi1.wordpress.com/2011/07/13/parsing-xml-with-boost/>56
+ *         <http://pugixml.org/docs/samples/load_file.cpp>
  * @param xmlCfgFile
  * @return
  */
@@ -168,24 +167,28 @@ std::vector<GekkoFyre::CmnRoutines::CurlDlInfo> GekkoFyre::CmnRoutines::readDown
     sys::error_code ec;
     if (fs::exists(xmlCfgFile_loc, ec) && fs::is_regular_file(xmlCfgFile_loc)) {
         std::vector<GekkoFyre::CmnRoutines::CurlDlInfo> dl_info_list;
-        pt::ptree pt;
-        pt::read_xml(xmlCfgFile_loc.string(), pt);
 
-        // Traverse ptree
-        for (auto &child : pt.get_child("download-history-db")) {
-            if (child.first == "file") {
-                GekkoFyre::CmnRoutines::CurlDlInfo i;
-                i.cId = child.second.get<unsigned int>("content-id");
-                i.file_loc = child.second.get<std::string>("file-loc");
-                i.dlStatus = convDlStat_toEnum(child.second.get<short>("status"));
-                i.timestamp = child.second.get<uint>("insert-date");
-                i.ext_info.status_ok = child.second.get<bool>("status-ok");
-                i.ext_info.status_msg = child.second.get<std::string>("status-msg");
-                i.ext_info.effective_url = child.second.get<std::string>("effec-url");
-                i.ext_info.response_code = child.second.get<long>("resp-code");
-                i.ext_info.content_length = child.second.get<double>("content-length");
-                dl_info_list.push_back(i);
+        pugi::xml_document doc;
+        pugi::xml_parse_result result = doc.load_file(xmlCfgFile_loc.string().c_str(), pugi::parse_default|pugi::parse_declaration);
+            if (!result) {
+                throw std::invalid_argument(tr("Parse error: %1, character pos= %2")
+                                            .arg(result.description(),
+                                                 QString::number(result.offset)).toStdString());
             }
+
+        pugi::xml_node tools = doc.child("file");
+        for (pugi::xml_node tool = tools.child("file"); tool; tool = tool.next_sibling("file")) {
+            GekkoFyre::CmnRoutines::CurlDlInfo i;
+            i.cId = tool.attribute("content-id").as_uint();
+            i.file_loc = tool.attribute("file-loc").value();
+            i.dlStatus = convDlStat_toEnum(tool.attribute("status").as_int());
+            i.timestamp = tool.attribute("insert-date").as_uint();
+            // i.ext_info.status_ok = tool.attribute("status-ok").as_bool();
+            i.ext_info.status_msg = tool.attribute("status-msg").value();
+            i.ext_info.effective_url = tool.attribute("effec-url").value();
+            i.ext_info.response_code = tool.attribute("resp-code").as_llong();
+            i.ext_info.content_length = tool.attribute("content-length").as_double();
+            dl_info_list.push_back(i);
         }
 
         return dl_info_list;
@@ -198,8 +201,8 @@ std::vector<GekkoFyre::CmnRoutines::CurlDlInfo> GekkoFyre::CmnRoutines::readDown
  * @brief GekkoFyre::CmnRoutines::writeDownloadInfo
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
  * @date   2016-10
- * @note   <http://stackoverflow.com/questions/6656380/boost-1-46-1-property-tree-how-to-iterate-through-ptree-receiving-sub-ptrees>
- *         <http://www.boost.org/doc/libs/1_58_0/doc/html/property_tree/tutorial.html>
+ * @note   <http://stackoverflow.com/questions/9387610/what-xml-parser-should-i-use-in-c>
+ *         <http://www.gerald-fahrnholz.eu/sw/DocGenerated/HowToUse/html/group___grp_pugi_xml.html>
  * @param dl_info
  * @param xmlCfgFile
  * @return
@@ -232,27 +235,61 @@ bool GekkoFyre::CmnRoutines::writeDownloadInfo(GekkoFyre::CmnRoutines::CurlDlInf
                 dl_info.dlStatus = GekkoFyre::DownloadStatus::Unknown;
                 QDateTime now = QDateTime::currentDateTime();
                 dl_info.timestamp = now.toTime_t();
-                dl_info_list.push_back(dl_info);
+                dl_info.ext_info.status_msg = "";
 
-                for (size_t i = 0; i < dl_info_list.size(); ++i) {
-                    dl_info_list.at(i).ext_info.status_msg = "";
+                // Generate new XML document within memory
+                pugi::xml_document doc;
+                // Alternatively store as shared pointer if tree shall be used for longer
+                // time or multiple client calls:
+                // std::shared_ptr<pugi::xml_document> spDoc = std::make_shared<pugi::xml_document>();
+
+                pugi::xml_node root;
+
+                if (!fs::exists(xmlCfgFile_loc, ec) && !fs::is_regular_file(xmlCfgFile_loc)) {
+                    // Generate XML declaration
+                    auto declarNode = doc.append_child(pugi::node_declaration);
+                    declarNode.append_attribute("version") = "1.0";
+                    declarNode.append_attribute("encoding") = "ISO-8859-1";;
+                    declarNode.append_attribute("standalone") = "yes";
+
+                    // A valid XML doc must contain a single root node of any name
+                    root = doc.append_child("file");
+
+                    // Save XML tree to file.
+                    // Remark: second optional param is indent string to be used;
+                    // default indentation is tab character.
+                    bool saveSucceed = doc.save_file(xmlCfgFile_loc.string().c_str(), PUGIXML_TEXT("  "));
+                    if (saveSucceed == false) {
+                        throw std::runtime_error(tr("Error with saving XML config file!").toStdString());
+                    }
                 }
 
-                pt::ptree pt;
-                pt.add("download-history-db.version", 3);
-                for (const auto &d: dl_info_list) {
-                    pt::ptree & node = pt.add("download-history-db.file", "");
-                    node.put("content-id", d.cId);
-                    node.put("file-loc", d.file_loc);
-                    node.put("status", convDlStat_toInt(d.dlStatus));
-                    node.put("insert-date", d.timestamp);
-                    node.put("status-ok", d.ext_info.status_ok);
-                    node.put("status-msg", d.ext_info.status_msg);
-                    node.put("effec-url", d.ext_info.effective_url);
-                    node.put("resp-code", d.ext_info.response_code);
-                    node.put("content-length", d.ext_info.content_length);
+                // Load XML into memory
+                // Remark: to fully read declaration entries you have to specify, "pugi::parse_declaration"
+                pugi::xml_parse_result result = doc.load_file(xmlCfgFile_loc.string().c_str(), pugi::parse_default|pugi::parse_declaration);
+                if (!result) {
+                    throw std::invalid_argument(tr("Parse error: %1, character pos= %2")
+                                                .arg(result.description(),
+                                                     QString::number(result.offset)).toStdString());
                 }
-                pt::write_xml(xmlCfgFile_loc.string(), pt, std::locale());
+
+                // A valid XML document must have a single root node
+                pugi::xml_node rootExisting = doc.document_element();
+
+                pugi::xml_node nodeChild = rootExisting.append_child("file");
+                nodeChild.append_attribute("content-id") = dl_info.cId;
+                nodeChild.append_attribute("file-loc") = dl_info.file_loc.c_str();
+                nodeChild.append_attribute("status") = convDlStat_toInt(dl_info.dlStatus);
+                nodeChild.append_attribute("insert-date") = dl_info.timestamp;
+                nodeChild.append_attribute("status-msg") = dl_info.ext_info.status_msg.c_str();
+                nodeChild.append_attribute("effec-url") = dl_info.ext_info.effective_url.c_str();
+                nodeChild.append_attribute("resp-code") = dl_info.ext_info.response_code;
+                nodeChild.append_attribute("content-length") = dl_info.ext_info.content_length;
+
+                bool saveSucceed_sec = doc.save_file(xmlCfgFile_loc.string().c_str(), PUGIXML_TEXT("  "));
+                if (saveSucceed_sec == false) {
+                    throw std::runtime_error(tr("Error with saving XML config file!").toStdString());
+                }
                 return true;
             }
             default:
@@ -267,7 +304,7 @@ bool GekkoFyre::CmnRoutines::writeDownloadInfo(GekkoFyre::CmnRoutines::CurlDlInf
     return false;
 }
 
-short GekkoFyre::CmnRoutines::convDlStat_toInt(const GekkoFyre::DownloadStatus &status)
+int GekkoFyre::CmnRoutines::convDlStat_toInt(const GekkoFyre::DownloadStatus &status)
 {
     switch (status) {
     case GekkoFyre::DownloadStatus::Downloading:
@@ -287,7 +324,7 @@ short GekkoFyre::CmnRoutines::convDlStat_toInt(const GekkoFyre::DownloadStatus &
     }
 }
 
-GekkoFyre::DownloadStatus GekkoFyre::CmnRoutines::convDlStat_toEnum(const short &s)
+GekkoFyre::DownloadStatus GekkoFyre::CmnRoutines::convDlStat_toEnum(const int &s)
 {
     GekkoFyre::DownloadStatus ds_enum;
     switch (s) {

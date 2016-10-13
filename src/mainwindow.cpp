@@ -43,15 +43,14 @@
 #include "mainwindow.hpp"
 #include "ui_mainwindow.h"
 #include <boost/filesystem.hpp>
-#include <QString>
 #include <QInputDialog>
-#include <QtWidgets/QFileDialog>
 #include <QModelIndex>
-#include <QStringList>
 #include <QMessageBox>
 #include <QFileDialog>
 #include <QList>
 #include <vector>
+#include <QSortFilterProxyModel>
+#include <QItemSelectionModel>
 
 namespace fs = boost::filesystem;
 MainWindow::MainWindow(QWidget *parent) :
@@ -68,6 +67,7 @@ MainWindow::MainWindow(QWidget *parent) :
 
     dlModel = new downloadModel(this);
     ui->downloadView->setModel(dlModel);
+    ui->downloadView->setSelectionMode(QAbstractItemView::SingleSelection);
     ui->downloadView->horizontalHeader()->setStretchLastSection(true); // http://stackoverflow.com/questions/16931569/qstandarditemmodel-inside-qtableview
     // QModelIndex downloadIndex = downloadModel->index(QModelIndex());
 
@@ -103,14 +103,6 @@ void MainWindow::addDownload()
     // delete add_url;
     return;
 }
-
-/**
- * @brief MainWindow::removeDownload
- * @author    Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
- * @param url
- */
-void MainWindow::removeDownload(const QString &url)
-{}
 
 /**
  * @brief MainWindow::readFromHistoryFile
@@ -155,7 +147,9 @@ void MainWindow::readFromHistoryFile()
  * @param xmlCfgFile
  */
 void MainWindow::modifyHistoryFile()
-{}
+{
+    QList<std::vector<QString>> list = dlModel->getList();
+}
 
 void MainWindow::insertNewRow(const std::string &fileName, const double &fileSize, const int &downloaded,
                               const double &progress, const int &upSpeed, const int &downSpeed,
@@ -187,6 +181,36 @@ void MainWindow::insertNewRow(const std::string &fileName, const double &fileSiz
     index = dlModel->index(0, 7, QModelIndex());
     dlModel->setData(index, QString::fromStdString(destination), Qt::DisplayRole);
     return;
+}
+
+/**
+ * @brief MainWindow::removeSelRows
+ * @author yarovenkoas <http://www.qtcentre.org/threads/4885-Remove-selected-rows-from-a-QTableView>
+ *         Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @date   2016-10-12
+ * @note   <http://doc.qt.io/qt-5/qtwidgets-itemviews-addressbook-example.html>
+ */
+void MainWindow::removeSelRows()
+{
+    // Be sure not to delete items from within slots connected to signals that have the item (or its
+    // index) as their parameter.
+    QModelIndexList indexes = ui->downloadView->selectionModel()->selectedIndexes();
+    int countRow = indexes.count();
+
+    bool flagDif = false;
+    for (int i = countRow; i > 1; --i) {
+        if ((indexes.at(i - 1).row() - 1) != indexes.at(i - 2).row()) {
+            flagDif = true;
+        }
+    }
+
+    if (!flagDif) {
+        dlModel->removeRows(indexes.at(0).row(), countRow, QModelIndex());
+    } else {
+        for (int i = countRow; i > 0; --i) {
+            dlModel->removeRow(indexes.at(i - 1).row(), QModelIndex());
+        }
+    }
 }
 
 void MainWindow::on_action_Open_a_File_triggered()
@@ -232,7 +256,9 @@ void MainWindow::on_dlstopToolBtn_clicked()
 {}
 
 void MainWindow::on_removeToolBtn_clicked()
-{}
+{
+    removeSelRows();
+}
 
 void MainWindow::on_clearhistoryToolBtn_clicked()
 {}
