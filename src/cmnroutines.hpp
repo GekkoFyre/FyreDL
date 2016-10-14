@@ -110,8 +110,9 @@ public:
     double percentDownloaded(const double &content_length, const double &amountDl);
     std::string findCfgFile(const std::string &cfgFileName);
     std::vector<CurlDlInfo> readDownloadInfo(const std::string &xmlCfgFile = CFG_HISTORY_FILE);
-    bool writeDownloadInfo(CurlDlInfo dl_info_list, const std::string &xmlCfgFile = CFG_HISTORY_FILE);
+    bool writeDownloadItem(CurlDlInfo dl_info_list, const std::string &xmlCfgFile = CFG_HISTORY_FILE);
     pugi::xml_node createNewXmlFile(const std::string &xmlCfgFile = CFG_HISTORY_FILE);
+    bool delDownloadItem(const QString &effec_url, const std::string &xmlCfgFile = CFG_HISTORY_FILE);
     int convDlStat_toInt(const GekkoFyre::DownloadStatus &status);
     GekkoFyre::DownloadStatus convDlStat_toEnum(const int &s);
     QString convDlStat_toString(const GekkoFyre::DownloadStatus &status);

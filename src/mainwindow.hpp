@@ -68,7 +68,8 @@ private:
     void modifyHistoryFile();
     void insertNewRow(const std::string &fileName, const double &fileSize, const int &downloaded,
                       const double &progress, const int &upSpeed, const int &downSpeed,
-                      const GekkoFyre::DownloadStatus &status, const std::string &destination);
+                      const GekkoFyre::DownloadStatus &status, const std::string &url,
+                      const std::string &destination);
     void removeSelRows();
 
     downloadModel *dlModel;
@@ -92,7 +93,8 @@ private slots:
     void on_settingsToolBtn_clicked();
     void sendDetails(const std::string &fileName, const double &fileSize, const int &downloaded,
                      const double &progress, const int &upSpeed, const int &downSpeed,
-                     const GekkoFyre::DownloadStatus &status, const std::string &destination);
+                     const GekkoFyre::DownloadStatus &status, const std::string &url,
+                     const std::string &destination);
 
 private:
     Ui::MainWindow *ui;

@@ -93,11 +93,7 @@ MainWindow::~MainWindow()
 void MainWindow::addDownload()
 {
     AddURL *add_url = new AddURL(this);
-    QObject::connect(add_url, SIGNAL(sendDetails(std::string,double,int,double,int,int,
-                                                 GekkoFyre::DownloadStatus,std::string)), this,
-                     SLOT(sendDetails(std::string,double,int,double,int,int,
-                                      GekkoFyre::DownloadStatus,std::string)));
-
+    QObject::connect(add_url, SIGNAL(sendDetails(std::string,double,int,double,int,int,GekkoFyre::DownloadStatus,std::string,std::string)), this, SLOT(sendDetails(std::string,double,int,double,int,int,GekkoFyre::DownloadStatus,std::string,std::string)));
     add_url->setAttribute(Qt::WA_DeleteOnClose, true);
     add_url->open();
     // delete add_url;
@@ -129,7 +125,8 @@ void MainWindow::readFromHistoryFile()
             if (dl_history.at(i).ext_info.content_length > 0) {
                 insertNewRow(dl_history.at(i).ext_info.effective_url,
                              dl_history.at(i).ext_info.content_length, 0, 0, 0, 0,
-                             dl_history.at(i).dlStatus, dl_history.at(i).file_loc);
+                             dl_history.at(i).dlStatus, dl_history.at(i).ext_info.effective_url,
+                             dl_history.at(i).file_loc);
             } else {
                 QMessageBox::information(this, tr("Problem!"), tr("The size of the download could not be "
                                                                   "determined. Please try again."),
@@ -157,7 +154,8 @@ void MainWindow::modifyHistoryFile()
 
 void MainWindow::insertNewRow(const std::string &fileName, const double &fileSize, const int &downloaded,
                               const double &progress, const int &upSpeed, const int &downSpeed,
-                              const GekkoFyre::DownloadStatus &status, const std::string &destination)
+                              const GekkoFyre::DownloadStatus &status, const std::string &url,
+                              const std::string &destination)
 {
     dlModel->insertRows(0, 1, QModelIndex());
 
@@ -183,7 +181,11 @@ void MainWindow::insertNewRow(const std::string &fileName, const double &fileSiz
     dlModel->setData(index, routines->convDlStat_toString(status), Qt::DisplayRole);
 
     index = dlModel->index(0, 7, QModelIndex());
+    dlModel->setData(index, QString::fromStdString(url), Qt::DisplayRole);
+
+    index = dlModel->index(0, 7, QModelIndex());
     dlModel->setData(index, QString::fromStdString(destination), Qt::DisplayRole);
+
     return;
 }
 
@@ -209,6 +211,7 @@ void MainWindow::removeSelRows()
     }
 
     if (!flagDif) {
+        routines->delDownloadItem(ui->downloadView->model()->data(ui->downloadView->model()->index(indexes.at(0).row(), 8)).toString());
         dlModel->removeRows(indexes.at(0).row(), countRow, QModelIndex());
     } else {
         for (int i = countRow; i > 0; --i) {
@@ -272,13 +275,14 @@ void MainWindow::on_settingsToolBtn_clicked()
 
 void MainWindow::sendDetails(const std::string &fileName, const double &fileSize, const int &downloaded,
                              const double &progress, const int &upSpeed, const int &downSpeed,
-                             const GekkoFyre::DownloadStatus &status, const std::string &destination)
+                             const GekkoFyre::DownloadStatus &status, const std::string &url,
+                             const std::string &destination)
 {
     QList<std::vector<QString>> list = dlModel->getList();
     std::vector<QString> fileNameVector;
     fileNameVector.push_back(QString::fromStdString(fileName));
     if (!list.contains(fileNameVector) && !list.contains(std::vector<QString>())) {
-        insertNewRow(fileName, fileSize, downloaded, progress, upSpeed, downSpeed, status, destination);
+        insertNewRow(fileName, fileSize, downloaded, progress, upSpeed, downSpeed, status, url, destination);
         return;
     } else {
         QMessageBox::information(this, tr("Duplicate entry"), tr("A duplicate of, \"%1\", was entered!")

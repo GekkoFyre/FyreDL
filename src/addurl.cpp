@@ -53,10 +53,10 @@ void AddURL::on_buttonBox_accepted()
                     dl_info.ext_info.effective_url = info_ext.effective_url;
                     dl_info.ext_info.response_code = info_ext.response_code;
                     dl_info.ext_info.status_ok = info_ext.status_ok;
-                    routines->writeDownloadInfo(dl_info);
+                    routines->writeDownloadItem(dl_info);
 
                     emit sendDetails(dl_info.ext_info.effective_url, dl_info.ext_info.content_length, 0, 0, 0,
-                                     0, dl_info.dlStatus, dl_info.file_loc);
+                                     0, dl_info.dlStatus, dl_info.ext_info.effective_url, dl_info.file_loc);
                     return AddURL::done(QDialog::Accepted);
                 } else {
                     QMessageBox::information(this, tr("Error!"), QString("%1").arg(

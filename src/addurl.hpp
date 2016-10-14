@@ -27,7 +27,8 @@ private slots:
 signals:
     void sendDetails(const std::string &fileName, const double &fileSize, const int &downloaded,
                      const double &progress, const int &upSpeed, const int &downSpeed,
-                     const GekkoFyre::DownloadStatus &status, const std::string &destination);
+                     const GekkoFyre::DownloadStatus &status, const std::string &url,
+                     const std::string &destination);
 
 private:
     Ui::AddURL *ui;
