@@ -132,7 +132,7 @@ QVariant downloadModel::headerData(int section, Qt::Orientation orientation, int
         case 0:
             return tr("File name");
         case 1:
-            return tr("File size (KB)");
+            return tr("File size");
         case 2:
             return tr("Downloaded (KB)");
         case 3:

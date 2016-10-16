@@ -42,6 +42,7 @@
 
 #include "mainwindow.hpp"
 #include "ui_mainwindow.h"
+#include "settings.hpp"
 #include <boost/filesystem.hpp>
 #include <QInputDialog>
 #include <QModelIndex>
@@ -69,7 +70,10 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->downloadView->setModel(dlModel);
     ui->downloadView->setSelectionMode(QAbstractItemView::SingleSelection);
     ui->downloadView->horizontalHeader()->setStretchLastSection(true); // http://stackoverflow.com/questions/16931569/qstandarditemmodel-inside-qtableview
-    // QModelIndex downloadIndex = downloadModel->index(QModelIndex());
+    ui->downloadView->setContextMenuPolicy(Qt::CustomContextMenu);
+
+    QObject::connect(ui->downloadView, SIGNAL(customContextMenuRequested(QPoint)), this, SLOT(on_downloadView_customContextMenuRequested(QPoint)));
+    QObject::connect(routines, SIGNAL(sendXferStats(GekkoFyre::CmnRoutines::CurlStatistics)), this, SLOT(recvXferStats(GekkoFyre::CmnRoutines::CurlStatistics)));
 
     readFromHistoryFile();
 }
@@ -163,7 +167,7 @@ void MainWindow::insertNewRow(const std::string &fileName, const double &fileSiz
     dlModel->setData(index, routines->extractFilename(QString::fromStdString(fileName)), Qt::DisplayRole);
 
     index = dlModel->index(0, 1, QModelIndex());
-    dlModel->setData(index, QString::number(routines->bytesToKilobytes(fileSize)), Qt::DisplayRole);
+    dlModel->setData(index, routines->bytesToKilobytes(fileSize), Qt::DisplayRole);
 
     index = dlModel->index(0, 2, QModelIndex());
     dlModel->setData(index, QString::number(downloaded), Qt::DisplayRole);
@@ -211,7 +215,13 @@ void MainWindow::removeSelRows()
     }
 
     if (!flagDif) {
-        routines->delDownloadItem(ui->downloadView->model()->data(ui->downloadView->model()->index(indexes.at(0).row(), 8)).toString());
+        try {
+            routines->delDownloadItem(ui->downloadView->model()->data(ui->downloadView->model()->index(indexes.at(0).row(), 8)).toString());
+        } catch (const std::exception &e) {
+            QMessageBox::warning(this, tr("Error!"), tr("%1").arg(e.what()), QMessageBox::Ok);
+            return;
+        }
+
         dlModel->removeRows(indexes.at(0).row(), countRow, QModelIndex());
     } else {
         for (int i = countRow; i > 0; --i) {
@@ -271,7 +281,11 @@ void MainWindow::on_clearhistoryToolBtn_clicked()
 {}
 
 void MainWindow::on_settingsToolBtn_clicked()
-{}
+{
+    Settings *settingsUi = new Settings(this);
+    settingsUi->setAttribute(Qt::WA_DeleteOnClose, true);
+    settingsUi->open();
+}
 
 void MainWindow::sendDetails(const std::string &fileName, const double &fileSize, const int &downloaded,
                              const double &progress, const int &upSpeed, const int &downSpeed,
@@ -291,4 +305,25 @@ void MainWindow::sendDetails(const std::string &fileName, const double &fileSize
     }
 
     return;
+}
+
+void MainWindow::recvXferStats(const GekkoFyre::CmnRoutines::CurlStatistics &stats)
+{}
+
+/**
+ * @brief MainWindow::on_downloadView_customContextMenuRequested
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @date   2016-10-15
+ * @note   <https://forum.qt.io/topic/31233/how-to-create-a-custom-context-menu-for-qtableview/3>
+ * @param pos
+ */
+void MainWindow::on_downloadView_customContextMenuRequested(const QPoint &pos)
+{
+    ui->downloadView->indexAt(pos);
+
+    QMenu *menu = new QMenu(this);
+    menu->addAction(new QAction(tr("Edit"), this));
+    menu->addAction(new QAction(tr("Delete"), this));
+
+    menu->popup(ui->downloadView->viewport()->mapToGlobal(pos));
 }

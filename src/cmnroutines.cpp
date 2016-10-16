@@ -43,6 +43,7 @@
 #include "cmnroutines.hpp"
 #include <boost/exception/all.hpp>
 #include <boost/filesystem.hpp>
+#include <boost/bind.hpp>
 #include <exception>
 #include <sstream>
 #include <algorithm>
@@ -51,7 +52,11 @@
 #include <cmath>
 #include <fstream>
 #include <iostream>
+#include <thread>
+#include <mutex>
+#include <future>
 #include <QUrl>
+#include <QLocale>
 
 #ifdef _WIN32
 #define NTDDI_VERSION NTDDI_VISTASP1
@@ -108,9 +113,19 @@ QString GekkoFyre::CmnRoutines::extractFilename(const QString &url)
  * @param content_length
  * @return
  */
-double GekkoFyre::CmnRoutines::bytesToKilobytes(const double &content_length)
+QString GekkoFyre::CmnRoutines::bytesToKilobytes(const double &content_length)
 {
-    return std::round((content_length / 1024));
+    std::ostringstream oss;
+    oss << numberSeperators(std::round((content_length / 1024))).toStdString() << " KB";
+    return QString::fromStdString(oss.str());
+}
+
+QString GekkoFyre::CmnRoutines::numberSeperators(const QVariant &value)
+{
+    QLocale locale;
+    locale.setDefault(QLocale(QLocale::English, QLocale::UnitedStates));
+    QString formattedNum = locale.toString(value.toDouble(), 'f', 0);
+    return formattedNum;
 }
 
 /**
@@ -442,42 +457,43 @@ QString GekkoFyre::CmnRoutines::convDlStat_toString(const GekkoFyre::DownloadSta
  * @brief GekkoFyre::CmnRoutines::fileStream
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
  * @date   2016-10
- * @note   <http://stackoverflow.com/questions/195323/what-is-the-most-elegant-way-to-read-a-text-file-with-c>
- *         <https://curl.haxx.se/libcurl/c/url2file.html>
+ * @note   <https://curl.haxx.se/libcurl/c/url2file.html>
  *         <https://www.hackthissite.org/articles/read/1078>
+ *         <https://techoverflow.net/blog/2013/03/15/c-simple-http-download-using-libcurl-easy-api/>
+ *         <http://www.linuxdevcenter.com/pub/a/linux/2005/05/05/libcurl.html>
  * @param file_loc
  * @return
  */
-bool GekkoFyre::CmnRoutines::fileStream(const QString &url, const QString &file_loc)
+GekkoFyre::CmnRoutines::CurlInfoExt GekkoFyre::CmnRoutines::fileStream(const QString &url,
+                                                                          const QString &file_loc)
 {
-    CurlInit curl_struct = curlInit(url, "", "", false, false, file_loc);
+    CurlInit curl_struct = curlInit(url, "", "", false, false, file_loc, true);
+    CurlInfoExt info_ext;
+    info_ext = curlGrabInfo(url);
 
     if (curl_struct.curl_ptr != nullptr) {
-        curl_struct.curl_res = curl_easy_perform(curl_struct.curl_ptr);
+        std::future<CURLcode> ret = std::async(&curl_easy_perform, curl_struct.curl_ptr);
+        curl_struct.curl_res = ret.get();
+        info_ext.status_msg = curl_struct.curl_res;
 
-        if (curl_struct.curl_res != CURLE_OK) {
-
-        } else {
-            if (file_loc.isEmpty()) {
-                return false;
-            } else {
+        if (curl_struct.curl_res == CURLE_OK) {
+            if (!file_loc.isEmpty()) {
                 if (curl_struct.file_buf.stream) {
                     fclose(curl_struct.file_buf.stream);
                     curlCleanup(curl_struct);
-                    return true;
+                    return info_ext;
                 }
             }
         }
     }
 
     curlCleanup(curl_struct);
-    return false;
+    return info_ext;
 }
 
 GekkoFyre::CmnRoutines::CurlInfo GekkoFyre::CmnRoutines::verifyFileExists(const QString &url)
 {
     // curl_easy_perform(), to initiate the request and fire any callbacks
-
     CurlInfo info;
     CurlInit curl_struct = curlInit(url, "", "", true, true);
     if (curl_struct.curl_ptr != nullptr) {
@@ -511,6 +527,7 @@ GekkoFyre::CmnRoutines::CurlInfo GekkoFyre::CmnRoutines::verifyFileExists(const 
  *         <https://gist.github.com/whoshuu/2dc858b8730079602044>
  *         <http://stackoverflow.com/questions/16277894/curl-libhow-can-i-get-response-redirect-url>
  *         <http://stackoverflow.com/questions/7677285/how-to-get-the-length-of-a-file-without-downloading-the-file-in-a-curl-binary-ge>
+ *         <https://curl.haxx.se/libcurl/c/asiohiper.html>
  * @param url
  * @param username
  * @param password
@@ -520,7 +537,7 @@ GekkoFyre::CmnRoutines::CurlInit GekkoFyre::CmnRoutines::curlInit(const QString 
                                                                   const std::string &username,
                                                                   const std::string &password,
                                                                   bool grabHeaderOnly, bool writeToMemory,
-                                                                  const QString &fileLoc)
+                                                                  const QString &fileLoc, bool grabStats)
 {
     // curl_global_init(), to initialize the curl library (once per program)
     // curl_easy_init(), to create a context
@@ -580,6 +597,7 @@ GekkoFyre::CmnRoutines::CurlInit GekkoFyre::CmnRoutines::curlInit(const QString 
             curl_struct.file_buf.stream = nullptr;
 
             // Send all data to this function, via the computer's RAM
+            // NOTE: On Windows, 'CURLOPT_WRITEFUNCTION' /must/ be set, otherwise a crash will occur!
             curl_easy_setopt(curl_struct.curl_ptr, CURLOPT_WRITEFUNCTION, curl_write_memory_callback);
 
             // We pass our 'chunk' struct to the callback function
@@ -591,10 +609,31 @@ GekkoFyre::CmnRoutines::CurlInit GekkoFyre::CmnRoutines::curlInit(const QString 
             curl_struct.mem_chunk.size = 0;
 
             // Send all data to this function, via file streaming
+            // NOTE: On Windows, 'CURLOPT_WRITEFUNCTION' /must/ be set, otherwise a crash will occur!
             curl_easy_setopt(curl_struct.curl_ptr, CURLOPT_WRITEFUNCTION, curl_write_file_callback);
 
             // We pass our 'chunk' struct to the callback function
             curl_easy_setopt(curl_struct.curl_ptr, CURLOPT_WRITEDATA, &curl_struct.file_buf);
+
+            if (grabStats == true) {
+                #if LIBCURL_VERSION_NUM >= 0x072000
+                /* xferinfo was introduced in 7.32.0, no earlier libcurl versions will
+                   compile as they won't have the symbols around.
+
+                   If built with a newer libcurl, but running with an older libcurl:
+                   curl_easy_setopt() will fail in run-time trying to set the new
+                   callback, making the older callback get used.
+
+                   New libcurls will prefer the new callback and instead use that one even
+                   if both callbacks are set. */
+                curl_easy_setopt(curl_struct.curl_ptr, CURLOPT_XFERINFOFUNCTION, boost::bind(&GekkoFyre::CmnRoutines::curl_xferinfo, this));
+                // Pass the struct pointer into the xferinfo function, but note that this is an
+                // alias to CURLOPT_PROGRESSDATA
+                curl_easy_setopt(curl_struct.curl_ptr, CURLOPT_XFERINFODATA, &curl_struct.prog);
+                #else
+                #error "Libcurl needs to be of version 7.32.0 or later! Certain features are missing otherwise..."
+                #endif
+            }
         }
 
         return curl_struct;
@@ -616,7 +655,6 @@ GekkoFyre::CmnRoutines::CurlInit GekkoFyre::CmnRoutines::curlInit(const QString 
 GekkoFyre::CmnRoutines::CurlInfoExt GekkoFyre::CmnRoutines::curlGrabInfo(const QString &url)
 {
     // curl_easy_perform(), to initiate the request and fire any callbacks
-
     CurlInfoExt info;
     CurlInit curl_struct = curlInit(url, "", "", true, true);
     if (curl_struct.curl_ptr != nullptr) {
@@ -649,14 +687,45 @@ GekkoFyre::CmnRoutines::CurlInfoExt GekkoFyre::CmnRoutines::curlGrabInfo(const Q
 }
 
 /**
- * @brief GekkoFyre::CmnRoutines::curlGetProgress
+ * @brief GekkoFyre::CmnRoutines::curl_xferinfo gathers statistical info about the download/upload in
+ * question and returns it as a specialized struct.
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
- * @date   2016-09
+ * @date   2016-10-17
  * @note   <https://curl.haxx.se/libcurl/c/progressfunc.html>
- * @param curl_pointer
+ *         <http://stackoverflow.com/questions/9411153/sending-signal-from-static-class-method-in-qt>
+ *         <https://curl.haxx.se/libcurl/c/asiohiper.html>
+ * @param p should be the CURL pointer.
+ * @param dltotal refers to the total downloaded.
+ * @param dlnow refers to the current download speed.
+ * @param ultotal refers to the total uploaded.
+ * @param ulnow refers to the current upload speed.
+ * @return
  */
-void GekkoFyre::CmnRoutines::curlGetProgress(CURL *curl_pointer)
-{}
+int GekkoFyre::CmnRoutines::curl_xferinfo(void *p, curl_off_t dltotal, curl_off_t dlnow,
+                                          curl_off_t ultotal, curl_off_t ulnow)
+{
+    struct CurlProgressPtr *prog = (struct CurlProgressPtr *)p;
+    CURL *curl = prog->curl;
+    double curtime = 0;
+    CurlStatistics stats;
+
+    curl_easy_getinfo(curl, CURLINFO_TOTAL_TIME, &curtime);
+
+    /* Under certain circumstances it may be desirable for certain functionality
+       to only run every N seconds, in order to do this the transaction time can
+       be used */
+    if((curtime - prog->last_runtime) >= MINIMAL_PROGRESS_FUNCTIONALITY_INTERVAL) {
+      prog->last_runtime = curtime;
+      stats.cur_time = curtime;
+    }
+
+    stats.ul_now = ulnow;
+    stats.ul_total = ultotal;
+    stats.dl_now = dlnow;
+    stats.dl_total = dltotal;
+    emit sendXferStats(stats);
+    return 1;
+}
 
 /**
  * @brief GekkoFyre::CmnRoutines::curlCleanup

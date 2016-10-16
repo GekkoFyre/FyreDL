@@ -47,6 +47,7 @@
 #include <string>
 
 #define CFG_HISTORY_FILE "fyredl_history.xml"
+#define MINIMAL_PROGRESS_FUNCTIONALITY_INTERVAL 3
 
 namespace GekkoFyre {
 enum DownloadStatus {

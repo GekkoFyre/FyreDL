@@ -50,6 +50,7 @@
 #include <cstdio>
 #include <QString>
 #include <QObject>
+#include <QVariant>
 
 extern "C" {
 #include <curl/curl.h>
@@ -68,7 +69,12 @@ private:
 
     struct FileStream {
         const char *file_loc; // Name to store file as if download /and/ disk writing is successful
-        std::FILE *stream;
+        std::FILE *stream;    // File object stream
+    };
+
+    struct CurlProgressPtr {
+        double last_runtime;
+        CURL *curl;
     };
 
     struct CurlInit {
@@ -77,6 +83,7 @@ private:
         CURL *curl_ptr;
         MemoryStruct mem_chunk;
         FileStream file_buf;
+        CurlProgressPtr prog;
     };
 
 public:
@@ -88,6 +95,15 @@ public:
         std::string effective_url; // In cases when you've asked libcurl to follow redirects, it may very well not be the same value you set with 'CURLOPT_URL'
     };
 
+    struct CurlStatistics {
+        unsigned int cId;
+        curl_off_t dl_total;
+        curl_off_t ul_total;
+        curl_off_t dl_now;
+        curl_off_t ul_now;
+        double cur_time;
+    };
+
     struct CurlInfoExt {
         bool status_ok;            // Whether 'CURLE_OK' was returned or not
         std::string status_msg;    // The status message, if any, returned by the libcurl functions
@@ -95,10 +111,11 @@ public:
         double elapsed;            // Total time in seconds for the previous transfer (including name resolving, TCP connect, etc.)
         std::string effective_url; // In cases when you've asked libcurl to follow redirects, it may very well not be the same value you set with 'CURLOPT_URL'
         double content_length;     // The size of the download, i.e. content length
+        CurlStatistics stats;      // Statistics about the download in question
     };
 
     struct CurlDlInfo {
-        std::string file_loc;                   // The location of the downloaded file being streamed towards
+        std::string file_loc;               // The location of the downloaded file being streamed towards
         unsigned int cId;                   // Automatically incremented Content ID for each download/file
         uint timestamp;                     // The date/time of the download/file having been inserted into the history file
         GekkoFyre::DownloadStatus dlStatus; // Status of the downloading file(s) in question
@@ -106,7 +123,8 @@ public:
     };
 
     QString extractFilename(const QString &url);
-    double bytesToKilobytes(const double &content_length);
+    QString bytesToKilobytes(const double &content_length);
+    QString numberSeperators(const QVariant &value);
     double percentDownloaded(const double &content_length, const double &amountDl);
     std::string findCfgFile(const std::string &cfgFileName);
     std::vector<CurlDlInfo> readDownloadInfo(const std::string &xmlCfgFile = CFG_HISTORY_FILE);
@@ -119,15 +137,18 @@ public:
 
     CurlInfo verifyFileExists(const QString &url);
     CurlInfoExt curlGrabInfo(const QString &url);
-    bool fileStream(const QString &url, const QString &file_loc);
-    void curlGetProgress(CURL *curl_pointer);
+    CurlInfoExt fileStream(const QString &url, const QString &file_loc);
+    int curl_xferinfo(void *p, curl_off_t dltotal, curl_off_t dlnow, curl_off_t ultotal, curl_off_t ulnow);
+
+signals:
+    void sendXferStats(const CurlStatistics &stats);
 
 private:
     static size_t curl_write_memory_callback(void *ptr, size_t size, size_t nmemb, void *userp);
     static size_t curl_write_file_callback(void *buffer, size_t size, size_t nmemb, void *stream);
-    CurlInit curlInit(const QString &url, const std::string &username, const std::string &password,
+    CurlInit curlInit(const QString &url, const std::string &username = "", const std::string &password = "",
                       bool grabHeaderOnly = false, bool writeToMemory = false,
-                      const QString &fileLoc = "");
+                      const QString &fileLoc = "", bool grabStats = false);
     void curlCleanup(CurlInit curl_init);
 };
 }

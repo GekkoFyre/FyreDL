@@ -75,12 +75,15 @@ set(SOURCE_FILES
     dl_view.cpp
     main.cpp
     mainwindow.hpp
-    mainwindow.cpp)
+    mainwindow.cpp
+    settings.hpp
+    settings.cpp)
 
 # http://www.executionunit.com/blog/2014/01/22/moving-from-qmake-to-cmake/
 qt5_wrap_ui(UI_HEADERS
             mainwindow.ui
-            addurl.ui)
+            addurl.ui
+            settings.ui)
 
 qt5_add_resources(UI_RESOURCES assets.qrc)
 

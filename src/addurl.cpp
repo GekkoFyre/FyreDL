@@ -65,6 +65,7 @@ void AddURL::on_buttonBox_accepted()
                 }
             } catch (const std::exception &e) {
                 QMessageBox::warning(this, tr("Error!"), tr("%1").arg(e.what()), QMessageBox::Ok);
+                return;
             }
         }
     case 1:
