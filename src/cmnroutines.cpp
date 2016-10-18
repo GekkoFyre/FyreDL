@@ -527,6 +527,7 @@ GekkoFyre::CmnRoutines::CurlInfoExt GekkoFyre::CmnRoutines::curlGrabInfo(const Q
             int res = curl_multi_wait(curl_init.glob_info.multi, NULL, 0, MAX_WAIT_MSECS, &numfds); // https://daniel.haxx.se/blog/2012/09/03/introducing-curl_multi_wait/
             if(res != CURLM_OK) {
                 curl_ext_info.response_code = res;
+                curl_ext_info.status_ok = false;
                 return curl_ext_info;
             }
 
@@ -563,6 +564,7 @@ GekkoFyre::CmnRoutines::CurlInfoExt GekkoFyre::CmnRoutines::curlGrabInfo(const Q
                 std::memcpy(&curl_ext_info.elapsed, &elapsed, sizeof(double));
                 std::memcpy(&curl_ext_info.content_length, &content_length, sizeof(double));
                 curl_ext_info.effective_url = szUrl;
+                curl_ext_info.status_ok = true;
 
                 curl_multi_remove_handle(curl_init.glob_info.multi, eh);
                 curl_easy_cleanup(eh);

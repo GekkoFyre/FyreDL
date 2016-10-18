@@ -125,14 +125,16 @@ public:
     QString bytesToKilobytes(const double &content_length);
     QString numberSeperators(const QVariant &value);
     double percentDownloaded(const double &content_length, const double &amountDl);
+
+    int convDlStat_toInt(const GekkoFyre::DownloadStatus &status);
+    GekkoFyre::DownloadStatus convDlStat_toEnum(const int &s);
+    QString convDlStat_toString(const GekkoFyre::DownloadStatus &status);
+
     std::string findCfgFile(const std::string &cfgFileName);
     std::vector<CurlDlInfo> readDownloadInfo(const std::string &xmlCfgFile = CFG_HISTORY_FILE);
     bool writeDownloadItem(CurlDlInfo dl_info_list, const std::string &xmlCfgFile = CFG_HISTORY_FILE);
     pugi::xml_node createNewXmlFile(const std::string &xmlCfgFile = CFG_HISTORY_FILE);
     bool delDownloadItem(const QString &effec_url, const std::string &xmlCfgFile = CFG_HISTORY_FILE);
-    int convDlStat_toInt(const GekkoFyre::DownloadStatus &status);
-    GekkoFyre::DownloadStatus convDlStat_toEnum(const int &s);
-    QString convDlStat_toString(const GekkoFyre::DownloadStatus &status);
 
     CurlInfo verifyFileExists(const QString &url);
     CurlInfoExt curlGrabInfo(const QString &url);
