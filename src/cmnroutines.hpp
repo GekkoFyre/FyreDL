@@ -45,12 +45,14 @@
 
 #include "default_var.hpp"
 #include <pugixml.hpp>
+#include <boost/exception/all.hpp>
+#include <boost/asio.hpp>
+#include <boost/bind.hpp>
 #include <QDateTime>
 #include <string>
 #include <cstdio>
 #include <QString>
 #include <QObject>
-#include <QVariant>
 
 extern "C" {
 #include <curl/curl.h>
@@ -72,18 +74,25 @@ private:
         std::FILE *stream;    // File object stream
     };
 
-    struct CurlProgressPtr {
-        double last_runtime;
-        CURL *curl;
+    // Global information, common to all connections
+    struct GlobalInfo {
+        CURLM *multi;
+        int still_running;
+    };
+
+    // Information associated with a specific easy handle
+    struct ConnInfo {
+        CURL *easy;
+        char *url;
+        char error[CURL_ERROR_SIZE];
+        CURLMcode curlm_res;
     };
 
     struct CurlInit {
-        char errbuf[CURL_ERROR_SIZE];
-        CURLcode curl_res;
-        CURL *curl_ptr;
+        ConnInfo *conn_info;
+        GlobalInfo glob_info;
         MemoryStruct mem_chunk;
         FileStream file_buf;
-        CurlProgressPtr prog;
     };
 
 public:
@@ -95,15 +104,6 @@ public:
         std::string effective_url; // In cases when you've asked libcurl to follow redirects, it may very well not be the same value you set with 'CURLOPT_URL'
     };
 
-    struct CurlStatistics {
-        unsigned int cId;
-        curl_off_t dl_total;
-        curl_off_t ul_total;
-        curl_off_t dl_now;
-        curl_off_t ul_now;
-        double cur_time;
-    };
-
     struct CurlInfoExt {
         bool status_ok;            // Whether 'CURLE_OK' was returned or not
         std::string status_msg;    // The status message, if any, returned by the libcurl functions
@@ -111,7 +111,6 @@ public:
         double elapsed;            // Total time in seconds for the previous transfer (including name resolving, TCP connect, etc.)
         std::string effective_url; // In cases when you've asked libcurl to follow redirects, it may very well not be the same value you set with 'CURLOPT_URL'
         double content_length;     // The size of the download, i.e. content length
-        CurlStatistics stats;      // Statistics about the download in question
     };
 
     struct CurlDlInfo {
@@ -137,19 +136,28 @@ public:
 
     CurlInfo verifyFileExists(const QString &url);
     CurlInfoExt curlGrabInfo(const QString &url);
-    CurlInfoExt fileStream(const QString &url, const QString &file_loc);
-    int curl_xferinfo(void *p, curl_off_t dltotal, curl_off_t dlnow, curl_off_t ultotal, curl_off_t ulnow);
 
 signals:
-    void sendXferStats(const CurlStatistics &stats);
 
 private:
+    static void mcode_or_die(const char *where, CURLMcode code);
+
+    static void check_multi_info(GlobalInfo *g);
+    static void event_cb(GlobalInfo *g, boost::asio::ip::tcp::socket *tcp_socket, int action);
+    static void timer_cb(const boost::system::error_code &error, GlobalInfo *g);
+    static int multi_timer_cb(CURLM *multi, long timeout_ms, GlobalInfo *g);
+
+    static void remsock(int *f, GlobalInfo *g);
+    static void setsock(int *fdp, curl_socket_t s, CURL *e, int act, GlobalInfo *g);
+    static void addsock(curl_socket_t s, CURL *easy, int action, GlobalInfo *g);
+    static int sock_cb(CURL *e, curl_socket_t s, int what, void *cbp, void *sockp); // https://curl.haxx.se/libcurl/c/CURLMOPT_SOCKETFUNCTION.html
+
+    static int prog_cb(void *p, double dltotal, double dlnow, double ult, double uln); // https://curl.haxx.se/libcurl/c/CURLOPT_PROGRESSFUNCTION.html
+    static curl_socket_t opensocket(void *clientp, curlsocktype purpose, struct curl_sockaddr *address); // https://curl.haxx.se/libcurl/c/CURLOPT_OPENSOCKETFUNCTION.html
+    static int close_socket(void *clientp, curl_socket_t item); // https://curl.haxx.se/libcurl/c/CURLOPT_CLOSESOCKETFUNCTION.html
     static size_t curl_write_memory_callback(void *ptr, size_t size, size_t nmemb, void *userp);
     static size_t curl_write_file_callback(void *buffer, size_t size, size_t nmemb, void *stream);
-    CurlInit curlInit(const QString &url, const std::string &username = "", const std::string &password = "",
-                      bool grabHeaderOnly = false, bool writeToMemory = false,
-                      const QString &fileLoc = "", bool grabStats = false);
-    void curlCleanup(CurlInit curl_init);
+    static CurlInit new_conn(const QString &url, bool grabHeaderOnly = false, bool writeToMemory = false, const QString &fileLoc = "");
 };
 }
 

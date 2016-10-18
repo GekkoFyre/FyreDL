@@ -95,7 +95,6 @@ private slots:
                      const double &progress, const int &upSpeed, const int &downSpeed,
                      const GekkoFyre::DownloadStatus &status, const std::string &url,
                      const std::string &destination);
-    void recvXferStats(const GekkoFyre::CmnRoutines::CurlStatistics &stats);
     void on_downloadView_customContextMenuRequested(const QPoint &pos);
 
 private:

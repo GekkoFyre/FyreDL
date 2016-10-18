@@ -74,7 +74,7 @@ void AddURL::on_buttonBox_accepted()
                                      QMessageBox::Ok);
             return AddURL::done(QDialog::Rejected);
         } else {
-            // info = routines->verifyFileExists(ui->file_dest_lineEdit->text());
+            info = routines->verifyFileExists(ui->file_dest_lineEdit->text());
 
             // QModelIndex index = dlModel->index(0, 0, QModelIndex());
             // index = dlModel->index(0, 7, QModelIndex());

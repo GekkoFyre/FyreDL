@@ -48,6 +48,7 @@
 
 #define CFG_HISTORY_FILE "fyredl_history.xml"
 #define MINIMAL_PROGRESS_FUNCTIONALITY_INTERVAL 3
+#define MAX_WAIT_MSECS (30 * 1000) /* Wait max. 30 seconds */
 
 namespace GekkoFyre {
 enum DownloadStatus {

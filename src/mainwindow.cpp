@@ -73,7 +73,6 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->downloadView->setContextMenuPolicy(Qt::CustomContextMenu);
 
     QObject::connect(ui->downloadView, SIGNAL(customContextMenuRequested(QPoint)), this, SLOT(on_downloadView_customContextMenuRequested(QPoint)));
-    QObject::connect(routines, SIGNAL(sendXferStats(GekkoFyre::CmnRoutines::CurlStatistics)), this, SLOT(recvXferStats(GekkoFyre::CmnRoutines::CurlStatistics)));
 
     readFromHistoryFile();
 }
@@ -306,9 +305,6 @@ void MainWindow::sendDetails(const std::string &fileName, const double &fileSize
 
     return;
 }
-
-void MainWindow::recvXferStats(const GekkoFyre::CmnRoutines::CurlStatistics &stats)
-{}
 
 /**
  * @brief MainWindow::on_downloadView_customContextMenuRequested
