@@ -196,7 +196,7 @@ std::vector<GekkoFyre::CmnRoutines::CurlDlInfo> GekkoFyre::CmnRoutines::readDown
                 GekkoFyre::CmnRoutines::CurlDlInfo i;
                 i.cId = item.attribute("content-id").as_uint();
                 i.file_loc = item.attribute("file-loc").value();
-                i.dlStatus = convDlStat_toEnum(item.attribute("status").as_int());
+                i.dlStatus = convDlStat_IntToEnum(item.attribute("status").as_int());
                 i.timestamp = item.attribute("insert-date").as_uint();
                 // i.ext_info.status_ok = tool.attribute("status-ok").as_bool();
                 i.ext_info.status_msg = item.attribute("status-msg").value();
@@ -458,7 +458,7 @@ int GekkoFyre::CmnRoutines::convDlStat_toInt(const GekkoFyre::DownloadStatus &st
     }
 }
 
-GekkoFyre::DownloadStatus GekkoFyre::CmnRoutines::convDlStat_toEnum(const int &s)
+GekkoFyre::DownloadStatus GekkoFyre::CmnRoutines::convDlStat_IntToEnum(const int &s)
 {
     GekkoFyre::DownloadStatus ds_enum;
     switch (s) {
@@ -503,6 +503,25 @@ QString GekkoFyre::CmnRoutines::convDlStat_toString(const GekkoFyre::DownloadSta
         return tr("Unknown");
     default:
         return tr("Unknown");
+    }
+}
+
+GekkoFyre::DownloadStatus GekkoFyre::CmnRoutines::convDlStat_StringToEnum(const QString &status)
+{
+    if (status == tr("Downloading")) {
+        return GekkoFyre::DownloadStatus::Downloading;
+    } else if (status == tr("Completed")) {
+        return GekkoFyre::DownloadStatus::Completed;
+    } else if (status == tr("Failed")) {
+        return GekkoFyre::DownloadStatus::Failed;
+    } else if (status == tr("Paused")) {
+        return GekkoFyre::DownloadStatus::Paused;
+    } else if (status == tr("Stopped")) {
+        return GekkoFyre::DownloadStatus::Stopped;
+    } else if (status == tr("Unknown")) {
+        return GekkoFyre::DownloadStatus::Unknown;
+    } else {
+        return GekkoFyre::DownloadStatus::Unknown;
     }
 }
 
@@ -1064,6 +1083,7 @@ size_t GekkoFyre::CmnRoutines::curl_write_memory_callback(void *ptr, size_t size
  * @date   2015
  * @note   <https://curl.haxx.se/libcurl/c/ftpget.html>
  *         <https://curl.haxx.se/libcurl/c/url2file.html>
+ *         <http://www.cplusplus.com/reference/fstream/ifstream/>
  * @param ptr
  * @param size
  * @param nmemb

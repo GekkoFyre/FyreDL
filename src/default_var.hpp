@@ -50,6 +50,16 @@
 #define MINIMAL_PROGRESS_FUNCTIONALITY_INTERVAL 3
 #define MAX_WAIT_MSECS (30 * 1000) /* Wait max. 30 seconds */
 
+#define MN_FILENAME_COL 0
+#define MN_FILESIZE_COL 1
+#define MN_DOWNLOADED_COL 2
+#define MN_PROGRESS_COL 3
+#define MN_UPSPEED_COL 4
+#define MN_DOWNSPEED_COL 5
+#define MN_STATUS_COL 6
+#define MN_DESTINATION_COL 7
+#define MN_URL_COL 8
+
 namespace GekkoFyre {
 enum DownloadStatus {
     Downloading,
@@ -58,6 +68,12 @@ enum DownloadStatus {
     Paused,
     Stopped,
     Unknown
+};
+
+enum DownloadType {
+    HTTP,
+    FTP,
+    Torrent
 };
 }
 

@@ -47,6 +47,7 @@
 #include "dl_view.hpp"
 #include "cmnroutines.hpp"
 #include "addurl.hpp"
+#include <vector>
 #include <QMainWindow>
 #include <QString>
 
@@ -75,6 +76,10 @@ private:
     downloadModel *dlModel;
     GekkoFyre::CmnRoutines *routines;
     GekkoFyre::DownloadStatus status;
+    std::vector<GekkoFyre::CmnRoutines::CurlDlStats> dl_stat;
+
+signals:
+    void updateDlStats();
 
 private slots:
     void on_action_Open_a_File_triggered();
@@ -91,13 +96,14 @@ private slots:
     void on_removeToolBtn_clicked();
     void on_clearhistoryToolBtn_clicked();
     void on_settingsToolBtn_clicked();
+    void on_downloadView_customContextMenuRequested(const QPoint &pos);
     void sendDetails(const std::string &fileName, const double &fileSize, const int &downloaded,
                      const double &progress, const int &upSpeed, const int &downSpeed,
                      const GekkoFyre::DownloadStatus &status, const std::string &url,
                      const std::string &destination);
-    void recvXferStats(GekkoFyre::CmnRoutines::CurlDlStats);
-    void recvXferPtr(GekkoFyre::CmnRoutines::CurlDlPtr);
-    void on_downloadView_customContextMenuRequested(const QPoint &pos);
+    void recvXferStats(const GekkoFyre::CmnRoutines::CurlDlStats &info);
+    void recvXferPtr(const GekkoFyre::CmnRoutines::CurlDlPtr &ptr_info);
+    void manageDlStats();
 
 private:
     Ui::MainWindow *ui;

@@ -49,7 +49,6 @@
 #include <QMessageBox>
 #include <QFileDialog>
 #include <QList>
-#include <vector>
 #include <QSortFilterProxyModel>
 #include <QItemSelectionModel>
 
@@ -75,6 +74,7 @@ MainWindow::MainWindow(QWidget *parent) :
     QObject::connect(ui->downloadView, SIGNAL(customContextMenuRequested(QPoint)), this, SLOT(on_downloadView_customContextMenuRequested(QPoint)));
     QObject::connect(routines, SIGNAL(sendXferStats(GekkoFyre::CmnRoutines::CurlDlStats)), this, SLOT(recvXferStats(GekkoFyre::CmnRoutines::CurlDlStats)));
     QObject::connect(routines, SIGNAL(sendXferPtr(GekkoFyre::CmnRoutines::CurlDlPtr)), this, SLOT(recvXferPtr(GekkoFyre::CmnRoutines::CurlDlPtr)));
+    QObject::connect(this, SIGNAL(updateDlStats()), this, SLOT(manageDlStats()));
 
     readFromHistoryFile();
 }
@@ -118,7 +118,7 @@ void MainWindow::readFromHistoryFile()
         try {
             dl_history = routines->readDownloadInfo(CFG_HISTORY_FILE);
         } catch (const std::exception &e) {
-            QMessageBox::warning(this, tr("Error!"), tr("%1").arg(e.what()), QMessageBox::Ok);
+            QMessageBox::warning(this, tr("Error!"), QString("%1").arg(e.what()), QMessageBox::Ok);
         }
     } else {
         return;
@@ -164,31 +164,31 @@ void MainWindow::insertNewRow(const std::string &fileName, const double &fileSiz
 {
     dlModel->insertRows(0, 1, QModelIndex());
 
-    QModelIndex index = dlModel->index(0, 0, QModelIndex());
+    QModelIndex index = dlModel->index(0, MN_FILENAME_COL, QModelIndex());
     dlModel->setData(index, routines->extractFilename(QString::fromStdString(fileName)), Qt::DisplayRole);
 
-    index = dlModel->index(0, 1, QModelIndex());
+    index = dlModel->index(0, MN_FILESIZE_COL, QModelIndex());
     dlModel->setData(index, routines->bytesToKilobytes(fileSize), Qt::DisplayRole);
 
-    index = dlModel->index(0, 2, QModelIndex());
+    index = dlModel->index(0, MN_DOWNLOADED_COL, QModelIndex());
     dlModel->setData(index, QString::number(downloaded), Qt::DisplayRole);
 
-    index = dlModel->index(0, 3, QModelIndex());
+    index = dlModel->index(0, MN_PROGRESS_COL, QModelIndex());
     dlModel->setData(index, QString::number(progress), Qt::DisplayRole);
 
-    index = dlModel->index(0, 4, QModelIndex());
+    index = dlModel->index(0, MN_UPSPEED_COL, QModelIndex());
     dlModel->setData(index, QString::number(upSpeed), Qt::DisplayRole);
 
-    index = dlModel->index(0, 5, QModelIndex());
+    index = dlModel->index(0, MN_DOWNSPEED_COL, QModelIndex());
     dlModel->setData(index, QString::number(downSpeed), Qt::DisplayRole);
 
-    index = dlModel->index(0, 6, QModelIndex());
+    index = dlModel->index(0, MN_STATUS_COL, QModelIndex());
     dlModel->setData(index, routines->convDlStat_toString(status), Qt::DisplayRole);
 
-    index = dlModel->index(0, 7, QModelIndex());
+    index = dlModel->index(0, MN_DESTINATION_COL, QModelIndex());
     dlModel->setData(index, QString::fromStdString(url), Qt::DisplayRole);
 
-    index = dlModel->index(0, 7, QModelIndex());
+    index = dlModel->index(0, MN_DESTINATION_COL, QModelIndex());
     dlModel->setData(index, QString::fromStdString(destination), Qt::DisplayRole);
 
     return;
@@ -196,8 +196,7 @@ void MainWindow::insertNewRow(const std::string &fileName, const double &fileSiz
 
 /**
  * @brief MainWindow::removeSelRows
- * @author yarovenkoas <http://www.qtcentre.org/threads/4885-Remove-selected-rows-from-a-QTableView>
- *         Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
  * @date   2016-10-12
  * @note   <http://doc.qt.io/qt-5/qtwidgets-itemviews-addressbook-example.html>
  */
@@ -219,7 +218,7 @@ void MainWindow::removeSelRows()
         try {
             routines->delDownloadItem(ui->downloadView->model()->data(ui->downloadView->model()->index(indexes.at(0).row(), 8)).toString());
         } catch (const std::exception &e) {
-            QMessageBox::warning(this, tr("Error!"), tr("%1").arg(e.what()), QMessageBox::Ok);
+            QMessageBox::warning(this, tr("Error!"), QString("%1").arg(e.what()), QMessageBox::Ok);
             return;
         }
 
@@ -265,7 +264,30 @@ void MainWindow::on_printToolBtn_clicked()
 {}
 
 void MainWindow::on_dlstartToolBtn_clicked()
-{}
+{
+    QModelIndexList indexes = ui->downloadView->selectionModel()->selectedIndexes();
+    int countRow = indexes.count();
+
+    bool flagDif = false;
+    for (int i = countRow; i > 1; --i) {
+        if ((indexes.at(i - 1).row() - 1) != indexes.at(i - 2).row()) {
+            flagDif = true;
+        }
+    }
+
+    if (!flagDif) {
+        try {
+            if (routines->convDlStat_StringToEnum(ui->downloadView->model()->data(ui->downloadView->model()->index(indexes.at(0).row(), 6)).toString()) != GekkoFyre::DownloadStatus::Downloading) {
+                routines->modifyDlState(ui->downloadView->model()->data(ui->downloadView->model()->index(indexes.at(0).row(), 8)).toString(), GekkoFyre::DownloadStatus::Downloading);
+                QModelIndex index = dlModel->index(indexes.at(0).row(), 6, QModelIndex());
+                dlModel->setData(index, routines->convDlStat_toString(GekkoFyre::DownloadStatus::Downloading), Qt::DisplayRole);
+            }
+        } catch (const std::exception &e) {
+            QMessageBox::warning(this, tr("Error!"), QString("%1").arg(e.what()), QMessageBox::Ok);
+            return;
+        }
+    }
+}
 
 void MainWindow::on_dlpauseToolBtn_clicked()
 {
@@ -281,18 +303,43 @@ void MainWindow::on_dlpauseToolBtn_clicked()
 
     if (!flagDif) {
         try {
-            routines->modifyDlState(ui->downloadView->model()->data(ui->downloadView->model()->index(indexes.at(0).row(), 8)).toString(), GekkoFyre::DownloadStatus::Paused);
-            QModelIndex index = dlModel->index(indexes.at(0).row(), 6, QModelIndex());
-            dlModel->setData(index, routines->convDlStat_toString(GekkoFyre::DownloadStatus::Paused), Qt::DisplayRole);
+            if (routines->convDlStat_StringToEnum(ui->downloadView->model()->data(ui->downloadView->model()->index(indexes.at(0).row(), 6)).toString()) != GekkoFyre::DownloadStatus::Paused) {
+                routines->modifyDlState(ui->downloadView->model()->data(ui->downloadView->model()->index(indexes.at(0).row(), 8)).toString(), GekkoFyre::DownloadStatus::Paused);
+                QModelIndex index = dlModel->index(indexes.at(0).row(), 6, QModelIndex());
+                dlModel->setData(index, routines->convDlStat_toString(GekkoFyre::DownloadStatus::Paused), Qt::DisplayRole);
+            }
         } catch (const std::exception &e) {
-            QMessageBox::warning(this, tr("Error!"), tr("%1").arg(e.what()), QMessageBox::Ok);
+            QMessageBox::warning(this, tr("Error!"), QString("%1").arg(e.what()), QMessageBox::Ok);
             return;
         }
     }
 }
 
 void MainWindow::on_dlstopToolBtn_clicked()
-{}
+{
+    QModelIndexList indexes = ui->downloadView->selectionModel()->selectedIndexes();
+    int countRow = indexes.count();
+
+    bool flagDif = false;
+    for (int i = countRow; i > 1; --i) {
+        if ((indexes.at(i - 1).row() - 1) != indexes.at(i - 2).row()) {
+            flagDif = true;
+        }
+    }
+
+    if (!flagDif) {
+        try {
+            if (routines->convDlStat_StringToEnum(ui->downloadView->model()->data(ui->downloadView->model()->index(indexes.at(0).row(), 6)).toString()) != GekkoFyre::DownloadStatus::Stopped) {
+                routines->modifyDlState(ui->downloadView->model()->data(ui->downloadView->model()->index(indexes.at(0).row(), 8)).toString(), GekkoFyre::DownloadStatus::Stopped);
+                QModelIndex index = dlModel->index(indexes.at(0).row(), 6, QModelIndex());
+                dlModel->setData(index, routines->convDlStat_toString(GekkoFyre::DownloadStatus::Stopped), Qt::DisplayRole);
+            }
+        } catch (const std::exception &e) {
+            QMessageBox::warning(this, tr("Error!"), QString("%1").arg(e.what()), QMessageBox::Ok);
+            return;
+        }
+    }
+}
 
 void MainWindow::on_removeToolBtn_clicked()
 {
@@ -329,11 +376,77 @@ void MainWindow::sendDetails(const std::string &fileName, const double &fileSize
     return;
 }
 
-void MainWindow::recvXferStats(GekkoFyre::CmnRoutines::CurlDlStats)
-{}
+/**
+ * @brief MainWindow::recvXferStats receives the statistics regarding a download.
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @date   2016-10-23
+ * @note   <http://stackoverflow.com/questions/9086372/how-to-compare-pointers>
+ * @param info is the struct related to the download info.
+ */
+void MainWindow::recvXferStats(const GekkoFyre::CmnRoutines::CurlDlStats &info)
+{
+    GekkoFyre::CmnRoutines::CurlDlStats temp_info;
+    temp_info.dlnow = info.dlnow;
+    temp_info.dltotal = info.dltotal;
+    temp_info.upnow = info.upnow;
+    temp_info.uptotal = info.uptotal;
+    temp_info.cur_time = info.cur_time;
+    temp_info.easy = info.easy;
 
-void MainWindow::recvXferPtr(GekkoFyre::CmnRoutines::CurlDlPtr)
-{}
+    bool alreadyExists = false;
+    for (size_t i = 0; i < dl_stat.size(); ++i) {
+        if (dl_stat.at(i).easy == temp_info.easy) { // Compare memory address for equality
+            alreadyExists = true;
+        }
+    }
+
+    if (!alreadyExists) {
+        dl_stat.push_back(temp_info);
+    }
+
+    return;
+}
+
+void MainWindow::recvXferPtr(const GekkoFyre::CmnRoutines::CurlDlPtr &ptr_info)
+{
+    for (size_t i = 0; i < dl_stat.size(); ++i) {
+        if (ptr_info.ptr == dl_stat.at(i).easy) {
+            dl_stat.at(i).url = ptr_info.url;
+            emit updateDlStats();
+            return;
+        }
+    }
+
+    return;
+}
+
+/**
+ * @brief MainWindow::manageDlStats
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @date   2016-10-23
+ * @note   <http://www.qtcentre.org/threads/18082-Hot-to-get-a-QModelIndexList-from-a-model>
+ */
+void MainWindow::manageDlStats()
+{
+    for (int i = 0; i < dlModel->getList().size(); ++i) {
+        QModelIndex find_index = dlModel->index(i, 8);
+        for (size_t j = 0; j < dl_stat.size(); ++j) {
+            if (ui->downloadView->model()->data(find_index).toString().toStdString() == dl_stat.at(j).url) {
+                try {
+                    dlModel->setData(dlModel->index(i, MN_DOWNSPEED_COL), QString::number(dl_stat.at(j).dlnow), Qt::DisplayRole); // Download speed
+                    dlModel->setData(dlModel->index(i, MN_DOWNLOADED_COL), QString::number(dl_stat.at(j).dltotal), Qt::DisplayRole); // Downloaded total
+
+                    dlModel->setData(dlModel->index(i, MN_UPSPEED_COL), QString::number(dl_stat.at(j).upnow), Qt::DisplayRole); // Upload speed
+                } catch (const std::exception &e) {
+                    QMessageBox::warning(this, tr("Error!"), QString("%1").arg(e.what()), QMessageBox::Ok);
+                    return;
+                }
+            }
+        }
+    }
+
+    return;
+}
 
 /**
  * @brief MainWindow::on_downloadView_customContextMenuRequested

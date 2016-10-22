@@ -148,8 +148,9 @@ public:
     double percentDownloaded(const double &content_length, const double &amountDl);
 
     int convDlStat_toInt(const GekkoFyre::DownloadStatus &status);
-    GekkoFyre::DownloadStatus convDlStat_toEnum(const int &s);
+    GekkoFyre::DownloadStatus convDlStat_IntToEnum(const int &s);
     QString convDlStat_toString(const GekkoFyre::DownloadStatus &status);
+    GekkoFyre::DownloadStatus convDlStat_StringToEnum(const QString &status);
 
     std::string findCfgFile(const std::string &cfgFileName);
     std::vector<CurlDlInfo> readDownloadInfo(const std::string &xmlCfgFile = CFG_HISTORY_FILE);

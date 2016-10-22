@@ -41,6 +41,7 @@
  */
 
 #include "dl_view.hpp"
+#include "default_var.hpp"
 
 downloadModel::downloadModel(QObject *parent) : QAbstractTableModel(parent)
 {}
@@ -129,23 +130,23 @@ QVariant downloadModel::headerData(int section, Qt::Orientation orientation, int
 
     if (orientation == Qt::Horizontal) {
         switch (section) {
-        case 0:
+        case MN_FILENAME_COL:
             return tr("File name");
-        case 1:
+        case MN_FILESIZE_COL:
             return tr("File size");
-        case 2:
+        case MN_DOWNLOADED_COL:
             return tr("Downloaded (KB)");
-        case 3:
+        case MN_PROGRESS_COL:
             return tr("Progress");
-        case 4:
+        case MN_UPSPEED_COL:
             return tr("Upload speed (KB/s)");
-        case 5:
+        case MN_DOWNSPEED_COL:
             return tr("Download speed (KB/s)");
-        case 6:
+        case MN_STATUS_COL:
             return tr("Status");
-        case 7:
+        case MN_DESTINATION_COL:
             return tr("Destination");
-        case 8:
+        case MN_URL_COL:
             return tr("URL");
         }
     }
@@ -185,24 +186,24 @@ bool downloadModel::setData(const QModelIndex &index, const QVariant &value, int
         int row = index.row();
 
         std::vector<QString> v = vectorList.value(row);
-        if (index.column() == 0) {
-            v.insert((v.begin() + 0), value.toString());
-        } else if (index.column() == 1) {
-            v.insert((v.begin() + 1), value.toString());
-        } else if (index.column() == 2) {
-            v.insert((v.begin() + 2), value.toString());
-        } else if (index.column() == 3) {
-            v.insert((v.begin() + 3), value.toString());
-        } else if (index.column() == 4) {
-            v.insert((v.begin() + 4), value.toString());
-        } else if (index.column() == 5) {
-            v.insert((v.begin() + 5), value.toString());
-        } else if (index.column() == 6) {
-            v.insert((v.begin() + 6), value.toString());
-        } else if (index.column() == 7) {
-            v.insert((v.begin() + 7), value.toString());
-        } else if (index.column() == 8) {
-            v.insert((v.begin() + 8), value.toString());
+        if (index.column() == MN_FILENAME_COL) {
+            v.insert((v.begin() + MN_FILENAME_COL), value.toString());
+        } else if (index.column() == MN_FILESIZE_COL) {
+            v.insert((v.begin() + MN_FILESIZE_COL), value.toString());
+        } else if (index.column() == MN_DOWNLOADED_COL) {
+            v.insert((v.begin() + MN_DOWNLOADED_COL), value.toString());
+        } else if (index.column() == MN_PROGRESS_COL) {
+            v.insert((v.begin() + MN_PROGRESS_COL), value.toString());
+        } else if (index.column() == MN_UPSPEED_COL) {
+            v.insert((v.begin() + MN_UPSPEED_COL), value.toString());
+        } else if (index.column() == MN_DOWNSPEED_COL) {
+            v.insert((v.begin() + MN_DOWNSPEED_COL), value.toString());
+        } else if (index.column() == MN_STATUS_COL) {
+            v.insert((v.begin() + MN_STATUS_COL), value.toString());
+        } else if (index.column() == MN_DESTINATION_COL) {
+            v.insert((v.begin() + MN_DESTINATION_COL), value.toString());
+        } else if (index.column() == MN_URL_COL) {
+            v.insert((v.begin() + MN_URL_COL), value.toString());
         } else {
             return false;
         }
