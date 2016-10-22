@@ -216,7 +216,7 @@ void MainWindow::removeSelRows()
 
     if (!flagDif) {
         try {
-            routines->delDownloadItem(ui->downloadView->model()->data(ui->downloadView->model()->index(indexes.at(0).row(), 8)).toString());
+            routines->delDownloadItem(ui->downloadView->model()->data(ui->downloadView->model()->index(indexes.at(0).row(), MN_URL_COL)).toString());
         } catch (const std::exception &e) {
             QMessageBox::warning(this, tr("Error!"), QString("%1").arg(e.what()), QMessageBox::Ok);
             return;
@@ -243,13 +243,24 @@ void MainWindow::on_actionEnter_URL_triggered()
 }
 
 void MainWindow::on_actionE_xit_triggered()
-{}
+{
+    QCoreApplication::quit(); // Exit with status code '0'
+    return;
+}
 
 void MainWindow::on_action_About_triggered()
-{}
+{
+    QMessageBox::information(this, tr("Problem!"), tr("This function is not yet implemented."),
+                             QMessageBox::Ok);
+    return;
+}
 
 void MainWindow::on_action_Documentation_triggered()
-{}
+{
+    QMessageBox::information(this, tr("Problem!"), tr("This function is not yet implemented."),
+                             QMessageBox::Ok);
+    return;
+}
 
 void MainWindow::on_addurlToolBtn_clicked()
 {
@@ -258,10 +269,14 @@ void MainWindow::on_addurlToolBtn_clicked()
 }
 
 void MainWindow::on_addfileToolBtn_clicked()
-{}
+{
+    return;
+}
 
 void MainWindow::on_printToolBtn_clicked()
-{}
+{
+    return;
+}
 
 void MainWindow::on_dlstartToolBtn_clicked()
 {
@@ -277,10 +292,15 @@ void MainWindow::on_dlstartToolBtn_clicked()
 
     if (!flagDif) {
         try {
-            if (routines->convDlStat_StringToEnum(ui->downloadView->model()->data(ui->downloadView->model()->index(indexes.at(0).row(), 6)).toString()) != GekkoFyre::DownloadStatus::Downloading) {
-                routines->modifyDlState(ui->downloadView->model()->data(ui->downloadView->model()->index(indexes.at(0).row(), 8)).toString(), GekkoFyre::DownloadStatus::Downloading);
-                QModelIndex index = dlModel->index(indexes.at(0).row(), 6, QModelIndex());
-                dlModel->setData(index, routines->convDlStat_toString(GekkoFyre::DownloadStatus::Downloading), Qt::DisplayRole);
+            const QString url = ui->downloadView->model()->data(ui->downloadView->model()->index(indexes.at(0).row(), MN_URL_COL)).toString();
+            if (routines->convDlStat_StringToEnum(ui->downloadView->model()->data(ui->downloadView->model()->index(indexes.at(0).row(), MN_STATUS_COL)).toString()) != GekkoFyre::DownloadStatus::Downloading) {
+                GekkoFyre::CmnRoutines::CurlInfo verify = routines->verifyFileExists(ui->downloadView->model()->data(ui->downloadView->model()->index(indexes.at(0).row(), MN_URL_COL)).toString());
+                if (verify.response_code == 200) {
+                    routines->modifyDlState(url, GekkoFyre::DownloadStatus::Downloading);
+                    QModelIndex index = dlModel->index(indexes.at(0).row(), MN_STATUS_COL, QModelIndex());
+                    dlModel->setData(index, routines->convDlStat_toString(GekkoFyre::DownloadStatus::Downloading), Qt::DisplayRole);
+                    routines->fileStream(url, ui->downloadView->model()->data(ui->downloadView->model()->index(indexes.at(0).row(), MN_DESTINATION_COL)).toString());
+                }
             }
         } catch (const std::exception &e) {
             QMessageBox::warning(this, tr("Error!"), QString("%1").arg(e.what()), QMessageBox::Ok);
@@ -303,9 +323,9 @@ void MainWindow::on_dlpauseToolBtn_clicked()
 
     if (!flagDif) {
         try {
-            if (routines->convDlStat_StringToEnum(ui->downloadView->model()->data(ui->downloadView->model()->index(indexes.at(0).row(), 6)).toString()) != GekkoFyre::DownloadStatus::Paused) {
-                routines->modifyDlState(ui->downloadView->model()->data(ui->downloadView->model()->index(indexes.at(0).row(), 8)).toString(), GekkoFyre::DownloadStatus::Paused);
-                QModelIndex index = dlModel->index(indexes.at(0).row(), 6, QModelIndex());
+            if (routines->convDlStat_StringToEnum(ui->downloadView->model()->data(ui->downloadView->model()->index(indexes.at(0).row(), MN_STATUS_COL)).toString()) != GekkoFyre::DownloadStatus::Paused) {
+                routines->modifyDlState(ui->downloadView->model()->data(ui->downloadView->model()->index(indexes.at(0).row(), MN_URL_COL)).toString(), GekkoFyre::DownloadStatus::Paused);
+                QModelIndex index = dlModel->index(indexes.at(0).row(), MN_STATUS_COL, QModelIndex());
                 dlModel->setData(index, routines->convDlStat_toString(GekkoFyre::DownloadStatus::Paused), Qt::DisplayRole);
             }
         } catch (const std::exception &e) {
@@ -329,9 +349,9 @@ void MainWindow::on_dlstopToolBtn_clicked()
 
     if (!flagDif) {
         try {
-            if (routines->convDlStat_StringToEnum(ui->downloadView->model()->data(ui->downloadView->model()->index(indexes.at(0).row(), 6)).toString()) != GekkoFyre::DownloadStatus::Stopped) {
-                routines->modifyDlState(ui->downloadView->model()->data(ui->downloadView->model()->index(indexes.at(0).row(), 8)).toString(), GekkoFyre::DownloadStatus::Stopped);
-                QModelIndex index = dlModel->index(indexes.at(0).row(), 6, QModelIndex());
+            if (routines->convDlStat_StringToEnum(ui->downloadView->model()->data(ui->downloadView->model()->index(indexes.at(0).row(), MN_STATUS_COL)).toString()) != GekkoFyre::DownloadStatus::Stopped) {
+                routines->modifyDlState(ui->downloadView->model()->data(ui->downloadView->model()->index(indexes.at(0).row(), MN_URL_COL)).toString(), GekkoFyre::DownloadStatus::Stopped);
+                QModelIndex index = dlModel->index(indexes.at(0).row(), MN_STATUS_COL, QModelIndex());
                 dlModel->setData(index, routines->convDlStat_toString(GekkoFyre::DownloadStatus::Stopped), Qt::DisplayRole);
             }
         } catch (const std::exception &e) {
@@ -347,7 +367,9 @@ void MainWindow::on_removeToolBtn_clicked()
 }
 
 void MainWindow::on_clearhistoryToolBtn_clicked()
-{}
+{
+    return;
+}
 
 void MainWindow::on_settingsToolBtn_clicked()
 {
