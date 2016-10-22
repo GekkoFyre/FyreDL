@@ -73,6 +73,8 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->downloadView->setContextMenuPolicy(Qt::CustomContextMenu);
 
     QObject::connect(ui->downloadView, SIGNAL(customContextMenuRequested(QPoint)), this, SLOT(on_downloadView_customContextMenuRequested(QPoint)));
+    QObject::connect(routines, SIGNAL(sendXferStats(GekkoFyre::CmnRoutines::CurlDlStats)), this, SLOT(recvXferStats(GekkoFyre::CmnRoutines::CurlDlStats)));
+    QObject::connect(routines, SIGNAL(sendXferPtr(GekkoFyre::CmnRoutines::CurlDlPtr)), this, SLOT(recvXferPtr(GekkoFyre::CmnRoutines::CurlDlPtr)));
 
     readFromHistoryFile();
 }
@@ -266,7 +268,28 @@ void MainWindow::on_dlstartToolBtn_clicked()
 {}
 
 void MainWindow::on_dlpauseToolBtn_clicked()
-{}
+{
+    QModelIndexList indexes = ui->downloadView->selectionModel()->selectedIndexes();
+    int countRow = indexes.count();
+
+    bool flagDif = false;
+    for (int i = countRow; i > 1; --i) {
+        if ((indexes.at(i - 1).row() - 1) != indexes.at(i - 2).row()) {
+            flagDif = true;
+        }
+    }
+
+    if (!flagDif) {
+        try {
+            routines->modifyDlState(ui->downloadView->model()->data(ui->downloadView->model()->index(indexes.at(0).row(), 8)).toString(), GekkoFyre::DownloadStatus::Paused);
+            QModelIndex index = dlModel->index(indexes.at(0).row(), 6, QModelIndex());
+            dlModel->setData(index, routines->convDlStat_toString(GekkoFyre::DownloadStatus::Paused), Qt::DisplayRole);
+        } catch (const std::exception &e) {
+            QMessageBox::warning(this, tr("Error!"), tr("%1").arg(e.what()), QMessageBox::Ok);
+            return;
+        }
+    }
+}
 
 void MainWindow::on_dlstopToolBtn_clicked()
 {}
@@ -305,6 +328,12 @@ void MainWindow::sendDetails(const std::string &fileName, const double &fileSize
 
     return;
 }
+
+void MainWindow::recvXferStats(GekkoFyre::CmnRoutines::CurlDlStats)
+{}
+
+void MainWindow::recvXferPtr(GekkoFyre::CmnRoutines::CurlDlPtr)
+{}
 
 /**
  * @brief MainWindow::on_downloadView_customContextMenuRequested

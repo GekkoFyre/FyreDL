@@ -347,7 +347,6 @@ bool GekkoFyre::CmnRoutines::delDownloadItem(const QString &effec_url, const std
     fs::path xmlCfgFile_loc = findCfgFile(xmlCfgFile);
     sys::error_code ec;
     if (fs::exists(xmlCfgFile_loc, ec) && fs::is_regular_file(xmlCfgFile_loc)) {
-        // Code goes here
         std::vector<GekkoFyre::CmnRoutines::CurlDlInfo> dl_info_list;
         dl_info_list = readDownloadInfo(xmlCfgFile);
 
@@ -355,7 +354,8 @@ bool GekkoFyre::CmnRoutines::delDownloadItem(const QString &effec_url, const std
 
         // Load XML into memory
         // Remark: to fully read declaration entries you have to specify, "pugi::parse_declaration"
-        pugi::xml_parse_result result = doc.load_file(xmlCfgFile_loc.string().c_str(), pugi::parse_default|pugi::parse_declaration);
+        pugi::xml_parse_result result = doc.load_file(xmlCfgFile_loc.string().c_str(),
+                                                      pugi::parse_default|pugi::parse_declaration);
         if (!result) {
             throw std::invalid_argument(tr("Parse error: %1, character pos= %2")
                                         .arg(result.description(),
@@ -367,6 +367,59 @@ bool GekkoFyre::CmnRoutines::delDownloadItem(const QString &effec_url, const std
             for (const auto& item: file.children("item")) {
                 if (file.find_child_by_attribute("effec-url", effec_url.toStdString().c_str())) {
                     item.parent().remove_child(item);
+                }
+            }
+        }
+
+        bool saveSucceed = doc.save_file(xmlCfgFile_loc.string().c_str(), PUGIXML_TEXT("    "));
+        if (saveSucceed == false) {
+            throw std::runtime_error(tr("Error with saving XML config file!").toStdString());
+        }
+
+        return true;
+    } else {
+        throw std::invalid_argument(tr("XML config file does not exist! Location attempt: "
+                                       "%1").arg(xmlCfgFile_loc.string().c_str()).toStdString());
+    }
+
+    return false;
+}
+
+/**
+ * @brief GekkoFyre::CmnRoutines::modifyDlState allows the modification of the download state, whether it
+ * be 'paused', 'actively downloading', 'unknown', or something else.
+ * @param effec_url  The URL of the download you wish to change.
+ * @param status     The download state you wish to change towards.
+ * @param xmlCfgFile The XML history file in question.
+ * @return Whether the operation was a success or not.
+ */
+bool GekkoFyre::CmnRoutines::modifyDlState(const QString &effec_url,
+                                           const GekkoFyre::DownloadStatus &status,
+                                           const std::string &xmlCfgFile)
+{
+    fs::path xmlCfgFile_loc = findCfgFile(xmlCfgFile);
+    sys::error_code ec;
+    if (fs::exists(xmlCfgFile_loc, ec) && fs::is_regular_file(xmlCfgFile_loc)) {
+        std::vector<GekkoFyre::CmnRoutines::CurlDlInfo> dl_info_list;
+        dl_info_list = readDownloadInfo(xmlCfgFile);
+
+        pugi::xml_document doc;
+
+        // Load XML into memory
+        // Remark: to fully read declaration entries you have to specify, "pugi::parse_declaration"
+        pugi::xml_parse_result result = doc.load_file(xmlCfgFile_loc.string().c_str(),
+                                                      pugi::parse_default|pugi::parse_declaration);
+        if (!result) {
+            throw std::invalid_argument(tr("Parse error: %1, character pos= %2")
+                                        .arg(result.description(),
+                                             QString::number(result.offset)).toStdString());
+        }
+
+        pugi::xml_node items = doc.child("download-db");
+        for (const auto& file: items.children("file")) {
+            for (const auto& item: file.children("item")) {
+                if (file.find_child_by_attribute("effec-url", effec_url.toStdString().c_str())) {
+                    item.attribute("status").set_value(convDlStat_toInt(status));
                 }
             }
         }
@@ -576,6 +629,61 @@ GekkoFyre::CmnRoutines::CurlInfoExt GekkoFyre::CmnRoutines::curlGrabInfo(const Q
     return curl_ext_info;
 }
 
+bool GekkoFyre::CmnRoutines::fileStream(const QString &url, const QString &file_loc)
+{
+    CurlInit curl_init;
+    if (!file_loc.isEmpty()) {
+        curl_init = new_conn(url, false, false, file_loc, true);
+
+        if (curl_init.conn_info->easy != nullptr) {
+            curl_multi_perform(curl_init.glob_info.multi, &curl_init.glob_info.still_running);
+
+            CurlDlPtr dl_ptr;
+            dl_ptr.ptr = &curl_init.conn_info->easy;
+            dl_ptr.url = curl_init.conn_info->url;
+            emit sendXferPtr(dl_ptr);
+
+            do {
+                int numfds = 0;
+                int res = curl_multi_wait(curl_init.glob_info.multi, NULL, 0, MAX_WAIT_MSECS, &numfds); // https://daniel.haxx.se/blog/2012/09/03/introducing-curl_multi_wait/
+                if(res != CURLM_OK) {
+                    return false;
+                }
+
+                curl_multi_perform(curl_init.glob_info.multi, &curl_init.glob_info.still_running);
+            } while (curl_init.glob_info.still_running);
+
+            // Call curl_multi_perform or curl_multi_socket_action first, then loop through and check
+            // if there are any transfers that have completed
+            // https://gist.github.com/clemensg/4960504
+            struct CURLMsg *m;
+            do {
+                m = curl_multi_info_read(curl_init.glob_info.multi, &curl_init.glob_info.still_running);
+                if (m && (m->msg == CURLMSG_DONE)) {
+                    CURLcode return_code;
+                    CURL *eh = m->easy_handle;
+
+                    return_code = m->data.result;
+                    if (return_code != CURLE_OK) {
+                        qDebug() << QString("CURL error code: %1").arg(QString::number(return_code));
+                        continue;
+                    }
+
+                    curl_multi_remove_handle(curl_init.glob_info.multi, eh);
+                    curl_easy_cleanup(eh);
+                    fclose(curl_init.file_buf.stream);
+                }
+            } while (m);
+            return true;
+        }
+    } else {
+        throw std::invalid_argument(tr("Invalid and/or empty file location has been given!").toStdString());
+    }
+
+    curl_multi_cleanup(curl_init.glob_info.multi);
+    return false;
+}
+
 /**
  * @brief GekkoFyre::CmnRoutines::mcode_or_die will terminate the application if we get a bad CURLMcode
  * somewhere.
@@ -618,7 +726,7 @@ void GekkoFyre::CmnRoutines::mcode_or_die(const char *where, CURLMcode code)
           return;
         }
 
-        qDebug() << tr("ERROR: %1 returns %2").arg(where).arg(s);
+        qDebug() << QString("ERROR: %1 returns %2").arg(where).arg(s);
         exit(code);
     }
 }
@@ -638,7 +746,7 @@ void GekkoFyre::CmnRoutines::check_multi_info(GekkoFyre::CmnRoutines::GlobalInfo
     CURL *easy;
     CURLcode res;
 
-    qDebug() << tr("REMAINING: %1").arg(QString::number(g->still_running));
+    qDebug() << QString("REMAINING: %1").arg(QString::number(g->still_running));
 
     while((msg = curl_multi_info_read(g->multi, &msgs_left))) {
         if(msg->msg == CURLMSG_DONE) {
@@ -646,7 +754,7 @@ void GekkoFyre::CmnRoutines::check_multi_info(GekkoFyre::CmnRoutines::GlobalInfo
             res = msg->data.result;
             curl_easy_getinfo(easy, CURLINFO_PRIVATE, &conn);
             curl_easy_getinfo(easy, CURLINFO_EFFECTIVE_URL, &eff_url);
-            qDebug() << tr("DONE: %1 => %2").arg(eff_url).arg(conn->error);
+            qDebug() << QString("DONE: %1 => %2").arg(eff_url).arg(conn->error);
             curl_multi_remove_handle(g->multi, easy);
             free(conn->url);
             curl_easy_cleanup(easy);
@@ -665,7 +773,7 @@ void GekkoFyre::CmnRoutines::check_multi_info(GekkoFyre::CmnRoutines::GlobalInfo
 void GekkoFyre::CmnRoutines::event_cb(GekkoFyre::CmnRoutines::GlobalInfo *g,
                                       boost::asio::ip::tcp::socket *tcp_socket, int action)
 {
-    qDebug() << tr("event_cb: action=%1").arg(QString::number(action));
+    qDebug() << QString("event_cb: action=%1").arg(QString::number(action));
 
     CURLMcode rc;
     rc = curl_multi_socket_action(g->multi, tcp_socket->native_handle(), action, &g->still_running);
@@ -674,7 +782,7 @@ void GekkoFyre::CmnRoutines::event_cb(GekkoFyre::CmnRoutines::GlobalInfo *g,
     check_multi_info(g);
 
     if(g->still_running <= 0) {
-        qDebug() << tr("last transfer done, kill timeout");
+        qDebug() << QString("last transfer done, kill timeout");
         timer.cancel();
     }
 }
@@ -709,7 +817,7 @@ int GekkoFyre::CmnRoutines::multi_timer_cb(CURLM *multi, long timeout_ms,
                                            GekkoFyre::CmnRoutines::GlobalInfo *g)
 {
     Q_UNUSED(multi);
-    qDebug() << tr("multi_timer_cb: timeout_ms %1").arg(QString::number(timeout_ms));
+    qDebug() << QString("multi_timer_cb: timeout_ms %1").arg(QString::number(timeout_ms));
 
     // Cancel running timer
     timer.cancel();
@@ -753,12 +861,12 @@ void GekkoFyre::CmnRoutines::remsock(int *f, GekkoFyre::CmnRoutines::GlobalInfo 
 void GekkoFyre::CmnRoutines::setsock(int *fdp, curl_socket_t s, CURL *e, int act,
                                      GekkoFyre::CmnRoutines::GlobalInfo *g)
 {
-    qDebug() << tr("netsock: socket=%1, act=%2").arg(QString::number(s)).arg(QString::number(act));
+    qDebug() << QString("netsock: socket=%1, act=%2").arg(QString::number(s)).arg(QString::number(act));
 
     std::map<curl_socket_t, boost::asio::ip::tcp::socket *>::iterator it = socket_map.find(s);
 
     if (it == socket_map.end()) {
-        qDebug() << tr("socket %1 is a c-ares socket, ignoring").arg(QString::number(s));
+        qDebug() << QString("socket %1 is a c-ares socket, ignoring").arg(QString::number(s));
         return;
     }
 
@@ -766,15 +874,15 @@ void GekkoFyre::CmnRoutines::setsock(int *fdp, curl_socket_t s, CURL *e, int act
     *fdp = act;
 
     if (act == CURL_POLL_IN) {
-        qDebug() << tr("watching for socket to become readable");
+        qDebug() << QString("watching for socket to become readable");
         tcp_socket->async_read_some(boost::asio::null_buffers(),
                                     boost::bind(&event_cb, g, tcp_socket, act));
     } else if (act == CURL_POLL_OUT) {
-        qDebug() << tr("watching for socket to become writable");
+        qDebug() << QString("watching for socket to become writable");
         tcp_socket->async_write_some(boost::asio::null_buffers(),
                                      boost::bind(&event_cb, g, tcp_socket, act));
     } else if (act == CURL_POLL_INOUT) {
-        qDebug() << tr("watching for socket to become readable AND writable");
+        qDebug() << QString("watching for socket to become readable AND writable");
         tcp_socket->async_read_some(boost::asio::null_buffers(),
                                     boost::bind(&event_cb, g, tcp_socket, act));
         tcp_socket->async_write_some(boost::asio::null_buffers(),
@@ -812,22 +920,22 @@ void GekkoFyre::CmnRoutines::addsock(curl_socket_t s, CURL *easy, int action,
  */
 int GekkoFyre::CmnRoutines::sock_cb(CURL *e, curl_socket_t s, int what, void *cbp, void *sockp)
 {
-    qDebug() << tr("sock_cb: socket=%1, what=%2").arg(QString::number(s)).arg(QString::number(what));
+    qDebug() << QString("sock_cb: socket=%1, what=%2").arg(QString::number(s)).arg(QString::number(what));
 
     GlobalInfo *g = (GlobalInfo*) cbp;
     int *actionp = (int *) sockp;
     const char *whatstr[] = { "none", "IN", "OUT", "INOUT", "REMOVE" };
 
-    qDebug() << tr("socket callback: s=%1 what=%2").arg(QString::number(s)).arg(whatstr[what]);
+    qDebug() << QString("socket callback: s=%1 what=%2").arg(QString::number(s)).arg(whatstr[what]);
 
     if (what == CURL_POLL_REMOVE) {
         remsock(actionp, g);
     } else {
         if (!actionp) {
-            qDebug() << tr("Adding data: %1").arg(whatstr[what]);
+            qDebug() << QString("Adding data: %1").arg(whatstr[what]);
             addsock(s, e, what, g);
         } else {
-            qDebug() << tr("Changing action from %1 to %2").arg(whatstr[*actionp]).arg(whatstr[what]);
+            qDebug() << QString("Changing action from %1 to %2").arg(whatstr[*actionp]).arg(whatstr[what]);
             setsock(actionp, s, e, what, g);
         }
     }
@@ -838,6 +946,7 @@ int GekkoFyre::CmnRoutines::sock_cb(CURL *e, curl_socket_t s, int what, void *cb
 /**
  * @brief GekkoFyre::CmnRoutines::prog_cb details the progress of the download or upload.
  * @note  <https://curl.haxx.se/libcurl/c/asiohiper.html>
+ *        <https://curl.haxx.se/libcurl/c/progressfunc.html>
  * @param p
  * @param dltotal
  * @param dlnow
@@ -845,13 +954,30 @@ int GekkoFyre::CmnRoutines::sock_cb(CURL *e, curl_socket_t s, int what, void *cb
  * @param uln
  * @return
  */
-int GekkoFyre::CmnRoutines::prog_cb(void *p, double dltotal, double dlnow, double ult, double uln)
+int GekkoFyre::CmnRoutines::curl_xferinfo(void *p, curl_off_t dltotal, curl_off_t dlnow,
+                                          curl_off_t ultotal, curl_off_t ulnow)
 {
-    ConnInfo *conn = (ConnInfo *)p;
-    Q_UNUSED(conn);
+    struct CurlProgressPtr *prog = (struct CurlProgressPtr *)p;
+    CURL *curl = prog->curl;
+    double curtime = 0;
+    CurlDlStats dl_info;
 
-    (void)ult;
-    (void)uln;
+    curl_easy_getinfo(curl, CURLINFO_TOTAL_TIME, &curtime);
+
+    /* Under certain circumstances it may be desirable for certain functionality
+       to only run every N seconds, in order to do this the transaction time can
+       be used */
+    if((curtime - prog->last_runtime) >= MINIMAL_PROGRESS_FUNCTIONALITY_INTERVAL) {
+        prog->last_runtime = curtime;
+        dl_info.cur_time = curtime;
+
+        dl_info.dlnow = dlnow;
+        dl_info.dltotal = dltotal;
+        dl_info.upnow = ulnow;
+        dl_info.uptotal = ultotal;
+        dl_info.easy = &prog->curl;
+        emit sendXferStats(dl_info);
+    }
 
     return 0;
 }
@@ -873,11 +999,11 @@ curl_socket_t GekkoFyre::CmnRoutines::opensocket(void *clientp, curlsocktype pur
             // An error has occured
             std::ostringstream oss;
             oss << std::endl << "Couldn't open socket [" << ec << "][" << ec.message() << "]";
-            qDebug() << tr("ERROR: Returning CURL_SOCKET_BAD to signal error.");
+            qDebug() << QString("ERROR: Returning CURL_SOCKET_BAD to signal error.");
             throw std::runtime_error(oss.str());
         } else {
             sockfd = tcp_socket->native_handle();
-            qDebug() << tr("Opened socket %1").arg(QString::number(sockfd));
+            qDebug() << QString("Opened socket %1").arg(QString::number(sockfd));
 
             // Save it for monitoring
             socket_map.insert(std::pair<curl_socket_t, boost::asio::ip::tcp::socket *>(sockfd, tcp_socket));
@@ -889,7 +1015,7 @@ curl_socket_t GekkoFyre::CmnRoutines::opensocket(void *clientp, curlsocktype pur
 
 int GekkoFyre::CmnRoutines::close_socket(void *clientp, curl_socket_t item)
 {
-    qDebug() << tr("close_socket: %1").arg(QString::number(item));
+    qDebug() << QString("close_socket: %1").arg(QString::number(item));
 
     std::map<curl_socket_t, boost::asio::ip::tcp::socket *>::iterator it = socket_map.find(item);
 
@@ -964,12 +1090,13 @@ size_t GekkoFyre::CmnRoutines::curl_write_file_callback(void *buffer, size_t siz
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
  * @date   2016-10
  * @note   <https://curl.haxx.se/libcurl/c/asiohiper.html>
+ *         <https://gist.github.com/lijoantony/4098139>
  * @param url
  * @param ci
  */
 GekkoFyre::CmnRoutines::CurlInit GekkoFyre::CmnRoutines::new_conn(const QString &url, bool grabHeaderOnly,
                                                                   bool writeToMemory,
-                                                                  const QString &fileLoc)
+                                                                  const QString &fileLoc, bool grabStats)
 {
     GekkoFyre::CmnRoutines::CurlInit ci;
     ci.conn_info = (ConnInfo *) calloc(1, sizeof(ConnInfo));
@@ -1009,6 +1136,8 @@ GekkoFyre::CmnRoutines::CurlInit GekkoFyre::CmnRoutines::new_conn(const QString 
 
         // We pass our 'chunk' struct to the callback function
         curl_easy_setopt(ci.conn_info->easy, CURLOPT_WRITEDATA, (void *)&ci.mem_chunk);
+
+        curl_easy_setopt(ci.conn_info->easy, CURLOPT_NOPROGRESS, 1L);
     } else {
         ci.file_buf.file_loc = fileLoc.toStdString().c_str();
         ci.file_buf.stream = nullptr;
@@ -1021,6 +1150,28 @@ GekkoFyre::CmnRoutines::CurlInit GekkoFyre::CmnRoutines::new_conn(const QString 
 
         // We pass our 'chunk' struct to the callback function
         curl_easy_setopt(ci.conn_info->easy, CURLOPT_WRITEDATA, &ci.file_buf);
+
+        if (grabStats == true) {
+            #if LIBCURL_VERSION_NUM >= 0x072000
+            /* xferinfo was introduced in 7.32.0, no earlier libcurl versions will
+               compile as they won't have the symbols around.
+               If built with a newer libcurl, but running with an older libcurl:
+               curl_easy_setopt() will fail in run-time trying to set the new
+               callback, making the older callback get used.
+               New libcurls will prefer the new callback and instead use that one even
+               if both callbacks are set. */
+            curl_easy_setopt(ci.conn_info->easy, CURLOPT_XFERINFOFUNCTION, &GekkoFyre::CmnRoutines::curl_xferinfo);
+            // Pass the struct pointer into the xferinfo function, but note that this is an
+            // alias to CURLOPT_PROGRESSDATA
+            curl_easy_setopt(ci.conn_info->easy, CURLOPT_XFERINFODATA, &ci.prog);
+
+            curl_easy_setopt(ci.conn_info->easy, CURLOPT_NOPROGRESS, 0L);
+            #else
+            #error "Libcurl needs to be of version 7.32.0 or later! Certain features are missing otherwise..."
+            #endif
+        } else {
+            curl_easy_setopt(ci.conn_info->easy, CURLOPT_NOPROGRESS, 1L);
+        }
     }
 
     // A long parameter set to 1 tells the library to follow any Location: header that the server
@@ -1044,9 +1195,6 @@ GekkoFyre::CmnRoutines::CurlInit GekkoFyre::CmnRoutines::new_conn(const QString 
     curl_easy_setopt(ci.conn_info->easy, CURLOPT_VERBOSE, 1L);
     curl_easy_setopt(ci.conn_info->easy, CURLOPT_ERRORBUFFER, ci.conn_info->error);
     curl_easy_setopt(ci.conn_info->easy, CURLOPT_PRIVATE, ci.conn_info);
-    curl_easy_setopt(ci.conn_info->easy, CURLOPT_NOPROGRESS, 1L);
-    curl_easy_setopt(ci.conn_info->easy, CURLOPT_PROGRESSFUNCTION, prog_cb);
-    curl_easy_setopt(ci.conn_info->easy, CURLOPT_PROGRESSDATA, ci.conn_info);
     curl_easy_setopt(ci.conn_info->easy, CURLOPT_LOW_SPEED_TIME, 3L);
     curl_easy_setopt(ci.conn_info->easy, CURLOPT_LOW_SPEED_LIMIT, 10L);
 
@@ -1056,7 +1204,7 @@ GekkoFyre::CmnRoutines::CurlInit GekkoFyre::CmnRoutines::new_conn(const QString 
     // Call this function to close a socket
     curl_easy_setopt(ci.conn_info->easy, CURLOPT_CLOSESOCKETFUNCTION, close_socket);
 
-    qDebug() << tr("Adding easy to multi (%1)").arg(url);
+    qDebug() << QString("Adding easy to multi (%1)").arg(url);
     ci.conn_info->curlm_res = curl_multi_add_handle(ci.glob_info.multi, ci.conn_info->easy);
     mcode_or_die("new_conn: curl_multi_add_handle", ci.conn_info->curlm_res);
 

@@ -88,11 +88,17 @@ private:
         CURLMcode curlm_res;
     };
 
+    struct CurlProgressPtr {
+        double last_runtime;
+        CURL *curl;
+    };
+
     struct CurlInit {
         ConnInfo *conn_info;
         GlobalInfo glob_info;
         MemoryStruct mem_chunk;
         FileStream file_buf;
+        CurlProgressPtr prog;
     };
 
 public:
@@ -113,12 +119,27 @@ public:
         double content_length;     // The size of the download, i.e. content length
     };
 
+    struct CurlDlStats {
+        curl_off_t dltotal; // Total downloaded
+        curl_off_t uptotal; // Total uploaded
+        curl_off_t dlnow;   // Current download
+        curl_off_t upnow;   // Current upload
+        double cur_time;
+        std::string url;    // The URL in question
+        CURL *easy;
+    };
+
     struct CurlDlInfo {
         std::string file_loc;               // The location of the downloaded file being streamed towards
         unsigned int cId;                   // Automatically incremented Content ID for each download/file
         uint timestamp;                     // The date/time of the download/file having been inserted into the history file
         GekkoFyre::DownloadStatus dlStatus; // Status of the downloading file(s) in question
         CurlInfoExt ext_info;               // Extended info about the file(s) themselves
+    };
+
+    struct CurlDlPtr {
+        CURL *ptr;
+        std::string url;
     };
 
     QString extractFilename(const QString &url);
@@ -135,11 +156,16 @@ public:
     bool writeDownloadItem(CurlDlInfo dl_info_list, const std::string &xmlCfgFile = CFG_HISTORY_FILE);
     pugi::xml_node createNewXmlFile(const std::string &xmlCfgFile = CFG_HISTORY_FILE);
     bool delDownloadItem(const QString &effec_url, const std::string &xmlCfgFile = CFG_HISTORY_FILE);
+    bool modifyDlState(const QString &effec_url, const DownloadStatus &status,
+                       const std::string &xmlCfgFile = CFG_HISTORY_FILE);
 
     CurlInfo verifyFileExists(const QString &url);
     CurlInfoExt curlGrabInfo(const QString &url);
+    bool fileStream(const QString &url, const QString &file_loc);
 
 signals:
+    void sendXferStats(CurlDlStats);
+    void sendXferPtr(CurlDlPtr);
 
 private:
     static void mcode_or_die(const char *where, CURLMcode code);
@@ -154,12 +180,13 @@ private:
     static void addsock(curl_socket_t s, CURL *easy, int action, GlobalInfo *g);
     static int sock_cb(CURL *e, curl_socket_t s, int what, void *cbp, void *sockp); // https://curl.haxx.se/libcurl/c/CURLMOPT_SOCKETFUNCTION.html
 
-    static int prog_cb(void *p, double dltotal, double dlnow, double ult, double uln); // https://curl.haxx.se/libcurl/c/CURLOPT_PROGRESSFUNCTION.html
+    int curl_xferinfo(void *p, curl_off_t dltotal, curl_off_t dlnow, curl_off_t ultotal, curl_off_t ulnow); // https://curl.haxx.se/libcurl/c/CURLOPT_PROGRESSFUNCTION.html
     static curl_socket_t opensocket(void *clientp, curlsocktype purpose, struct curl_sockaddr *address); // https://curl.haxx.se/libcurl/c/CURLOPT_OPENSOCKETFUNCTION.html
     static int close_socket(void *clientp, curl_socket_t item); // https://curl.haxx.se/libcurl/c/CURLOPT_CLOSESOCKETFUNCTION.html
     static size_t curl_write_memory_callback(void *ptr, size_t size, size_t nmemb, void *userp);
     static size_t curl_write_file_callback(void *buffer, size_t size, size_t nmemb, void *stream);
-    static CurlInit new_conn(const QString &url, bool grabHeaderOnly = false, bool writeToMemory = false, const QString &fileLoc = "");
+    static CurlInit new_conn(const QString &url, bool grabHeaderOnly = false, bool writeToMemory = false,
+                             const QString &fileLoc = "", bool grabStats = false);
 };
 }
 
