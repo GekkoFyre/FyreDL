@@ -48,11 +48,12 @@
 #include <cstring>
 #include <cstdlib>
 #include <cmath>
-#include <fstream>
 #include <iostream>
+#include <fstream>
 #include <QUrl>
 #include <QLocale>
 #include <QDebug>
+#include <QApplication>
 
 #ifdef _WIN32
 #define NTDDI_VERSION NTDDI_VISTASP1
@@ -69,6 +70,7 @@
 extern "C" {
 #include <unistd.h>
 #include <sys/types.h>
+#include <sys/time.h>
 #include <pwd.h>
 }
 
@@ -82,6 +84,9 @@ namespace fs = boost::filesystem;
 boost::asio::io_service io_service;
 boost::asio::deadline_timer timer(io_service);
 std::map<curl_socket_t, boost::asio::ip::tcp::socket *> socket_map;
+
+time_t lastTime = 0;
+FILE *pagefile;
 
 GekkoFyre::CmnRoutines::CmnRoutines()
 {
@@ -535,437 +540,98 @@ GekkoFyre::DownloadStatus GekkoFyre::CmnRoutines::convDlStat_StringToEnum(const 
  */
 GekkoFyre::CmnRoutines::CurlInfo GekkoFyre::CmnRoutines::verifyFileExists(const QString &url)
 {
-    CurlInfo curl_info;
-    CurlInit curl_init = new_conn(url, true, true);
-    if (curl_init.conn_info->easy != nullptr) {
-        curl_multi_perform(curl_init.glob_info.multi, &curl_init.glob_info.still_running);
+    // curl_easy_perform(), to initiate the request and fire any callbacks
 
-        do {
-            int numfds = 0;
-            int res = curl_multi_wait(curl_init.glob_info.multi, NULL, 0, MAX_WAIT_MSECS, &numfds); // https://daniel.haxx.se/blog/2012/09/03/introducing-curl_multi_wait/
-            if(res != CURLM_OK) {
-                curl_info.response_code = res;
-                return curl_info;
-            }
+    CurlInfo info;
+    CurlInit curl_struct = new_conn(url, true, true, "", false);
+    if (curl_struct.conn_info->easy != nullptr) {
+        curl_struct.conn_info->curl_res = curl_easy_perform(curl_struct.conn_info->easy);
+        if (curl_struct.conn_info->curl_res != CURLE_OK) {
+            info.response_code = curl_struct.conn_info->curl_res;
+            info.effective_url = curl_struct.conn_info->error;
+            return info;
+        } else {
+            // https://curl.haxx.se/libcurl/c/curl_easy_getinfo.html
+            // http://stackoverflow.com/questions/14947821/how-do-i-use-strdup
+            long rescode;
+            char *effec_url;
+            curl_easy_getinfo(curl_struct.conn_info->easy, CURLINFO_RESPONSE_CODE, &rescode);
+            curl_easy_getinfo(curl_struct.conn_info->easy, CURLINFO_EFFECTIVE_URL, &effec_url);
 
-            curl_multi_perform(curl_init.glob_info.multi, &curl_init.glob_info.still_running);
-        } while (curl_init.glob_info.still_running);
-
-        // Call curl_multi_perform or curl_multi_socket_action first, then loop through and check
-        // if there are any transfers that have completed
-        // https://gist.github.com/clemensg/4960504
-        struct CURLMsg *m;
-        do {
-            m = curl_multi_info_read(curl_init.glob_info.multi, &curl_init.glob_info.still_running);
-            if (m && (m->msg == CURLMSG_DONE)) {
-                CURLcode return_code;
-                int http_status_code;
-                char *szUrl;
-                CURL *eh = m->easy_handle;
-
-                return_code = m->data.result;
-                if (return_code != CURLE_OK) {
-                    qDebug() << QString("CURL error code: %1").arg(QString::number(return_code));
-                    continue;
-                }
-
-                // Get HTTP status code
-                curl_easy_getinfo(eh, CURLINFO_RESPONSE_CODE, &http_status_code);
-                curl_easy_getinfo(eh, CURLINFO_PRIVATE, &szUrl);
-
-                // Must be trivially copyable otherwise UB!
-                std::memcpy(&curl_info.response_code, &http_status_code, sizeof(unsigned long));
-                curl_info.effective_url = szUrl;
-
-                curl_multi_remove_handle(curl_init.glob_info.multi, eh);
-                curl_easy_cleanup(eh);
-            }
-        } while (m);
+            std::memcpy(&info.response_code, &rescode, sizeof(unsigned long)); // Must be trivially copyable otherwise UB!
+            info.effective_url = effec_url;
+        }
     }
 
-    curl_multi_cleanup(curl_init.glob_info.multi);
-    return curl_info;
+    curlCleanup(curl_struct);
+    return info;
 }
 
 GekkoFyre::CmnRoutines::CurlInfoExt GekkoFyre::CmnRoutines::curlGrabInfo(const QString &url)
 {
-    CurlInfoExt curl_ext_info;
-    CurlInit curl_init = new_conn(url, true, true);
-    if (curl_init.conn_info->easy != nullptr) {
-        curl_multi_perform(curl_init.glob_info.multi, &curl_init.glob_info.still_running);
+    // curl_easy_perform(), to initiate the request and fire any callbacks
 
-        do {
-            int numfds = 0;
-            int res = curl_multi_wait(curl_init.glob_info.multi, NULL, 0, MAX_WAIT_MSECS, &numfds); // https://daniel.haxx.se/blog/2012/09/03/introducing-curl_multi_wait/
-            if(res != CURLM_OK) {
-                curl_ext_info.response_code = res;
-                curl_ext_info.status_ok = false;
-                return curl_ext_info;
-            }
+    CurlInfoExt info;
+    CurlInit curl_struct = new_conn(url, true, true, "", false);
+    if (curl_struct.conn_info->easy != nullptr) {
+        curl_struct.conn_info->curl_res = curl_easy_perform(curl_struct.conn_info->easy);
+        if (curl_struct.conn_info->curl_res != CURLE_OK) {
+            info.status_ok = false;
+            info.status_msg = curl_struct.conn_info->error;
+        } else {
+            // https://curl.haxx.se/libcurl/c/curl_easy_getinfo.html
+            long rescode;
+            double elapsed, content_length;
+            char *effec_url;
+            curl_easy_getinfo(curl_struct.conn_info->easy, CURLINFO_RESPONSE_CODE, &rescode);
+            curl_easy_getinfo(curl_struct.conn_info->easy, CURLINFO_TOTAL_TIME, &elapsed);
+            curl_easy_getinfo(curl_struct.conn_info->easy, CURLINFO_EFFECTIVE_URL, &effec_url);
+            curl_easy_getinfo(curl_struct.conn_info->easy, CURLINFO_CONTENT_LENGTH_DOWNLOAD, &content_length);
 
-            curl_multi_perform(curl_init.glob_info.multi, &curl_init.glob_info.still_running);
-        } while (curl_init.glob_info.still_running);
-
-        // Call curl_multi_perform or curl_multi_socket_action first, then loop through and check
-        // if there are any transfers that have completed
-        // https://gist.github.com/clemensg/4960504
-        struct CURLMsg *m;
-        do {
-            m = curl_multi_info_read(curl_init.glob_info.multi, &curl_init.glob_info.still_running);
-            if (m && (m->msg == CURLMSG_DONE)) {
-                CURLcode return_code;
-                int http_status_code;
-                double elapsed, content_length;
-                char *szUrl;
-                CURL *eh = m->easy_handle;
-
-                return_code = m->data.result;
-                if (return_code != CURLE_OK) {
-                    qDebug() << QString("CURL error code: %1").arg(QString::number(return_code));
-                    continue;
-                }
-
-                // Get HTTP status code and other information
-                curl_easy_getinfo(eh, CURLINFO_RESPONSE_CODE, &http_status_code);
-                curl_easy_getinfo(eh, CURLINFO_TOTAL_TIME, &elapsed);
-                curl_easy_getinfo(eh, CURLINFO_EFFECTIVE_URL, &szUrl);
-                curl_easy_getinfo(eh, CURLINFO_CONTENT_LENGTH_DOWNLOAD, &content_length);
-
-                // Must be trivially copyable otherwise UB!
-                std::memcpy(&curl_ext_info.response_code, &http_status_code, sizeof(unsigned long));
-                std::memcpy(&curl_ext_info.elapsed, &elapsed, sizeof(double));
-                std::memcpy(&curl_ext_info.content_length, &content_length, sizeof(double));
-                curl_ext_info.effective_url = szUrl;
-                curl_ext_info.status_ok = true;
-
-                curl_multi_remove_handle(curl_init.glob_info.multi, eh);
-                curl_easy_cleanup(eh);
-            }
-        } while (m);
+            // Must be trivially copyable otherwise UB!
+            std::memcpy(&info.response_code, &rescode, sizeof(unsigned long));
+            std::memcpy(&info.elapsed, &elapsed, sizeof(double));
+            std::memcpy(&info.content_length, &content_length, sizeof(double));
+            info.effective_url = effec_url;
+            info.status_msg = curl_struct.conn_info->error;
+            info.status_ok = true;
+        }
     }
 
-    curl_multi_cleanup(curl_init.glob_info.multi);
-    return curl_ext_info;
+    curlCleanup(curl_struct);
+    return info;
 }
 
+/**
+ * @brief GekkoFyre::CmnRoutines::fileStream
+ * @note  <https://curl.haxx.se/libcurl/c/multi-single.html>
+ * @param url
+ * @param file_loc
+ * @return
+ */
 bool GekkoFyre::CmnRoutines::fileStream(const QString &url, const QString &file_loc)
 {
-    CurlInit curl_init;
-    if (!file_loc.isEmpty()) {
-        curl_init = new_conn(url, false, false, file_loc, true);
-
-        if (curl_init.conn_info->easy != nullptr) {
-            curl_multi_perform(curl_init.glob_info.multi, &curl_init.glob_info.still_running);
-
-            CurlDlPtr dl_ptr;
-            dl_ptr.ptr = &curl_init.conn_info->easy;
-            dl_ptr.url = curl_init.conn_info->url;
-            emit sendXferPtr(dl_ptr);
-
-            do {
-                int numfds = 0;
-                int res = curl_multi_wait(curl_init.glob_info.multi, NULL, 0, MAX_WAIT_MSECS, &numfds); // https://daniel.haxx.se/blog/2012/09/03/introducing-curl_multi_wait/
-                if(res != CURLM_OK) {
-                    return false;
-                }
-
-                curl_multi_perform(curl_init.glob_info.multi, &curl_init.glob_info.still_running);
-            } while (curl_init.glob_info.still_running);
-
-            // Call curl_multi_perform or curl_multi_socket_action first, then loop through and check
-            // if there are any transfers that have completed
-            // https://gist.github.com/clemensg/4960504
-            struct CURLMsg *m;
-            do {
-                m = curl_multi_info_read(curl_init.glob_info.multi, &curl_init.glob_info.still_running);
-                if (m && (m->msg == CURLMSG_DONE)) {
-                    CURLcode return_code;
-                    CURL *eh = m->easy_handle;
-
-                    return_code = m->data.result;
-                    if (return_code != CURLE_OK) {
-                        qDebug() << QString("CURL error code: %1").arg(QString::number(return_code));
-                        continue;
-                    }
-
-                    curl_multi_remove_handle(curl_init.glob_info.multi, eh);
-                    curl_easy_cleanup(eh);
-                    fclose(curl_init.file_buf.stream);
-                }
-            } while (m);
-            return true;
-        }
-    } else {
-        throw std::invalid_argument(tr("Invalid and/or empty file location has been given!").toStdString());
-    }
-
-    curl_multi_cleanup(curl_init.glob_info.multi);
-    return false;
-}
-
-/**
- * @brief GekkoFyre::CmnRoutines::mcode_or_die will terminate the application if we get a bad CURLMcode
- * somewhere.
- * @note  <https://curl.haxx.se/libcurl/c/asiohiper.html>
- * @param where
- * @param code
- */
-void GekkoFyre::CmnRoutines::mcode_or_die(const char *where, CURLMcode code)
-{
-    if(CURLM_OK != code) {
-        const char *s;
-        switch(code) {
-        case CURLM_CALL_MULTI_PERFORM:
-          s = "CURLM_CALL_MULTI_PERFORM";
-          break;
-        case CURLM_BAD_HANDLE:
-          s = "CURLM_BAD_HANDLE";
-          break;
-        case CURLM_BAD_EASY_HANDLE:
-          s = "CURLM_BAD_EASY_HANDLE";
-          break;
-        case CURLM_OUT_OF_MEMORY:
-          s = "CURLM_OUT_OF_MEMORY";
-          break;
-        case CURLM_INTERNAL_ERROR:
-          s = "CURLM_INTERNAL_ERROR";
-          break;
-        case CURLM_UNKNOWN_OPTION:
-          s = "CURLM_UNKNOWN_OPTION";
-          break;
-        case CURLM_LAST:
-          s = "CURLM_LAST";
-          break;
-        default:
-          s = "CURLM_unknown";
-          break;
-        case CURLM_BAD_SOCKET:
-          s = "CURLM_BAD_SOCKET";
-          /* ignore this error */
-          return;
-        }
-
-        qDebug() << QString("ERROR: %1 returns %2").arg(where).arg(s);
-        exit(code);
-    }
-}
-
-/**
- * @brief GekkoFyre::CmnRoutines::check_multi_info checks for completed transfers, and removes their easy
- * handles.
- * @note  <https://curl.haxx.se/libcurl/c/asiohiper.html>
- * @param g
- */
-void GekkoFyre::CmnRoutines::check_multi_info(GekkoFyre::CmnRoutines::GlobalInfo *g)
-{
-    char *eff_url;
-    CURLMsg *msg;
-    int msgs_left;
-    ConnInfo *conn;
-    CURL *easy;
-    CURLcode res;
-
-    qDebug() << QString("REMAINING: %1").arg(QString::number(g->still_running));
-
-    while((msg = curl_multi_info_read(g->multi, &msgs_left))) {
-        if(msg->msg == CURLMSG_DONE) {
-            easy = msg->easy_handle;
-            res = msg->data.result;
-            curl_easy_getinfo(easy, CURLINFO_PRIVATE, &conn);
-            curl_easy_getinfo(easy, CURLINFO_EFFECTIVE_URL, &eff_url);
-            qDebug() << QString("DONE: %1 => %2").arg(eff_url).arg(conn->error);
-            curl_multi_remove_handle(g->multi, easy);
-            free(conn->url);
-            curl_easy_cleanup(easy);
-            free(conn);
-        }
-    }
-}
-
-/**
- * @brief GekkoFyre::CmnRoutines::event_cb is called by asio when there is an action on a socket.
- * @note  <https://curl.haxx.se/libcurl/c/asiohiper.html>
- * @param g
- * @param tcp_socket
- * @param action
- */
-void GekkoFyre::CmnRoutines::event_cb(GekkoFyre::CmnRoutines::GlobalInfo *g,
-                                      boost::asio::ip::tcp::socket *tcp_socket, int action)
-{
-    qDebug() << QString("event_cb: action=%1").arg(QString::number(action));
-
-    CURLMcode rc;
-    rc = curl_multi_socket_action(g->multi, tcp_socket->native_handle(), action, &g->still_running);
-
-    mcode_or_die("event_cb: curl_multi_socket_action", rc);
-    check_multi_info(g);
-
-    if(g->still_running <= 0) {
-        qDebug() << QString("last transfer done, kill timeout");
-        timer.cancel();
-    }
-}
-
-/**
- * @brief GekkoFyre::CmnRoutines::timer_cb is called by asio when our timeout expires.
- * @note  <https://curl.haxx.se/libcurl/c/asiohiper.html>
- * @param error
- * @param g
- */
-void GekkoFyre::CmnRoutines::timer_cb(const boost::system::error_code &error,
-                                      GekkoFyre::CmnRoutines::GlobalInfo *g)
-{
-    if (!error) {
-        CURLMcode rc;
-        rc = curl_multi_socket_action(g->multi, CURL_SOCKET_TIMEOUT, 0, &g->still_running);
-
-        mcode_or_die("timer_cb: curl_multi_socket_action", rc);
-        check_multi_info(g);
-    }
-}
-
-/**
- * @brief GekkoFyre::CmnRoutines::multi_timer_cb updates the event timer after curl_multi library calls.
- * @note  <https://curl.haxx.se/libcurl/c/asiohiper.html>
- * @param multi
- * @param timeout_ms
- * @param g
- * @return
- */
-int GekkoFyre::CmnRoutines::multi_timer_cb(CURLM *multi, long timeout_ms,
-                                           GekkoFyre::CmnRoutines::GlobalInfo *g)
-{
-    Q_UNUSED(multi);
-    qDebug() << QString("multi_timer_cb: timeout_ms %1").arg(QString::number(timeout_ms));
-
-    // Cancel running timer
-    timer.cancel();
-
-    if (timeout_ms > 0) {
-        // Update timer
-        timer.expires_from_now(boost::posix_time::millisec(timeout_ms));
-        timer.async_wait(boost::bind(&timer_cb, _1, g));
-    } else {
-        // Call timeout function immediately
-        boost::system::error_code error; /*success*/
-        timer_cb(error, g);
-    }
-
-    return 0;
-}
-
-/**
- * @brief GekkoFyre::CmnRoutines::remsock
- * @note  <https://curl.haxx.se/libcurl/c/asiohiper.html>
- * @param f
- * @param g
- */
-void GekkoFyre::CmnRoutines::remsock(int *f, GekkoFyre::CmnRoutines::GlobalInfo *g)
-{
-    Q_UNUSED(g);
-    if (f) {
-        free (f);
-    }
-}
-
-/**
- * @brief GekkoFyre::CmnRoutines::setsock
- * @note  <https://curl.haxx.se/libcurl/c/asiohiper.html>
- * @param fdp
- * @param s
- * @param e
- * @param act
- * @param g
- */
-void GekkoFyre::CmnRoutines::setsock(int *fdp, curl_socket_t s, CURL *e, int act,
-                                     GekkoFyre::CmnRoutines::GlobalInfo *g)
-{
-    qDebug() << QString("netsock: socket=%1, act=%2").arg(QString::number(s)).arg(QString::number(act));
-
-    std::map<curl_socket_t, boost::asio::ip::tcp::socket *>::iterator it = socket_map.find(s);
-
-    if (it == socket_map.end()) {
-        qDebug() << QString("socket %1 is a c-ares socket, ignoring").arg(QString::number(s));
-        return;
-    }
-
-    boost::asio::ip::tcp::socket * tcp_socket = it->second;
-    *fdp = act;
-
-    if (act == CURL_POLL_IN) {
-        qDebug() << QString("watching for socket to become readable");
-        tcp_socket->async_read_some(boost::asio::null_buffers(),
-                                    boost::bind(&event_cb, g, tcp_socket, act));
-    } else if (act == CURL_POLL_OUT) {
-        qDebug() << QString("watching for socket to become writable");
-        tcp_socket->async_write_some(boost::asio::null_buffers(),
-                                     boost::bind(&event_cb, g, tcp_socket, act));
-    } else if (act == CURL_POLL_INOUT) {
-        qDebug() << QString("watching for socket to become readable AND writable");
-        tcp_socket->async_read_some(boost::asio::null_buffers(),
-                                    boost::bind(&event_cb, g, tcp_socket, act));
-        tcp_socket->async_write_some(boost::asio::null_buffers(),
-                                     boost::bind(&event_cb, g, tcp_socket, act));
-    }
-}
-
-/**
- * @brief GekkoFyre::CmnRoutines::addsock
- * @note  <https://curl.haxx.se/libcurl/c/asiohiper.html>
- * @param s
- * @param easy
- * @param action
- * @param g
- */
-void GekkoFyre::CmnRoutines::addsock(curl_socket_t s, CURL *easy, int action,
-                                     GekkoFyre::CmnRoutines::GlobalInfo *g)
-{
-    // fdp is used to store current action
-    int *fdp = (int *) calloc(sizeof(int), 1);
-
-    setsock(fdp, s, easy, action, g);
-    curl_multi_assign(g->multi, s, fdp);
-}
-
-/**
- * @brief GekkoFyre::CmnRoutines::sock_cb
- * @note  <https://curl.haxx.se/libcurl/c/asiohiper.html>
- * @param e
- * @param s
- * @param what
- * @param cbp
- * @param sockp
- * @return
- */
-int GekkoFyre::CmnRoutines::sock_cb(CURL *e, curl_socket_t s, int what, void *cbp, void *sockp)
-{
-    qDebug() << QString("sock_cb: socket=%1, what=%2").arg(QString::number(s)).arg(QString::number(what));
-
-    GlobalInfo *g = (GlobalInfo*) cbp;
-    int *actionp = (int *) sockp;
-    const char *whatstr[] = { "none", "IN", "OUT", "INOUT", "REMOVE" };
-
-    qDebug() << QString("socket callback: s=%1 what=%2").arg(QString::number(s)).arg(whatstr[what]);
-
-    if (what == CURL_POLL_REMOVE) {
-        remsock(actionp, g);
-    } else {
-        if (!actionp) {
-            qDebug() << QString("Adding data: %1").arg(whatstr[what]);
-            addsock(s, e, what, g);
-        } else {
-            qDebug() << QString("Changing action from %1 to %2").arg(whatstr[*actionp]).arg(whatstr[what]);
-            setsock(actionp, s, e, what, g);
+    CurlInit curl_struct = new_conn(url, false, false, file_loc, false);
+    if (curl_struct.conn_info->easy != nullptr) {
+        curl_struct.conn_info->curl_res = curl_easy_perform(curl_struct.conn_info->easy);
+        if (curl_struct.conn_info->curl_res != CURLE_OK) {
+            throw std::runtime_error(tr("Error while downloading file! Message: %1")
+                                     .arg(QString::number(curl_struct.conn_info->curl_res)).toStdString());
         }
     }
 
-    return 0;
+    curlCleanup(curl_struct);
+    fclose(pagefile);
+    return true;
 }
 
 /**
  * @brief GekkoFyre::CmnRoutines::prog_cb details the progress of the download or upload.
  * @note  <https://curl.haxx.se/libcurl/c/asiohiper.html>
  *        <https://curl.haxx.se/libcurl/c/progressfunc.html>
+ *        <https://curl.haxx.se/libcurl/c/chkspeed.html>
+ *        <http://prog3.com/sbdm/blog/ixiaochouyu/article/details/47301005>
+ *        <https://github.com/y-wine/HttpClient/blob/master/HttpClient/HttpClient.cpp>
  * @param p
  * @param dltotal
  * @param dlnow
@@ -976,72 +642,28 @@ int GekkoFyre::CmnRoutines::sock_cb(CURL *e, curl_socket_t s, int what, void *cb
 int GekkoFyre::CmnRoutines::curl_xferinfo(void *p, curl_off_t dltotal, curl_off_t dlnow,
                                           curl_off_t ultotal, curl_off_t ulnow)
 {
-    struct CurlProgressPtr *prog = (struct CurlProgressPtr *)p;
-    CURL *curl = prog->curl;
-    double curtime = 0;
+    CurlProgressPtr *prog = static_cast<CurlProgressPtr *>(p);
+    // CURL *curl = prog->curl;
     CurlDlStats dl_info;
-
-    curl_easy_getinfo(curl, CURLINFO_TOTAL_TIME, &curtime);
 
     /* Under certain circumstances it may be desirable for certain functionality
        to only run every N seconds, in order to do this the transaction time can
        be used */
-    if((curtime - prog->last_runtime) >= MINIMAL_PROGRESS_FUNCTIONALITY_INTERVAL) {
-        prog->last_runtime = curtime;
-        dl_info.cur_time = curtime;
-
-        dl_info.dlnow = dlnow;
-        dl_info.dltotal = dltotal;
-        dl_info.upnow = ulnow;
-        dl_info.uptotal = ultotal;
-        dl_info.easy = &prog->curl;
-        emit sendXferStats(dl_info);
+    time_t now = time(NULL);
+    if (now - lastTime < 1) {
+        return 0;
     }
+    lastTime = now;
 
-    return 0;
-}
+    // double dlspeed = 0;
+    // curl_easy_getinfo(curl, CURLINFO_SPEED_DOWNLOAD, &dlspeed);
 
-curl_socket_t GekkoFyre::CmnRoutines::opensocket(void *clientp, curlsocktype purpose, curl_sockaddr *address)
-{
-    curl_socket_t sockfd = CURL_SOCKET_BAD;
-
-    // Restrict to IPv4
-    if (purpose == CURLSOCKTYPE_IPCXN && address->family == AF_INET) {
-        // Create a tcp socket object
-        boost::asio::ip::tcp::socket *tcp_socket = new boost::asio::ip::tcp::socket(io_service);
-
-        // Open it and get the native handle
-        boost::system::error_code ec;
-        tcp_socket->open(boost::asio::ip::tcp::v4(), ec);
-
-        if (ec) {
-            // An error has occured
-            std::ostringstream oss;
-            oss << std::endl << "Couldn't open socket [" << ec << "][" << ec.message() << "]";
-            qDebug() << QString("ERROR: Returning CURL_SOCKET_BAD to signal error.");
-            throw std::runtime_error(oss.str());
-        } else {
-            sockfd = tcp_socket->native_handle();
-            qDebug() << QString("Opened socket %1").arg(QString::number(sockfd));
-
-            // Save it for monitoring
-            socket_map.insert(std::pair<curl_socket_t, boost::asio::ip::tcp::socket *>(sockfd, tcp_socket));
-        }
-    }
-
-    return sockfd;
-}
-
-int GekkoFyre::CmnRoutines::close_socket(void *clientp, curl_socket_t item)
-{
-    qDebug() << QString("close_socket: %1").arg(QString::number(item));
-
-    std::map<curl_socket_t, boost::asio::ip::tcp::socket *>::iterator it = socket_map.find(item);
-
-    if (it != socket_map.end()) {
-        delete it->second;
-        socket_map.erase(it);
-    }
+    dl_info.dlnow = dlnow;
+    dl_info.dltotal = dltotal;
+    dl_info.upnow = ulnow;
+    dl_info.uptotal = ultotal;
+    dl_info.easy = &prog->curl;
+    GekkoFyre::StatisticEvent::postStatEvent(dl_info);
 
     return 0;
 }
@@ -1084,25 +706,23 @@ size_t GekkoFyre::CmnRoutines::curl_write_memory_callback(void *ptr, size_t size
  * @note   <https://curl.haxx.se/libcurl/c/ftpget.html>
  *         <https://curl.haxx.se/libcurl/c/url2file.html>
  *         <http://www.cplusplus.com/reference/fstream/ifstream/>
+ *         <http://www.velvetcache.org/2008/10/24/better-libcurl-from-c>
+ *         <http://stackoverflow.com/questions/2329571/c-libcurl-get-output-into-a-string>
  * @param ptr
  * @param size
  * @param nmemb
  * @param stream
  * @return
  */
-size_t GekkoFyre::CmnRoutines::curl_write_file_callback(void *buffer, size_t size, size_t nmemb,
-                                                        void *stream)
+size_t GekkoFyre::CmnRoutines::curl_write_file_callback(char *buffer, size_t size, size_t nmemb, void *userdata)
 {
-    struct FileStream *out = (struct FileStream *)stream;
-    if(out && !out->stream) {
-        // Open file for writing
-        out->stream = fopen(out->file_loc, "wb");
-        if(!out->stream) {
-            return 0; // Failure, can't open file to write!
-        }
+    FILE *fp = static_cast<FILE *>(userdata);
+    size_t length = fwrite(buffer, size, nmemb, fp);
+    if (length != nmemb) {
+        return length;
     }
 
-    return fwrite(buffer, size, nmemb, out->stream);
+    return (size * nmemb);
 }
 
 /**
@@ -1111,6 +731,8 @@ size_t GekkoFyre::CmnRoutines::curl_write_file_callback(void *buffer, size_t siz
  * @date   2016-10
  * @note   <https://curl.haxx.se/libcurl/c/asiohiper.html>
  *         <https://gist.github.com/lijoantony/4098139>
+ *         <https://github.com/y-wine/HttpClient/blob/master/HttpClient/HttpClient.cpp>
+ *         <https://github.com/y-wine/HttpClient/blob/master/HttpClient/include/HttpClient.h>
  * @param url
  * @param ci
  */
@@ -1120,24 +742,16 @@ GekkoFyre::CmnRoutines::CurlInit GekkoFyre::CmnRoutines::new_conn(const QString 
 {
     GekkoFyre::CmnRoutines::CurlInit ci;
     ci.conn_info = (ConnInfo *) calloc(1, sizeof(ConnInfo));
-    memset(&ci.glob_info, 0, sizeof(GlobalInfo));
 
-    ci.glob_info.multi = curl_multi_init();
+    curl_global_init(CURL_GLOBAL_DEFAULT);
+    ci.conn_info->easy = curl_easy_init(); // Initiate the curl session
 
-    curl_multi_setopt(ci.glob_info.multi, CURLMOPT_SOCKETFUNCTION, sock_cb);
-    curl_multi_setopt(ci.glob_info.multi, CURLMOPT_SOCKETDATA, &ci.glob_info);
-    curl_multi_setopt(ci.glob_info.multi, CURLMOPT_TIMERFUNCTION, multi_timer_cb);
-    curl_multi_setopt(ci.glob_info.multi, CURLMOPT_TIMERDATA, &ci.glob_info);
-
-    curl_global_init(CURL_GLOBAL_ALL);
-    ci.conn_info->easy = curl_easy_init();
     if (!ci.conn_info->easy) {
         throw std::runtime_error(tr("'curl_easy_init()' failed, exiting!").toStdString());
     }
 
-    ci.conn_info->url = strdup(url.toStdString().c_str());
-    curl_easy_setopt(ci.conn_info->easy, CURLOPT_URL, ci.conn_info->url);
-    // curl_easy_setopt(ci->conn_info->easy, CURLOPT_WRITEFUNCTION, write_cb);
+    ci.conn_info->url = url.toStdString();
+    curl_easy_setopt(ci.conn_info->easy, CURLOPT_URL, ci.conn_info->url.c_str());
 
     if (grabHeaderOnly) {
         curl_easy_setopt(ci.conn_info->easy, CURLOPT_HEADER, 1);
@@ -1148,7 +762,6 @@ GekkoFyre::CmnRoutines::CurlInit GekkoFyre::CmnRoutines::new_conn(const QString 
         ci.mem_chunk.memory = (char *)malloc(1); // Will be grown as needed by the realloc above
         ci.mem_chunk.size = 0; // No data at this point
         ci.file_buf.file_loc = nullptr;
-        ci.file_buf.stream = nullptr;
 
         // Send all data to this function, via the computer's RAM
         // NOTE: On Windows, 'CURLOPT_WRITEFUNCTION' /must/ be set, otherwise a crash will occur!
@@ -1160,19 +773,26 @@ GekkoFyre::CmnRoutines::CurlInit GekkoFyre::CmnRoutines::new_conn(const QString 
         curl_easy_setopt(ci.conn_info->easy, CURLOPT_NOPROGRESS, 1L);
     } else {
         ci.file_buf.file_loc = fileLoc.toStdString().c_str();
-        ci.file_buf.stream = nullptr;
         ci.mem_chunk.memory = nullptr;
         ci.mem_chunk.size = 0;
+
+        pagefile = fopen(fileLoc.toStdString().c_str(), "ab+");
+        if (pagefile == NULL) {
+            throw std::runtime_error(tr("Failed to create file! Not enough disk space?").toStdString());
+        }
 
         // Send all data to this function, via file streaming
         // NOTE: On Windows, 'CURLOPT_WRITEFUNCTION' /must/ be set, otherwise a crash will occur!
         curl_easy_setopt(ci.conn_info->easy, CURLOPT_WRITEFUNCTION, curl_write_file_callback);
 
         // We pass our 'chunk' struct to the callback function
-        curl_easy_setopt(ci.conn_info->easy, CURLOPT_WRITEDATA, &ci.file_buf);
+        curl_easy_setopt(ci.conn_info->easy, CURLOPT_WRITEDATA, pagefile);
 
         if (grabStats == true) {
             #if LIBCURL_VERSION_NUM >= 0x072000
+            curl_easy_setopt(ci.conn_info->easy, CURLOPT_NOPROGRESS, 0L);
+            ci.prog = (CurlProgressPtr *) calloc(1, sizeof(CurlProgressPtr));
+
             /* xferinfo was introduced in 7.32.0, no earlier libcurl versions will
                compile as they won't have the symbols around.
                If built with a newer libcurl, but running with an older libcurl:
@@ -1185,7 +805,6 @@ GekkoFyre::CmnRoutines::CurlInit GekkoFyre::CmnRoutines::new_conn(const QString 
             // alias to CURLOPT_PROGRESSDATA
             curl_easy_setopt(ci.conn_info->easy, CURLOPT_XFERINFODATA, &ci.prog);
 
-            curl_easy_setopt(ci.conn_info->easy, CURLOPT_NOPROGRESS, 0L);
             #else
             #error "Libcurl needs to be of version 7.32.0 or later! Certain features are missing otherwise..."
             #endif
@@ -1218,18 +837,42 @@ GekkoFyre::CmnRoutines::CurlInit GekkoFyre::CmnRoutines::new_conn(const QString 
     curl_easy_setopt(ci.conn_info->easy, CURLOPT_LOW_SPEED_TIME, 3L);
     curl_easy_setopt(ci.conn_info->easy, CURLOPT_LOW_SPEED_LIMIT, 10L);
 
-    // Call this function to get a socket
-    curl_easy_setopt(ci.conn_info->easy, CURLOPT_OPENSOCKETFUNCTION, opensocket);
-
-    // Call this function to close a socket
-    curl_easy_setopt(ci.conn_info->easy, CURLOPT_CLOSESOCKETFUNCTION, close_socket);
-
-    qDebug() << QString("Adding easy to multi (%1)").arg(url);
-    ci.conn_info->curlm_res = curl_multi_add_handle(ci.glob_info.multi, ci.conn_info->easy);
-    mcode_or_die("new_conn: curl_multi_add_handle", ci.conn_info->curlm_res);
-
-    /* note that the add_handle() will set a time-out to trigger very soon so
-       that the necessary socket_action() call will be called by this app */
-
     return ci;
+}
+
+void GekkoFyre::CmnRoutines::curlCleanup(GekkoFyre::CmnRoutines::CurlInit curl_init)
+{
+    // curl_easy_cleanup(), to clean up the context
+    // curl_global_cleanup(), to tear down the curl library (once per program)
+
+    curl_easy_cleanup(curl_init.conn_info->easy); // Always cleanup
+    curl_global_cleanup(); // We're done with libcurl, globally, so clean it up!
+
+    if (curl_init.mem_chunk.memory != nullptr) {
+        free(curl_init.mem_chunk.memory);
+    }
+
+    curl_init.conn_info->easy = nullptr;
+    return;
+}
+
+void GekkoFyre::StatisticEvent::postStatEvent(const GekkoFyre::CmnRoutines::CurlDlStats &dl_stat)
+{
+    // This method (GekkoFyre::StatisticEvent::postStatEvent) can be called from any thread
+    QApplication::postEvent(new StatisticEvent(dl_stat), new QEvent(QEvent::User));
+}
+
+void GekkoFyre::StatisticEvent::statEvent(QEvent *event)
+{
+    // When we get here, we've crossed the thread boundary and are now executing in the Qt object's thread
+    if (event->type() == GekkoFyre::CmnRoutines::stat_event) {
+        handleStatEvent(static_cast<StatisticEvent *>(event));
+    }
+}
+
+void GekkoFyre::StatisticEvent::handleStatEvent(const GekkoFyre::StatisticEvent *event)
+{
+    // Now you can safely do something with your Qt objects.
+    // Access your custom data using event->getDlTotal() etc.
+    emit sendXferStats(event->getDlStats());
 }

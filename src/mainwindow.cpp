@@ -186,10 +186,10 @@ void MainWindow::insertNewRow(const std::string &fileName, const double &fileSiz
     dlModel->setData(index, routines->convDlStat_toString(status), Qt::DisplayRole);
 
     index = dlModel->index(0, MN_DESTINATION_COL, QModelIndex());
-    dlModel->setData(index, QString::fromStdString(url), Qt::DisplayRole);
-
-    index = dlModel->index(0, MN_DESTINATION_COL, QModelIndex());
     dlModel->setData(index, QString::fromStdString(destination), Qt::DisplayRole);
+
+    index = dlModel->index(0, MN_URL_COL, QModelIndex());
+    dlModel->setData(index, QString::fromStdString(url), Qt::DisplayRole);
 
     return;
 }
@@ -293,13 +293,17 @@ void MainWindow::on_dlstartToolBtn_clicked()
     if (!flagDif) {
         try {
             const QString url = ui->downloadView->model()->data(ui->downloadView->model()->index(indexes.at(0).row(), MN_URL_COL)).toString();
+            const QString dest = ui->downloadView->model()->data(ui->downloadView->model()->index(indexes.at(0).row(), MN_DESTINATION_COL)).toString();
+            std::ostringstream oss_dest;
+            oss_dest << dest.toStdString() << fs::path::preferred_separator << routines->extractFilename(url).toStdString();
+
             if (routines->convDlStat_StringToEnum(ui->downloadView->model()->data(ui->downloadView->model()->index(indexes.at(0).row(), MN_STATUS_COL)).toString()) != GekkoFyre::DownloadStatus::Downloading) {
                 GekkoFyre::CmnRoutines::CurlInfo verify = routines->verifyFileExists(ui->downloadView->model()->data(ui->downloadView->model()->index(indexes.at(0).row(), MN_URL_COL)).toString());
                 if (verify.response_code == 200) {
                     routines->modifyDlState(url, GekkoFyre::DownloadStatus::Downloading);
                     QModelIndex index = dlModel->index(indexes.at(0).row(), MN_STATUS_COL, QModelIndex());
                     dlModel->setData(index, routines->convDlStat_toString(GekkoFyre::DownloadStatus::Downloading), Qt::DisplayRole);
-                    routines->fileStream(url, ui->downloadView->model()->data(ui->downloadView->model()->index(indexes.at(0).row(), MN_DESTINATION_COL)).toString());
+                    routines->fileStream(url, QString::fromStdString(oss_dest.str()));
                 }
             }
         } catch (const std::exception &e) {

@@ -53,6 +53,7 @@
 #include <cstdio>
 #include <QString>
 #include <QObject>
+#include <QEvent>
 
 extern "C" {
 #include <curl/curl.h>
@@ -71,39 +72,34 @@ private:
 
     struct FileStream {
         const char *file_loc; // Name to store file as if download /and/ disk writing is successful
-        std::FILE *stream;    // File object stream
-    };
-
-    // Global information, common to all connections
-    struct GlobalInfo {
-        CURLM *multi;
-        int still_running;
+        FILE *stream;         // File object stream
     };
 
     // Information associated with a specific easy handle
     struct ConnInfo {
         CURL *easy;
-        char *url;
+        std::string url;
         char error[CURL_ERROR_SIZE];
-        CURLMcode curlm_res;
+        CURLcode curl_res;
     };
 
     struct CurlProgressPtr {
-        double last_runtime;
+        double lastruntime;
         CURL *curl;
     };
 
     struct CurlInit {
         ConnInfo *conn_info;
-        GlobalInfo glob_info;
         MemoryStruct mem_chunk;
         FileStream file_buf;
-        CurlProgressPtr prog;
+        CurlProgressPtr *prog;
     };
 
 public:
     CmnRoutines();
     ~CmnRoutines();
+
+    static const QEvent::Type stat_event = static_cast<QEvent::Type>(QEvent::User + 1);
 
     struct CurlInfo {
         long response_code;        // The HTTP/FTP response code
@@ -122,7 +118,7 @@ public:
     struct CurlDlStats {
         curl_off_t dltotal; // Total downloaded
         curl_off_t uptotal; // Total uploaded
-        curl_off_t dlnow;   // Current download
+        double dlnow;   // Current download
         curl_off_t upnow;   // Current upload
         double cur_time;
         std::string url;    // The URL in question
@@ -169,25 +165,36 @@ signals:
     void sendXferPtr(CurlDlPtr);
 
 private:
-    static void mcode_or_die(const char *where, CURLMcode code);
-
-    static void check_multi_info(GlobalInfo *g);
-    static void event_cb(GlobalInfo *g, boost::asio::ip::tcp::socket *tcp_socket, int action);
-    static void timer_cb(const boost::system::error_code &error, GlobalInfo *g);
-    static int multi_timer_cb(CURLM *multi, long timeout_ms, GlobalInfo *g);
-
-    static void remsock(int *f, GlobalInfo *g);
-    static void setsock(int *fdp, curl_socket_t s, CURL *e, int act, GlobalInfo *g);
-    static void addsock(curl_socket_t s, CURL *easy, int action, GlobalInfo *g);
-    static int sock_cb(CURL *e, curl_socket_t s, int what, void *cbp, void *sockp); // https://curl.haxx.se/libcurl/c/CURLMOPT_SOCKETFUNCTION.html
-
-    int curl_xferinfo(void *p, curl_off_t dltotal, curl_off_t dlnow, curl_off_t ultotal, curl_off_t ulnow); // https://curl.haxx.se/libcurl/c/CURLOPT_PROGRESSFUNCTION.html
-    static curl_socket_t opensocket(void *clientp, curlsocktype purpose, struct curl_sockaddr *address); // https://curl.haxx.se/libcurl/c/CURLOPT_OPENSOCKETFUNCTION.html
-    static int close_socket(void *clientp, curl_socket_t item); // https://curl.haxx.se/libcurl/c/CURLOPT_CLOSESOCKETFUNCTION.html
+    static int curl_xferinfo(void *p, curl_off_t dltotal, curl_off_t dlnow, curl_off_t ultotal, curl_off_t ulnow); // https://curl.haxx.se/libcurl/c/CURLOPT_PROGRESSFUNCTION.html
     static size_t curl_write_memory_callback(void *ptr, size_t size, size_t nmemb, void *userp);
-    static size_t curl_write_file_callback(void *buffer, size_t size, size_t nmemb, void *stream);
+    static size_t curl_write_file_callback(char *buffer, size_t size, size_t nmemb, void *userdata);
     static CurlInit new_conn(const QString &url, bool grabHeaderOnly = false, bool writeToMemory = false,
                              const QString &fileLoc = "", bool grabStats = false);
+    static void curlCleanup(CurlInit curl_init);
+};
+
+// http://stackoverflow.com/questions/6061352/creating-a-custom-message-event-with-qt
+class StatisticEvent : public QEvent, CmnRoutines
+{
+public:
+    StatisticEvent(const GekkoFyre::CmnRoutines::CurlDlStats &dl_stat)
+        : QEvent(GekkoFyre::CmnRoutines::stat_event), m_dl_stats(dl_stat) {}
+
+    GekkoFyre::CmnRoutines::CurlDlStats getDlStats() const {
+        return m_dl_stats;
+    }
+
+private:
+    GekkoFyre::CmnRoutines::CurlDlStats m_dl_stats;
+
+public:
+    static void postStatEvent(const GekkoFyre::CmnRoutines::CurlDlStats &dl_stat);
+
+protected:
+    void statEvent(QEvent *event);
+
+private:
+    void handleStatEvent(const StatisticEvent *event);
 };
 }
 
