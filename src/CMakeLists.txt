@@ -77,7 +77,8 @@ set(SOURCE_FILES
     mainwindow.hpp
     mainwindow.cpp
     settings.hpp
-    settings.cpp)
+    settings.cpp
+    singleton_proc.hpp)
 
 # http://www.executionunit.com/blog/2014/01/22/moving-from-qmake-to-cmake/
 qt5_wrap_ui(UI_HEADERS

@@ -853,6 +853,7 @@ void GekkoFyre::CmnRoutines::curlCleanup(GekkoFyre::CmnRoutines::CurlInit curl_i
     }
 
     curl_init.conn_info->easy = nullptr;
+    free(curl_init.conn_info);
     return;
 }
 

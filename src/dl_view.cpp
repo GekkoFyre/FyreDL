@@ -260,6 +260,29 @@ bool downloadModel::removeRows(int position, int rows, const QModelIndex &index)
     return true;
 }
 
+bool downloadModel::updateCol(const QModelIndex &index, const QVariant &value, const int &col)
+{
+    if (index.isValid()) {
+        if (col >= 0) {
+            int row = index.row();
+
+            std::vector<QString> v = vectorList.value(row);
+            if (index.column() == col) {
+                v.at((size_t)col) = value.toString();
+            }
+
+            vectorList.replace(row, v);
+            emit(dataChanged(index, index));
+            return true;
+        } else {
+            throw std::invalid_argument(tr("'col' is less than zero! Please restart the application "
+                                           "and try again.").toStdString());
+        }
+    }
+
+    return false;
+}
+
 /**
  * @brief downloadModel::getList
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
