@@ -101,8 +101,8 @@ private slots:
                      const double &progress, const int &upSpeed, const int &downSpeed,
                      const GekkoFyre::DownloadStatus &status, const std::string &url,
                      const std::string &destination);
-    void recvXferStats(const GekkoFyre::CmnRoutines::CurlDlStats &info);
-    void recvXferPtr(const GekkoFyre::CmnRoutines::CurlDlPtr &ptr_info);
+    void recvXferStats(GekkoFyre::CmnRoutines::CurlDlStats info);
+    void recvXferPtr(GekkoFyre::CmnRoutines::CurlDlPtr ptr_info);
     void manageDlStats();
 
 private:

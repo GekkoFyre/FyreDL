@@ -161,8 +161,8 @@ public:
     bool fileStream(const QString &url, const QString &file_loc);
 
 signals:
-    void sendXferStats(CurlDlStats);
-    void sendXferPtr(CurlDlPtr);
+    void sendXferStats(GekkoFyre::CmnRoutines::CurlDlStats dl_stat);
+    void sendXferPtr(GekkoFyre::CmnRoutines::CurlDlPtr curl_ptr);
 
 private:
     static int curl_xferinfo(void *p, curl_off_t dltotal, curl_off_t dlnow, curl_off_t ultotal, curl_off_t ulnow); // https://curl.haxx.se/libcurl/c/CURLOPT_PROGRESSFUNCTION.html

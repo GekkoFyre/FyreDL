@@ -733,6 +733,7 @@ size_t GekkoFyre::CmnRoutines::curl_write_file_callback(char *buffer, size_t siz
  *         <https://gist.github.com/lijoantony/4098139>
  *         <https://github.com/y-wine/HttpClient/blob/master/HttpClient/HttpClient.cpp>
  *         <https://github.com/y-wine/HttpClient/blob/master/HttpClient/include/HttpClient.h>
+ *         <https://curl.haxx.se/libcurl/c/threadsafe.html>
  * @param url
  * @param ci
  */

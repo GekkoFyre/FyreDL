@@ -448,7 +448,7 @@ void MainWindow::sendDetails(const std::string &fileName, const double &fileSize
  * @note   <http://stackoverflow.com/questions/9086372/how-to-compare-pointers>
  * @param info is the struct related to the download info.
  */
-void MainWindow::recvXferStats(const GekkoFyre::CmnRoutines::CurlDlStats &info)
+void MainWindow::recvXferStats(GekkoFyre::CmnRoutines::CurlDlStats info)
 {
     GekkoFyre::CmnRoutines::CurlDlStats temp_info;
     temp_info.dlnow = info.dlnow;
@@ -472,7 +472,7 @@ void MainWindow::recvXferStats(const GekkoFyre::CmnRoutines::CurlDlStats &info)
     return;
 }
 
-void MainWindow::recvXferPtr(const GekkoFyre::CmnRoutines::CurlDlPtr &ptr_info)
+void MainWindow::recvXferPtr(GekkoFyre::CmnRoutines::CurlDlPtr ptr_info)
 {
     for (size_t i = 0; i < dl_stat.size(); ++i) {
         if (ptr_info.ptr == dl_stat.at(i).easy) {
