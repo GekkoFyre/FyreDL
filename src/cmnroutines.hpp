@@ -44,6 +44,7 @@
 #define CMNROUTINES_HPP
 
 #include "default_var.hpp"
+#include "singleton_emit.hpp"
 #include <pugixml.hpp>
 #include <boost/exception/all.hpp>
 #include <boost/asio.hpp>
@@ -60,6 +61,7 @@ extern "C" {
 }
 
 namespace GekkoFyre {
+
 class CmnRoutines : public QObject
 {
     Q_OBJECT
@@ -99,8 +101,6 @@ public:
     CmnRoutines();
     ~CmnRoutines();
 
-    static const QEvent::Type stat_event = static_cast<QEvent::Type>(QEvent::User + 1);
-
     struct CurlInfo {
         long response_code;        // The HTTP/FTP response code
         std::string effective_url; // In cases when you've asked libcurl to follow redirects, it may very well not be the same value you set with 'CURLOPT_URL'
@@ -118,10 +118,11 @@ public:
     struct CurlDlStats {
         curl_off_t dltotal; // Total downloaded
         curl_off_t uptotal; // Total uploaded
-        double dlnow;   // Current download
+        double dlnow;       // Current download
         curl_off_t upnow;   // Current upload
         double cur_time;
         std::string url;    // The URL in question
+        bool dl_finished;   // Whether the download in question has finished downloading
         CURL *easy;
     };
 
@@ -158,11 +159,12 @@ public:
 
     CurlInfo verifyFileExists(const QString &url);
     CurlInfoExt curlGrabInfo(const QString &url);
-    bool fileStream(const QString &url, const QString &file_loc);
+    static bool fileStream(const QString &url, const QString &file_loc);
 
 signals:
     void sendXferStats(GekkoFyre::CmnRoutines::CurlDlStats dl_stat);
     void sendXferPtr(GekkoFyre::CmnRoutines::CurlDlPtr curl_ptr);
+    void sendDlFinished(const QString &url);
 
 private:
     static int curl_xferinfo(void *p, curl_off_t dltotal, curl_off_t dlnow, curl_off_t ultotal, curl_off_t ulnow); // https://curl.haxx.se/libcurl/c/CURLOPT_PROGRESSFUNCTION.html
@@ -173,29 +175,7 @@ private:
     static void curlCleanup(CurlInit curl_init);
 };
 
-// http://stackoverflow.com/questions/6061352/creating-a-custom-message-event-with-qt
-class StatisticEvent : public QEvent, CmnRoutines
-{
-public:
-    StatisticEvent(const GekkoFyre::CmnRoutines::CurlDlStats &dl_stat)
-        : QEvent(GekkoFyre::CmnRoutines::stat_event), m_dl_stats(dl_stat) {}
-
-    GekkoFyre::CmnRoutines::CurlDlStats getDlStats() const {
-        return m_dl_stats;
-    }
-
-private:
-    GekkoFyre::CmnRoutines::CurlDlStats m_dl_stats;
-
-public:
-    static void postStatEvent(const GekkoFyre::CmnRoutines::CurlDlStats &dl_stat);
-
-protected:
-    void statEvent(QEvent *event);
-
-private:
-    void handleStatEvent(const StatisticEvent *event);
-};
+typedef SingletonEmit<CmnRoutines> routine_singleton;
 }
 
 #endif // CMNROUTINES_HPP

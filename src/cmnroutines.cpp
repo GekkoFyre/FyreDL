@@ -87,6 +87,7 @@ std::map<curl_socket_t, boost::asio::ip::tcp::socket *> socket_map;
 
 time_t lastTime = 0;
 FILE *pagefile;
+GekkoFyre::CmnRoutines::CurlDlStats dl_stats_priv;
 
 GekkoFyre::CmnRoutines::CmnRoutines()
 {
@@ -612,6 +613,8 @@ GekkoFyre::CmnRoutines::CurlInfoExt GekkoFyre::CmnRoutines::curlGrabInfo(const Q
 bool GekkoFyre::CmnRoutines::fileStream(const QString &url, const QString &file_loc)
 {
     CurlInit curl_struct = new_conn(url, false, false, file_loc, false);
+    dl_stats_priv.url = url.toStdString();
+
     if (curl_struct.conn_info->easy != nullptr) {
         curl_struct.conn_info->curl_res = curl_easy_perform(curl_struct.conn_info->easy);
         if (curl_struct.conn_info->curl_res != CURLE_OK) {
@@ -622,6 +625,11 @@ bool GekkoFyre::CmnRoutines::fileStream(const QString &url, const QString &file_
 
     curlCleanup(curl_struct);
     fclose(pagefile);
+
+    dl_stats_priv.dl_finished = true;
+    // GekkoFyre::StatisticEvent::postStatEvent(dl_stats_priv);
+    routine_singleton::instance()->sendDlFinished(url);
+
     return true;
 }
 
@@ -643,8 +651,7 @@ int GekkoFyre::CmnRoutines::curl_xferinfo(void *p, curl_off_t dltotal, curl_off_
                                           curl_off_t ultotal, curl_off_t ulnow)
 {
     CurlProgressPtr *prog = static_cast<CurlProgressPtr *>(p);
-    // CURL *curl = prog->curl;
-    CurlDlStats dl_info;
+    CURL *curl = prog->curl;
 
     /* Under certain circumstances it may be desirable for certain functionality
        to only run every N seconds, in order to do this the transaction time can
@@ -655,15 +662,15 @@ int GekkoFyre::CmnRoutines::curl_xferinfo(void *p, curl_off_t dltotal, curl_off_
     }
     lastTime = now;
 
-    // double dlspeed = 0;
-    // curl_easy_getinfo(curl, CURLINFO_SPEED_DOWNLOAD, &dlspeed);
+    double dlspeed = 0;
+    curl_easy_getinfo(curl, CURLINFO_SPEED_DOWNLOAD, &dlspeed);
 
-    dl_info.dlnow = dlnow;
-    dl_info.dltotal = dltotal;
-    dl_info.upnow = ulnow;
-    dl_info.uptotal = ultotal;
-    dl_info.easy = &prog->curl;
-    GekkoFyre::StatisticEvent::postStatEvent(dl_info);
+    dl_stats_priv.dlnow = dlnow;
+    dl_stats_priv.dltotal = dltotal;
+    dl_stats_priv.upnow = ulnow;
+    dl_stats_priv.uptotal = ultotal;
+    dl_stats_priv.easy = &prog->curl;
+    // GekkoFyre::StatisticEvent::postStatEvent(dl_stats_priv);
 
     return 0;
 }
@@ -856,25 +863,4 @@ void GekkoFyre::CmnRoutines::curlCleanup(GekkoFyre::CmnRoutines::CurlInit curl_i
     curl_init.conn_info->easy = nullptr;
     free(curl_init.conn_info);
     return;
-}
-
-void GekkoFyre::StatisticEvent::postStatEvent(const GekkoFyre::CmnRoutines::CurlDlStats &dl_stat)
-{
-    // This method (GekkoFyre::StatisticEvent::postStatEvent) can be called from any thread
-    QApplication::postEvent(new StatisticEvent(dl_stat), new QEvent(QEvent::User));
-}
-
-void GekkoFyre::StatisticEvent::statEvent(QEvent *event)
-{
-    // When we get here, we've crossed the thread boundary and are now executing in the Qt object's thread
-    if (event->type() == GekkoFyre::CmnRoutines::stat_event) {
-        handleStatEvent(static_cast<StatisticEvent *>(event));
-    }
-}
-
-void GekkoFyre::StatisticEvent::handleStatEvent(const GekkoFyre::StatisticEvent *event)
-{
-    // Now you can safely do something with your Qt objects.
-    // Access your custom data using event->getDlTotal() etc.
-    emit sendXferStats(event->getDlStats());
 }

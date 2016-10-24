@@ -78,6 +78,7 @@ set(SOURCE_FILES
     mainwindow.cpp
     settings.hpp
     settings.cpp
+    singleton_emit.hpp
     singleton_proc.hpp)
 
 # http://www.executionunit.com/blog/2014/01/22/moving-from-qmake-to-cmake/
