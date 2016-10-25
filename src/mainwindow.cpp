@@ -111,8 +111,7 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->downloadView->setContextMenuPolicy(Qt::CustomContextMenu);
 
     QObject::connect(ui->downloadView, SIGNAL(customContextMenuRequested(QPoint)), this, SLOT(on_downloadView_customContextMenuRequested(QPoint)));
-    QObject::connect(routines, SIGNAL(sendXferStats(GekkoFyre::CmnRoutines::CurlDlStats)), this, SLOT(recvXferStats(GekkoFyre::CmnRoutines::CurlDlStats)));
-    QObject::connect(routines, SIGNAL(sendXferPtr(GekkoFyre::CmnRoutines::CurlDlPtr)), this, SLOT(recvXferPtr(GekkoFyre::CmnRoutines::CurlDlPtr)));
+    QObject::connect(routines, SIGNAL(sendXferStats(GekkoFyre::CmnRoutines::CurlProgressPtr)), this, SLOT(recvXferStats(GekkoFyre::CmnRoutines::CurlProgressPtr)));
     QObject::connect(this, SIGNAL(updateDlStats()), this, SLOT(manageDlStats()));
 
     readFromHistoryFile();
@@ -494,38 +493,27 @@ void MainWindow::sendDetails(const std::string &fileName, const double &fileSize
  * @note   <http://stackoverflow.com/questions/9086372/how-to-compare-pointers>
  * @param info is the struct related to the download info.
  */
-void MainWindow::recvXferStats(GekkoFyre::CmnRoutines::CurlDlStats info)
+void MainWindow::recvXferStats(GekkoFyre::CmnRoutines::CurlProgressPtr info)
 {
-    GekkoFyre::CmnRoutines::CurlDlStats temp_info;
-    temp_info.dlnow = info.dlnow;
-    temp_info.dltotal = info.dltotal;
-    temp_info.upnow = info.upnow;
-    temp_info.uptotal = info.uptotal;
-    temp_info.cur_time = info.cur_time;
-    temp_info.easy = info.easy;
+    GekkoFyre::CmnRoutines::CurlProgressPtr prog_temp;
+    prog_temp.stat.dlnow = info.stat.dlnow;
+    prog_temp.stat.dltotal = info.stat.dltotal;
+    prog_temp.stat.upnow = info.stat.upnow;
+    prog_temp.stat.uptotal = info.stat.uptotal;
+    prog_temp.stat.cur_time = info.stat.cur_time;
+    prog_temp.stat.url = info.stat.url;
 
     bool alreadyExists = false;
     for (size_t i = 0; i < dl_stat.size(); ++i) {
-        if (dl_stat.at(i).easy == temp_info.easy) { // Compare memory address for equality
+        if (dl_stat.at(i).stat.url == prog_temp.stat.url) { // Compare memory address for equality
             alreadyExists = true;
         }
     }
 
     if (!alreadyExists) {
-        dl_stat.push_back(temp_info);
-    }
-
-    return;
-}
-
-void MainWindow::recvXferPtr(GekkoFyre::CmnRoutines::CurlDlPtr ptr_info)
-{
-    for (size_t i = 0; i < dl_stat.size(); ++i) {
-        if (ptr_info.ptr == dl_stat.at(i).easy) {
-            dl_stat.at(i).url = ptr_info.url;
-            emit updateDlStats();
-            return;
-        }
+        dl_stat.push_back(prog_temp);
+        emit updateDlStats();
+        return;
     }
 
     return;
@@ -540,14 +528,14 @@ void MainWindow::recvXferPtr(GekkoFyre::CmnRoutines::CurlDlPtr ptr_info)
 void MainWindow::manageDlStats()
 {
     for (int i = 0; i < dlModel->getList().size(); ++i) {
-        QModelIndex find_index = dlModel->index(i, 8);
+        QModelIndex find_index = dlModel->index(i, MN_URL_COL);
         for (size_t j = 0; j < dl_stat.size(); ++j) {
-            if (ui->downloadView->model()->data(find_index).toString().toStdString() == dl_stat.at(j).url) {
+            if (ui->downloadView->model()->data(find_index).toString().toStdString() == dl_stat.at(j).stat.url) {
                 try {
-                    dlModel->setData(dlModel->index(i, MN_DOWNSPEED_COL), QString::number(dl_stat.at(j).dlnow), Qt::DisplayRole); // Download speed
-                    dlModel->setData(dlModel->index(i, MN_DOWNLOADED_COL), QString::number(dl_stat.at(j).dltotal), Qt::DisplayRole); // Downloaded total
+                    dlModel->setData(dlModel->index(i, MN_DOWNSPEED_COL), QString::number(dl_stat.at(j).stat.dlnow), Qt::DisplayRole); // Download speed
+                    dlModel->setData(dlModel->index(i, MN_DOWNLOADED_COL), QString::number(dl_stat.at(j).stat.dltotal), Qt::DisplayRole); // Downloaded total
 
-                    dlModel->setData(dlModel->index(i, MN_UPSPEED_COL), QString::number(dl_stat.at(j).upnow), Qt::DisplayRole); // Upload speed
+                    dlModel->setData(dlModel->index(i, MN_UPSPEED_COL), QString::number(dl_stat.at(j).stat.upnow), Qt::DisplayRole); // Upload speed
                 } catch (const std::exception &e) {
                     QMessageBox::warning(this, tr("Error!"), QString("%1").arg(e.what()), QMessageBox::Ok);
                     return;

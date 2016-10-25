@@ -86,8 +86,6 @@ boost::asio::deadline_timer timer(io_service);
 std::map<curl_socket_t, boost::asio::ip::tcp::socket *> socket_map;
 
 time_t lastTime = 0;
-FILE *pagefile;
-GekkoFyre::CmnRoutines::CurlDlStats dl_stats_priv;
 
 GekkoFyre::CmnRoutines::CmnRoutines()
 {
@@ -613,7 +611,6 @@ GekkoFyre::CmnRoutines::CurlInfoExt GekkoFyre::CmnRoutines::curlGrabInfo(const Q
 bool GekkoFyre::CmnRoutines::fileStream(const QString &url, const QString &file_loc)
 {
     CurlInit curl_struct = new_conn(url, false, false, file_loc, false);
-    dl_stats_priv.url = url.toStdString();
 
     if (curl_struct.conn_info->easy != nullptr) {
         curl_struct.conn_info->curl_res = curl_easy_perform(curl_struct.conn_info->easy);
@@ -623,10 +620,13 @@ bool GekkoFyre::CmnRoutines::fileStream(const QString &url, const QString &file_
         }
     }
 
-    curlCleanup(curl_struct);
-    fclose(pagefile);
+    curl_struct.file_buf.stream->close();
+    if (curl_struct.file_buf.stream != nullptr) {
+        delete curl_struct.file_buf.stream;
+    }
 
-    dl_stats_priv.dl_finished = true;
+    curlCleanup(curl_struct);
+
     // GekkoFyre::StatisticEvent::postStatEvent(dl_stats_priv);
     routine_singleton::instance()->sendDlFinished(url);
 
@@ -651,6 +651,7 @@ int GekkoFyre::CmnRoutines::curl_xferinfo(void *p, curl_off_t dltotal, curl_off_
                                           curl_off_t ultotal, curl_off_t ulnow)
 {
     CurlProgressPtr *prog = static_cast<CurlProgressPtr *>(p);
+    GekkoFyre::CmnRoutines::CurlDlStats dl_stats;
     CURL *curl = prog->curl;
 
     /* Under certain circumstances it may be desirable for certain functionality
@@ -665,12 +666,12 @@ int GekkoFyre::CmnRoutines::curl_xferinfo(void *p, curl_off_t dltotal, curl_off_
     double dlspeed = 0;
     curl_easy_getinfo(curl, CURLINFO_SPEED_DOWNLOAD, &dlspeed);
 
-    dl_stats_priv.dlnow = dlnow;
-    dl_stats_priv.dltotal = dltotal;
-    dl_stats_priv.upnow = ulnow;
-    dl_stats_priv.uptotal = ultotal;
-    dl_stats_priv.easy = &prog->curl;
-    // GekkoFyre::StatisticEvent::postStatEvent(dl_stats_priv);
+    prog->stat.dlnow = dlnow;
+    prog->stat.dltotal = dltotal;
+    prog->stat.upnow = ulnow;
+    prog->stat.uptotal = ultotal;
+
+    routine_singleton::instance()->sendXferStats(*prog);
 
     return 0;
 }
@@ -712,9 +713,9 @@ size_t GekkoFyre::CmnRoutines::curl_write_memory_callback(void *ptr, size_t size
  * @date   2015
  * @note   <https://curl.haxx.se/libcurl/c/ftpget.html>
  *         <https://curl.haxx.se/libcurl/c/url2file.html>
- *         <http://www.cplusplus.com/reference/fstream/ifstream/>
- *         <http://www.velvetcache.org/2008/10/24/better-libcurl-from-c>
  *         <http://stackoverflow.com/questions/2329571/c-libcurl-get-output-into-a-string>
+ *         <https://linustechtips.com/main/topic/663949-libcurl-curlopt_writefunction-callback-function-error/>
+ *         <https://www.apriorit.com/dev-blog/344-libcurl-usage-downloading-protocols>
  * @param ptr
  * @param size
  * @param nmemb
@@ -723,10 +724,9 @@ size_t GekkoFyre::CmnRoutines::curl_write_memory_callback(void *ptr, size_t size
  */
 size_t GekkoFyre::CmnRoutines::curl_write_file_callback(char *buffer, size_t size, size_t nmemb, void *userdata)
 {
-    FILE *fp = static_cast<FILE *>(userdata);
-    size_t length = fwrite(buffer, size, nmemb, fp);
-    if (length != nmemb) {
-        return length;
+    FileStream *fs = static_cast<FileStream *>(userdata);
+    for (size_t i = 0; i < nmemb; ++i) {
+        *fs->stream << buffer[i];
     }
 
     return (size * nmemb);
@@ -736,8 +736,7 @@ size_t GekkoFyre::CmnRoutines::curl_write_file_callback(char *buffer, size_t siz
  * @brief GekkoFyre::CmnRoutines::new_conn
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
  * @date   2016-10
- * @note   <https://curl.haxx.se/libcurl/c/asiohiper.html>
- *         <https://gist.github.com/lijoantony/4098139>
+ * @note   <https://gist.github.com/lijoantony/4098139>
  *         <https://github.com/y-wine/HttpClient/blob/master/HttpClient/HttpClient.cpp>
  *         <https://github.com/y-wine/HttpClient/blob/master/HttpClient/include/HttpClient.h>
  *         <https://curl.haxx.se/libcurl/c/threadsafe.html>
@@ -784,22 +783,22 @@ GekkoFyre::CmnRoutines::CurlInit GekkoFyre::CmnRoutines::new_conn(const QString 
         ci.mem_chunk.memory = nullptr;
         ci.mem_chunk.size = 0;
 
-        pagefile = fopen(fileLoc.toStdString().c_str(), "ab+");
-        if (pagefile == NULL) {
-            throw std::runtime_error(tr("Failed to create file! Not enough disk space?").toStdString());
-        }
+        ci.file_buf.stream = new std::ofstream;
+        ci.file_buf.stream->open(fileLoc.toStdString(), std::ios::binary | std::ofstream::out);
 
         // Send all data to this function, via file streaming
         // NOTE: On Windows, 'CURLOPT_WRITEFUNCTION' /must/ be set, otherwise a crash will occur!
         curl_easy_setopt(ci.conn_info->easy, CURLOPT_WRITEFUNCTION, curl_write_file_callback);
 
         // We pass our 'chunk' struct to the callback function
-        curl_easy_setopt(ci.conn_info->easy, CURLOPT_WRITEDATA, pagefile);
+        curl_easy_setopt(ci.conn_info->easy, CURLOPT_WRITEDATA, &ci.file_buf);
 
         if (grabStats == true) {
             #if LIBCURL_VERSION_NUM >= 0x072000
             curl_easy_setopt(ci.conn_info->easy, CURLOPT_NOPROGRESS, 0L);
-            ci.prog = (CurlProgressPtr *) calloc(1, sizeof(CurlProgressPtr));
+
+            ci.prog.stat.url = url.toStdString();
+            ci.prog.curl = ci.conn_info->easy;
 
             /* xferinfo was introduced in 7.32.0, no earlier libcurl versions will
                compile as they won't have the symbols around.
@@ -861,6 +860,7 @@ void GekkoFyre::CmnRoutines::curlCleanup(GekkoFyre::CmnRoutines::CurlInit curl_i
     }
 
     curl_init.conn_info->easy = nullptr;
+    curl_init.conn_info->url.clear();
     free(curl_init.conn_info);
     return;
 }

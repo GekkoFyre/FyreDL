@@ -77,7 +77,7 @@ private:
     downloadModel *dlModel;
     GekkoFyre::CmnRoutines *routines;
     GekkoFyre::DownloadStatus status;
-    std::vector<GekkoFyre::CmnRoutines::CurlDlStats> dl_stat;
+    std::vector<GekkoFyre::CmnRoutines::CurlProgressPtr> dl_stat;
     QFutureWatcher<bool> *fileStrFutWatch;
 
 signals:
@@ -103,8 +103,7 @@ private slots:
                      const double &progress, const int &upSpeed, const int &downSpeed,
                      const GekkoFyre::DownloadStatus &status, const std::string &url,
                      const std::string &destination);
-    void recvXferStats(GekkoFyre::CmnRoutines::CurlDlStats info);
-    void recvXferPtr(GekkoFyre::CmnRoutines::CurlDlPtr ptr_info);
+    void recvXferStats(GekkoFyre::CmnRoutines::CurlProgressPtr info);
     void manageDlStats();
     void recvDlFinished(const QString &url);
 

@@ -73,8 +73,8 @@ private:
     };
 
     struct FileStream {
-        const char *file_loc; // Name to store file as if download /and/ disk writing is successful
-        FILE *stream;         // File object stream
+        const char *file_loc;  // Name to store file as if download /and/ disk writing is successful
+        std::ofstream *stream; // File object stream
     };
 
     // Information associated with a specific easy handle
@@ -83,18 +83,6 @@ private:
         std::string url;
         char error[CURL_ERROR_SIZE];
         CURLcode curl_res;
-    };
-
-    struct CurlProgressPtr {
-        double lastruntime;
-        CURL *curl;
-    };
-
-    struct CurlInit {
-        ConnInfo *conn_info;
-        MemoryStruct mem_chunk;
-        FileStream file_buf;
-        CurlProgressPtr *prog;
     };
 
 public:
@@ -122,8 +110,12 @@ public:
         curl_off_t upnow;   // Current upload
         double cur_time;
         std::string url;    // The URL in question
-        bool dl_finished;   // Whether the download in question has finished downloading
-        CURL *easy;
+    };
+
+    struct CurlProgressPtr {
+        double lastruntime;
+        CURL *curl;
+        CurlDlStats stat;
     };
 
     struct CurlDlInfo {
@@ -162,11 +154,17 @@ public:
     static bool fileStream(const QString &url, const QString &file_loc);
 
 signals:
-    void sendXferStats(GekkoFyre::CmnRoutines::CurlDlStats dl_stat);
-    void sendXferPtr(GekkoFyre::CmnRoutines::CurlDlPtr curl_ptr);
+    void sendXferStats(GekkoFyre::CmnRoutines::CurlProgressPtr dl_stat);
     void sendDlFinished(const QString &url);
 
 private:
+    struct CurlInit {
+        ConnInfo *conn_info;
+        MemoryStruct mem_chunk;
+        FileStream file_buf;
+        CurlProgressPtr prog;
+    };
+
     static int curl_xferinfo(void *p, curl_off_t dltotal, curl_off_t dlnow, curl_off_t ultotal, curl_off_t ulnow); // https://curl.haxx.se/libcurl/c/CURLOPT_PROGRESSFUNCTION.html
     static size_t curl_write_memory_callback(void *ptr, size_t size, size_t nmemb, void *userp);
     static size_t curl_write_file_callback(char *buffer, size_t size, size_t nmemb, void *userdata);

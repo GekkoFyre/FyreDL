@@ -75,10 +75,6 @@ void AddURL::on_buttonBox_accepted()
             return AddURL::done(QDialog::Rejected);
         } else {
             info = routines->verifyFileExists(ui->file_dest_lineEdit->text());
-
-            // QModelIndex index = dlModel->index(0, 0, QModelIndex());
-            // index = dlModel->index(0, 7, QModelIndex());
-            // dlModel->setData(index, ui->file_dest_lineEdit->text(), Qt::DisplayRole);
             return AddURL::done(QDialog::Accepted);
         }
     default:
