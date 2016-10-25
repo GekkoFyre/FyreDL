@@ -68,7 +68,7 @@ class CmnRoutines : public QObject
 
 private:
     struct MemoryStruct {
-        char *memory;
+        std::string memory;
         size_t size;
     };
 

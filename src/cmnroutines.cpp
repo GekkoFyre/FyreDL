@@ -689,19 +689,9 @@ int GekkoFyre::CmnRoutines::curl_xferinfo(void *p, curl_off_t dltotal, curl_off_
  */
 size_t GekkoFyre::CmnRoutines::curl_write_memory_callback(void *ptr, size_t size, size_t nmemb, void *userp)
 {
+    MemoryStruct *mstr = static_cast<MemoryStruct *>(userp);
     size_t realsize = (size * nmemb);
-    struct MemoryStruct *mem = (struct MemoryStruct *)userp;
-
-    mem->memory = (char *)realloc(mem->memory, mem->size + realsize + 1);
-    if (mem->memory == NULL) {
-        // Out of memory!
-        throw std::runtime_error(tr("Not enough memory (realloc returned NULL)!").toStdString());
-    }
-
-    memcpy(&(mem->memory[mem->size]), ptr, realsize);
-    mem->size += realsize;
-    mem->memory[mem->size] = 0;
-
+    mstr->memory.append((char *)ptr, realsize);
     return realsize;
 }
 
@@ -765,21 +755,20 @@ GekkoFyre::CmnRoutines::CurlInit GekkoFyre::CmnRoutines::new_conn(const QString 
     }
 
     if (writeToMemory) {
-        ci.mem_chunk.memory = (char *)malloc(1); // Will be grown as needed by the realloc above
         ci.mem_chunk.size = 0; // No data at this point
-        ci.file_buf.file_loc = nullptr;
+        ci.file_buf.file_loc = "";
+
+        curl_easy_setopt(ci.conn_info->easy, CURLOPT_NOPROGRESS, 1L);
 
         // Send all data to this function, via the computer's RAM
         // NOTE: On Windows, 'CURLOPT_WRITEFUNCTION' /must/ be set, otherwise a crash will occur!
         curl_easy_setopt(ci.conn_info->easy, CURLOPT_WRITEFUNCTION, curl_write_memory_callback);
 
         // We pass our 'chunk' struct to the callback function
-        curl_easy_setopt(ci.conn_info->easy, CURLOPT_WRITEDATA, (void *)&ci.mem_chunk);
-
-        curl_easy_setopt(ci.conn_info->easy, CURLOPT_NOPROGRESS, 1L);
+        curl_easy_setopt(ci.conn_info->easy, CURLOPT_WRITEDATA, &ci.mem_chunk);
     } else {
         ci.file_buf.file_loc = fileLoc.toStdString().c_str();
-        ci.mem_chunk.memory = nullptr;
+        ci.mem_chunk.memory = "";
         ci.mem_chunk.size = 0;
 
         ci.file_buf.stream = new std::ofstream;
@@ -854,8 +843,8 @@ void GekkoFyre::CmnRoutines::curlCleanup(GekkoFyre::CmnRoutines::CurlInit curl_i
     curl_easy_cleanup(curl_init.conn_info->easy); // Always cleanup
     curl_global_cleanup(); // We're done with libcurl, globally, so clean it up!
 
-    if (curl_init.mem_chunk.memory != nullptr) {
-        free(curl_init.mem_chunk.memory);
+    if (!curl_init.mem_chunk.memory.empty()) {
+        curl_init.mem_chunk.memory.clear();
     }
 
     curl_init.conn_info->easy = nullptr;
