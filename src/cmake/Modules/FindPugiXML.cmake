@@ -1,69 +1,62 @@
 ###
- ##   Thank you for using "Gecho" for your encrypted, XMPP instant messages.
- ##   Copyright (C) 2015. GekkoFyre.
+ ##   Thank you for using the "FyreDL" download manager for your HTTP(S)/
+ ##   FTP(S)/BitTorrent downloads. You are looking at the source code to
+ ##   make the application work and as such, it will require compiling
+ ##   with the appropriate tools.
+ ##   Copyright (C) 2016. GekkoFyre.
  ##
  ##
- ##   This program is free software: you can redistribute it and/or modify
- ##   it under the terms of the GNU Affero General Public License as
- ##   published by the Free Software Foundation, either version 3 of the
- ##   License, or (at your option) any later version.
+ ##   FyreDL is free software: you can redistribute it and/or modify
+ ##   it under the terms of the GNU General Public License as published by
+ ##   the Free Software Foundation, either version 3 of the License, or
+ ##   (at your option) any later version.
  ##
- ##   This program is distributed in the hope that it will be useful,
+ ##   FyreDL is distributed in the hope that it will be useful,
  ##   but WITHOUT ANY WARRANTY; without even the implied warranty of
  ##   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- ##   GNU Affero General Public License for more details.
+ ##   GNU General Public License for more details.
  ##
- ##   You should have received a copy of the GNU Affero General Public License
- ##   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ ##   You should have received a copy of the GNU General Public License
+ ##   along with FyreDL.  If not, see <http://www.gnu.org/licenses/>.
  ##
  ##
  ##   The latest source code updates can be obtained from [ 1 ] below at your
  ##   leisure. A web-browser or the 'git' application may be required.
  ##
- ##   [ 1 ] - https://github.com/GekkoFyre/gecho
+ ##   [ 1 ] - https://github.com/GekkoFyre/fyredl
  ##
  #################################################################################
 
-# Try to find 'newt'
-# The following definitions are very important and are defined once 'ncursestw' is found
+# Try to find 'pugixml'
 #
-# GkPugiXML_FOUND
-# GkPugiXML_INCLUDE_DIR
-# GkPugiXML_LIBRARY
+# PUGIXML_FOUND
+# PUGIXML_INCLUDE_DIR
+# PUGIXML_LIBRARIES
 
-include(LibFindMacros)
+find_library(PUGIXML_LIBRARIES
+    NAMES "pugixml"
+    HINTS "${PUGIXML_LOCATION}/lib" "${PUGIXML_LOCATION}/lib64" "${PUGIXML_LOCATION}/lib32"
+    DOC "The main pugixml library"
+)
 
-# Dependencies
-# NOTE: What you need to find in /usr/lib
-# libfind_package(GkNCurses ncurses)
+# -----------------------------------------------------
+# PUGIXML Include Directories
+# -----------------------------------------------------
+find_path(PUGIXML_INCLUDE_DIR 
+    NAMES "pugixml.hpp"
+    HINTS "${PUGIXML_LOCATION}" "${PUGIXML_LOCATION}/include" "${PUGIXML_LOCATION}/include/*" "/usr/include"
+    DOC "The pugixml include directory"
+)
 
-INCLUDE(CMakeDetermineSystem)
-if (${CMAKE_SYSTEM_NAME} MATCHES "Linux") # Check if we are on Linux
-    # Use pkg-config to get hints about paths
-    # NOTE: This is what you need to find in /usr/lib/pkgconfig
-    libfind_pkg_check_modules(GkPugiXML_PKGCONF pugixml*)
-
-
-    # Include dir
-    find_path(GkPugiXML_INCLUDE_DIR
-        NAMES "pugixml.hpp"
-        HINTS "${GkPugiXML_PKGCONF_INCLUDE_DIRS}"
-    )
-
-    # Finally the library itself
-    find_library(GkPugiXML_LIBRARY
-        NAMES "pugixml"
-        HINTS "${GkPugiXML_PKGCONF_LIBRARY_DIRS}"
-    )
-elseif(${CMAKE_SYSTEM_NAME} MATCHES "Windows" OR "cygwin" OR "mingw") # Check if we are on Microsoft Windows
-    message(SEND_ERROR "Microsoft Windows is not supported as of yet!")
-else()
-    message(SEND_ERROR "The current operating system is not supported. If you believe this is a bug or you would like support to be added, then please contact the developers.")
+if(PUGIXML_INCLUDE_DIR)
+    message(STATUS "pugixml includes found in ${PUGIXML_INCLUDE_DIR}")
 endif()
 
-# Set the include dir variables and the libraries and let libfind_process do the rest.
-# NOTE: Singular variables for this library, plural for libraries this this lib depends on.
-set(GkPugiXML_PROCESS_INCLUDES GkPugiXML_INCLUDE_DIR)
-set(GkPugiXML_PROCESS_LIBS GkPugiXML_LIBRARY)
-libfind_process(GkPugiXML)
+# -----------------------------------------------------
+# Handle the QUIETLY and REQUIRED arguments and set PUGIXML_FOUND to TRUE if 
+# all listed variables are TRUE
+# -----------------------------------------------------
+include(FindPackageHandleStandardArgs)
+find_package_handle_standard_args(pugixml DEFAULT_MSG PUGIXML_LIBRARIES PUGIXML_INCLUDE_DIR)
+mark_as_advanced(PUGIXML_INCLUDE_DIR PUGIXML_LIBRARIES)
 

@@ -51,6 +51,7 @@
 #include <iostream>
 #include <fstream>
 #include <QUrl>
+#include <QDir>
 #include <QLocale>
 #include <QDebug>
 #include <QApplication>
@@ -150,20 +151,20 @@ double GekkoFyre::CmnRoutines::percentDownloaded(const double &content_length, c
     return percent;
 }
 
+/**
+ * @brief GekkoFyre::CmnRoutines::findCfgFile finds the defined configuration file and checks if it exists.
+ * @note  <http://theboostcpplibraries.com/boost.filesystem-paths>
+ * @param cfgFileName
+ * @return
+ */
 std::string GekkoFyre::CmnRoutines::findCfgFile(const std::string &cfgFileName)
 {
-    fs::path home_dir;
-    #ifdef _WIN32
-    #elif __linux__
-    struct passwd *pw = getpwuid(getuid()); // NOTE: If you need this in a threaded application, you'll want to use getpwuid_r instead
-    const char *home_dir_char = pw->pw_dir;
-    home_dir = home_dir_char;
-    #endif
-
-    // http://theboostcpplibraries.com/boost.filesystem-paths
+    fs::path home_dir(QDir::homePath().toStdString());
     std::ostringstream oss;
     if (fs::is_directory(home_dir)) {
         oss << home_dir.string() << fs::path::preferred_separator << cfgFileName;
+    } else {
+        throw std::invalid_argument(tr("Unable to find home directory!").toStdString());
     }
 
     return oss.str();

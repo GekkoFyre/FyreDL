@@ -112,8 +112,7 @@ foreach(i ${known_features})
 endforeach()
 
 # https://cmake.org/cmake/help/v3.1/prop_gbl/CMAKE_CXX_KNOWN_FEATURES.html
-set(GK_NEEDED_FEATURES cxx_aggregate_default_initializers
-                       cxx_auto_type
+set(GK_NEEDED_FEATURES cxx_auto_type
                        cxx_decltype
                        cxx_decltype_auto
                        cxx_inline_namespaces
@@ -155,7 +154,7 @@ if (Threads_FOUND)
 endif(Threads_FOUND)
 
 #
-# Find 'wget'
+# Find 'libcurl'
 #
 find_package(CURL REQUIRED)
 if (CURL_FOUND)
@@ -166,12 +165,12 @@ endif(CURL_FOUND)
 # Find 'pugixml'
 #
 find_package(PugiXML REQUIRED)
-if (GkPugiXML_FOUND)
-    include_directories(${GkPugiXML_INCLUDE_DIR})
-    set(LIBS ${LIBS} ${GkPugiXML_LIBRARY})
+if (PUGIXML_FOUND)
+    include_directories(${PUGIXML_INCLUDE_DIR})
+    set(LIBS ${LIBS} ${PUGIXML_LIBRARIES})
 else()
     message(SEND_ERROR "The 'pugixml' library could not be found!")
-endif(GkPugiXML_FOUND)
+endif(PUGIXML_FOUND)
 
 #
 # Qt5 translation routines
@@ -220,11 +219,10 @@ IF(${CMAKE_SYSTEM_NAME} MATCHES "Windows" OR "cygwin" OR "mingw") # Check if we 
         # TODO: Determine if it's neccessary to add a DEBUG flag here!
     elseif(CMAKE_BUILD_TYPE MATCHES "Release")
         message(STATUS "Creating a Microsoft Windows RELEASE build.")
-    endif(CMAKE_BUILD_TYPE)
+    endif()
     if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC") # Check if we are using the Visual Studio compiler
         set (CMAKE_GENERATOR "Visual Studio")
-        CHECK_INCLUDE_FILES("Windows.h" HAVE_WINDOWS_H)
-        set_target_properties(gecho PROPERTIES LINK_FLAGS "/SUBSYSTEM:WINDOWS")
+        set_target_properties(fyredl PROPERTIES LINK_FLAGS "/SUBSYSTEM:WINDOWS")
         message(STATUS "Using the Microsoft Visual C++ compiler!")
     elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
         SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mwindows") # This is apparently not tested!
