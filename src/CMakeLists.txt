@@ -141,6 +141,10 @@ if (Boost_FOUND)
     include_directories(${Boost_INCLUDE_DIRS})
     set(LIBS ${LIBS} ${Boost_LIBRARIES})
     message(STATUS "Boost C++ libraries have been found.")
+    add_definitions(-DBOOST_ALL_NO_LIB)
+
+    # http://stackoverflow.com/questions/9742003/platform-detection-in-cmake
+    add_definitions(-D_WIN32_WINNT=NTDDI_VISTASP1)
 else()
     message(SEND_ERROR "The required 'Boost C++' libraries are either not installed, or not multithreaded and/or of not an up-to-date version. Boost C++ 1.44 is the minimally required version.")
 endif(Boost_FOUND)
@@ -222,7 +226,7 @@ IF(${CMAKE_SYSTEM_NAME} MATCHES "Windows" OR "cygwin" OR "mingw") # Check if we 
     endif()
     if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC") # Check if we are using the Visual Studio compiler
         set (CMAKE_GENERATOR "Visual Studio")
-        set_target_properties(fyredl PROPERTIES LINK_FLAGS "/SUBSYSTEM:WINDOWS")
+        set_target_properties(fyredl PROPERTIES LINK_FLAGS "/SUBSYSTEM:CONSOLE")
         message(STATUS "Using the Microsoft Visual C++ compiler!")
     elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
         SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mwindows") # This is apparently not tested!

@@ -56,9 +56,7 @@
 #include <QtConcurrent/qtconcurrentrun.h>
 
 #ifdef _WIN32
-#define NTDDI_VERSION NTDDI_VISTASP1
-#define WINVER 0x0600
-#define _WIN32_WINNT 0x0600
+#define _WIN32_WINNT 0x06000100
 #include <SDKDDKVer.h>
 #include <Windows.h>
 #endif
