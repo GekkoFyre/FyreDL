@@ -245,27 +245,21 @@ void MainWindow::removeSelRows()
     QModelIndexList indexes = ui->downloadView->selectionModel()->selectedIndexes();
     int countRow = indexes.count();
 
-    bool flagDif = false;
-    for (int i = countRow; i > 1; --i) {
-        if ((indexes.at(i - 1).row() - 1) != indexes.at(i - 2).row()) {
-            flagDif = true;
-        }
-    }
+    if (indexes.size() > 0) {
+        if (indexes.at(0).isValid()) {
+            try {
+                routines->delDownloadItem(ui->downloadView->model()->data(ui->downloadView->model()->index(indexes.at(0).row(), MN_URL_COL)).toString());
+            } catch (const std::exception &e) {
+                QMessageBox::warning(this, tr("Error!"), QString("%1").arg(e.what()), QMessageBox::Ok);
+                return;
+            }
 
-    if (!flagDif) {
-        try {
-            routines->delDownloadItem(ui->downloadView->model()->data(ui->downloadView->model()->index(indexes.at(0).row(), MN_URL_COL)).toString());
-        } catch (const std::exception &e) {
-            QMessageBox::warning(this, tr("Error!"), QString("%1").arg(e.what()), QMessageBox::Ok);
+            dlModel->removeRows(indexes.at(0).row(), countRow, QModelIndex());
             return;
         }
-
-        dlModel->removeRows(indexes.at(0).row(), countRow, QModelIndex());
-    } else {
-        for (int i = countRow; i > 0; --i) {
-            dlModel->removeRow(indexes.at(i - 1).row(), QModelIndex());
-        }
     }
+
+    return;
 }
 
 void MainWindow::on_action_Open_a_File_triggered()
@@ -326,69 +320,63 @@ void MainWindow::on_printToolBtn_clicked()
 void MainWindow::on_dlstartToolBtn_clicked()
 {
     QModelIndexList indexes = ui->downloadView->selectionModel()->selectedIndexes();
-    int countRow = indexes.count();
 
-    bool flagDif = false;
-    for (int i = countRow; i > 1; --i) {
-        if ((indexes.at(i - 1).row() - 1) != indexes.at(i - 2).row()) {
-            flagDif = true;
-        }
-    }
+    if (indexes.size() > 0) {
+        if (indexes.at(0).isValid()) {
+            try {
+                const QString url = ui->downloadView->model()->data(ui->downloadView->model()->index(indexes.at(0).row(), MN_URL_COL)).toString();
+                const QString dest = ui->downloadView->model()->data(ui->downloadView->model()->index(indexes.at(0).row(), MN_DESTINATION_COL)).toString();
+                std::ostringstream oss_dest;
+                oss_dest << dest.toStdString() << fs::path::preferred_separator << routines->extractFilename(url).toStdString();
+                fs::path dest_boost_path(oss_dest.str());
 
-    if (!flagDif) {
-        try {
-            const QString url = ui->downloadView->model()->data(ui->downloadView->model()->index(indexes.at(0).row(), MN_URL_COL)).toString();
-            const QString dest = ui->downloadView->model()->data(ui->downloadView->model()->index(indexes.at(0).row(), MN_DESTINATION_COL)).toString();
-            std::ostringstream oss_dest;
-            oss_dest << dest.toStdString() << fs::path::preferred_separator << routines->extractFilename(url).toStdString();
-            fs::path dest_boost_path(oss_dest.str());
+                if (fs::exists(dest_boost_path)) {
+                    QMessageBox file_ask;
+                    file_ask.setWindowTitle(tr("Pre-existing file!"));
+                    file_ask.setText(tr("The file, \"%1\", already exists. Do you want remove it before starting the download?").arg(QString::fromStdString(oss_dest.str())));
+                    file_ask.setStandardButtons(QMessageBox::Yes | QMessageBox::No | QMessageBox::Cancel);
+                    file_ask.setDefaultButton(QMessageBox::No);
+                    file_ask.setModal(false);
+                    int ret = file_ask.exec();
 
-            if (fs::exists(dest_boost_path)) {
-                QMessageBox file_ask;
-                file_ask.setWindowTitle(tr("Pre-existing file!"));
-                file_ask.setText(tr("The file, \"%1\", already exists. Do you want remove it before starting the download?").arg(QString::fromStdString(oss_dest.str())));
-                file_ask.setStandardButtons(QMessageBox::Yes | QMessageBox::No | QMessageBox::Cancel);
-                file_ask.setDefaultButton(QMessageBox::No);
-                file_ask.setModal(false);
-                int ret = file_ask.exec();
+                    switch (ret) {
+                    case QMessageBox::Yes:
+                        try {
+                            fs::remove(dest_boost_path);
+                        } catch (const fs::filesystem_error &e) {
+                            QMessageBox::warning(this, tr("Error!"), QString("%1").arg(e.what()), QMessageBox::Ok);
+                            return;
+                        }
 
-                switch (ret) {
-                case QMessageBox::Yes:
-                    try {
-                        fs::remove(dest_boost_path);
-                    } catch (const fs::filesystem_error &e) {
-                        QMessageBox::warning(this, tr("Error!"), QString("%1").arg(e.what()), QMessageBox::Ok);
+                        break;
+                    case QMessageBox::No:
+                        return;
+                    case QMessageBox::Cancel:
                         return;
                     }
-
-                    break;
-                case QMessageBox::No:
-                    return;
-                case QMessageBox::Cancel:
-                    return;
                 }
-            }
 
-            QModelIndex index = dlModel->index(indexes.at(0).row(), MN_STATUS_COL, QModelIndex());
-            const GekkoFyre::DownloadStatus status = routines->convDlStat_StringToEnum(ui->downloadView->model()->data(index).toString());
+                QModelIndex index = dlModel->index(indexes.at(0).row(), MN_STATUS_COL, QModelIndex());
+                const GekkoFyre::DownloadStatus status = routines->convDlStat_StringToEnum(ui->downloadView->model()->data(index).toString());
 
-            if (status != GekkoFyre::DownloadStatus::Completed) {
-                GekkoFyre::CmnRoutines::CurlInfo verify = routines->verifyFileExists(url);
-                if (verify.response_code == 200) {
-                    if (status != GekkoFyre::DownloadStatus::Downloading) {
-                        routines->modifyDlState(url, GekkoFyre::DownloadStatus::Downloading);
-                        dlModel->updateCol(index, routines->convDlStat_toString(GekkoFyre::DownloadStatus::Downloading), MN_STATUS_COL);
+                if (status != GekkoFyre::DownloadStatus::Completed) {
+                    GekkoFyre::CmnRoutines::CurlInfo verify = routines->verifyFileExists(url);
+                    if (verify.response_code == 200) {
+                        if (status != GekkoFyre::DownloadStatus::Downloading) {
+                            routines->modifyDlState(url, GekkoFyre::DownloadStatus::Downloading);
+                            dlModel->updateCol(index, routines->convDlStat_toString(GekkoFyre::DownloadStatus::Downloading), MN_STATUS_COL);
 
-                        QObject::connect(GekkoFyre::routine_singleton::instance(), SIGNAL(sendDlFinished(QString)), this, SLOT(recvDlFinished(QString)));
-                        fileStrFutWatch = new QFutureWatcher<bool>(this);
-                        QFuture<bool> fileStrFut = QtConcurrent::run(&GekkoFyre::CmnRoutines::fileStream, url, QString::fromStdString(oss_dest.str()));
-                        fileStrFutWatch->setFuture(fileStrFut);
+                            QObject::connect(GekkoFyre::routine_singleton::instance(), SIGNAL(sendDlFinished(QString)), this, SLOT(recvDlFinished(QString)));
+                            fileStrFutWatch = new QFutureWatcher<bool>(this);
+                            QFuture<bool> fileStrFut = QtConcurrent::run(&GekkoFyre::CmnRoutines::fileStream, url, QString::fromStdString(oss_dest.str()));
+                            fileStrFutWatch->setFuture(fileStrFut);
+                        }
                     }
                 }
+            } catch (const std::exception &e) {
+                QMessageBox::warning(this, tr("Error!"), QString("%1").arg(e.what()), QMessageBox::Ok);
+                return;
             }
-        } catch (const std::exception &e) {
-            QMessageBox::warning(this, tr("Error!"), QString("%1").arg(e.what()), QMessageBox::Ok);
-            return;
         }
     }
 }
@@ -396,27 +384,21 @@ void MainWindow::on_dlstartToolBtn_clicked()
 void MainWindow::on_dlpauseToolBtn_clicked()
 {
     QModelIndexList indexes = ui->downloadView->selectionModel()->selectedIndexes();
-    int countRow = indexes.count();
 
-    bool flagDif = false;
-    for (int i = countRow; i > 1; --i) {
-        if ((indexes.at(i - 1).row() - 1) != indexes.at(i - 2).row()) {
-            flagDif = true;
-        }
-    }
-
-    if (!flagDif) {
-        try {
-            const QString url = ui->downloadView->model()->data(ui->downloadView->model()->index(indexes.at(0).row(), MN_URL_COL)).toString();
-            QModelIndex index = dlModel->index(indexes.at(0).row(), MN_STATUS_COL, QModelIndex());
-            const GekkoFyre::DownloadStatus status = routines->convDlStat_StringToEnum(ui->downloadView->model()->data(index).toString());
-            if (status != GekkoFyre::DownloadStatus::Paused && status != GekkoFyre::DownloadStatus::Completed) {
-                routines->modifyDlState(url, GekkoFyre::DownloadStatus::Paused);
-                dlModel->updateCol(index, routines->convDlStat_toString(GekkoFyre::DownloadStatus::Paused), MN_STATUS_COL);
+    if (indexes.size() > 0) {
+        if (indexes.at(0).isValid()) {
+            try {
+                const QString url = ui->downloadView->model()->data(ui->downloadView->model()->index(indexes.at(0).row(), MN_URL_COL)).toString();
+                QModelIndex index = dlModel->index(indexes.at(0).row(), MN_STATUS_COL, QModelIndex());
+                const GekkoFyre::DownloadStatus status = routines->convDlStat_StringToEnum(ui->downloadView->model()->data(index).toString());
+                if (status != GekkoFyre::DownloadStatus::Paused && status != GekkoFyre::DownloadStatus::Completed) {
+                    routines->modifyDlState(url, GekkoFyre::DownloadStatus::Paused);
+                    dlModel->updateCol(index, routines->convDlStat_toString(GekkoFyre::DownloadStatus::Paused), MN_STATUS_COL);
+                }
+            } catch (const std::exception &e) {
+                QMessageBox::warning(this, tr("Error!"), QString("%1").arg(e.what()), QMessageBox::Ok);
+                return;
             }
-        } catch (const std::exception &e) {
-            QMessageBox::warning(this, tr("Error!"), QString("%1").arg(e.what()), QMessageBox::Ok);
-            return;
         }
     }
 }
@@ -454,8 +436,53 @@ void MainWindow::on_removeToolBtn_clicked()
     removeSelRows();
 }
 
+/**
+ * @brief MainWindow::on_clearhistoryToolBtn_clicked
+ * @note  <http://stackoverflow.com/questions/8613737/how-can-i-remove-elements-from-a-qlist-while-iterating-over-it-using-foreach>
+ */
 void MainWindow::on_clearhistoryToolBtn_clicked()
 {
+    QMessageBox file_ask;
+    file_ask.setWindowTitle(tr("FyreDL"));
+    file_ask.setText(tr("Are you sure about clearing all completed downloads?"));
+    file_ask.setStandardButtons(QMessageBox::Apply | QMessageBox::No | QMessageBox::Cancel);
+    file_ask.setDefaultButton(QMessageBox::No);
+    file_ask.setModal(false);
+    int ret = file_ask.exec();
+
+    switch (ret) {
+    case QMessageBox::Apply:
+    {
+        QModelIndexList indexes;
+        for (int i = 0; i < dlModel->getList().size(); ++i) {
+            QModelIndex find_index = dlModel->index(i, MN_STATUS_COL);
+            const QString stat_string = ui->downloadView->model()->data(find_index).toString();
+            if (stat_string == routines->convDlStat_toString(GekkoFyre::DownloadStatus::Completed)) {
+                indexes.push_back(find_index);
+                QModelIndex url_index = dlModel->index(i, MN_URL_COL);
+                const QString url_string = ui->downloadView->model()->data(url_index).toString();
+
+                try {
+                    routines->delDownloadItem(url_string);
+                } catch (const std::exception &e) {
+                    QMessageBox::warning(this, tr("Error!"), QString("%1").arg(e.what()), QMessageBox::Ok);
+                    return;
+                }
+            }
+        }
+
+        for (int i = indexes.count(); i > 0; --i) {
+            dlModel->removeRow(indexes.at(i - 1).row(), QModelIndex());
+        }
+
+        return;
+    }
+    case QMessageBox::No:
+        return;
+    case QMessageBox::Cancel:
+        return;
+    }
+
     return;
 }
 
