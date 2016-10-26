@@ -58,6 +58,7 @@
 
 extern "C" {
 #include <curl/curl.h>
+#include <qmetatype.h>
 }
 
 namespace GekkoFyre {
@@ -132,7 +133,8 @@ public:
     };
 
     QString extractFilename(const QString &url);
-    QString bytesToKilobytes(const double &content_length);
+    QString bytesToKilobytes(const QVariant &value);
+    QString bytesToMegabytes(const QVariant &value);
     QString numberSeperators(const QVariant &value);
     double percentDownloaded(const double &content_length, const double &amountDl);
 
@@ -154,7 +156,7 @@ public:
     static bool fileStream(const QString &url, const QString &file_loc);
 
 signals:
-    void sendXferStats(GekkoFyre::CmnRoutines::CurlProgressPtr dl_stat);
+    void sendXferStats(const GekkoFyre::CmnRoutines::CurlProgressPtr &dl_stat);
     void sendDlFinished(const QString &url);
 
 private:
@@ -171,9 +173,14 @@ private:
     static CurlInit new_conn(const QString &url, bool grabHeaderOnly = false, bool writeToMemory = false,
                              const QString &fileLoc = "", bool grabStats = false);
     static void curlCleanup(CurlInit curl_init);
+
+private slots:
+    void recvStopDownload(const QString &url);
 };
 
 typedef SingletonEmit<CmnRoutines> routine_singleton;
 }
 
+// This is required for signaling, otherwise QVariant does not know the type.
+Q_DECLARE_METATYPE(GekkoFyre::CmnRoutines::CurlProgressPtr);
 #endif // CMNROUTINES_HPP

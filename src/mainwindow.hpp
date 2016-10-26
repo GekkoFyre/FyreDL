@@ -82,6 +82,7 @@ private:
 
 signals:
     void updateDlStats();
+    void sendStopDownload(const QString &url);
 
 private slots:
     void on_action_Open_a_File_triggered();
@@ -103,7 +104,7 @@ private slots:
                      const double &progress, const int &upSpeed, const int &downSpeed,
                      const GekkoFyre::DownloadStatus &status, const std::string &url,
                      const std::string &destination);
-    void recvXferStats(GekkoFyre::CmnRoutines::CurlProgressPtr info);
+    void recvXferStats(const GekkoFyre::CmnRoutines::CurlProgressPtr &info);
     void manageDlStats();
     void recvDlFinished(const QString &url);
 

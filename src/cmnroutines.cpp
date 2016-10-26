@@ -116,10 +116,17 @@ QString GekkoFyre::CmnRoutines::extractFilename(const QString &url)
  * @param content_length
  * @return
  */
-QString GekkoFyre::CmnRoutines::bytesToKilobytes(const double &content_length)
+QString GekkoFyre::CmnRoutines::bytesToKilobytes(const QVariant &value)
 {
     std::ostringstream oss;
-    oss << numberSeperators(std::round((content_length / 1024))).toStdString() << " KB";
+    oss << numberSeperators(std::round(value.toDouble() / 1024)).toStdString() << " KB";
+    return QString::fromStdString(oss.str());
+}
+
+QString GekkoFyre::CmnRoutines::bytesToMegabytes(const QVariant &value)
+{
+    std::ostringstream oss;
+    oss << numberSeperators(std::round((value.toDouble() / 1024) / 1024)).toStdString() << " MB";
     return QString::fromStdString(oss.str());
 }
 
@@ -609,7 +616,7 @@ GekkoFyre::CmnRoutines::CurlInfoExt GekkoFyre::CmnRoutines::curlGrabInfo(const Q
  */
 bool GekkoFyre::CmnRoutines::fileStream(const QString &url, const QString &file_loc)
 {
-    CurlInit curl_struct = new_conn(url, false, false, file_loc, false);
+    CurlInit curl_struct = new_conn(url, false, false, file_loc, true);
 
     if (curl_struct.conn_info->easy != nullptr) {
         curl_struct.conn_info->curl_res = curl_easy_perform(curl_struct.conn_info->easy);
@@ -649,9 +656,10 @@ bool GekkoFyre::CmnRoutines::fileStream(const QString &url, const QString &file_
 int GekkoFyre::CmnRoutines::curl_xferinfo(void *p, curl_off_t dltotal, curl_off_t dlnow,
                                           curl_off_t ultotal, curl_off_t ulnow)
 {
+    Q_UNUSED(dlnow)
     CurlProgressPtr *prog = static_cast<CurlProgressPtr *>(p);
-    GekkoFyre::CmnRoutines::CurlDlStats dl_stats;
     CURL *curl = prog->curl;
+    GekkoFyre::CmnRoutines::CurlProgressPtr dl_ptr;
 
     /* Under certain circumstances it may be desirable for certain functionality
        to only run every N seconds, in order to do this the transaction time can
@@ -660,17 +668,18 @@ int GekkoFyre::CmnRoutines::curl_xferinfo(void *p, curl_off_t dltotal, curl_off_
     if (now - lastTime < 1) {
         return 0;
     }
-    lastTime = now;
 
+    lastTime = now;
     double dlspeed = 0;
     curl_easy_getinfo(curl, CURLINFO_SPEED_DOWNLOAD, &dlspeed);
 
-    prog->stat.dlnow = dlnow;
-    prog->stat.dltotal = dltotal;
-    prog->stat.upnow = ulnow;
-    prog->stat.uptotal = ultotal;
+    dl_ptr.stat.dlnow = dlspeed;
+    dl_ptr.stat.dltotal = dltotal;
+    dl_ptr.stat.upnow = ulnow;
+    dl_ptr.stat.uptotal = ultotal;
+    dl_ptr.stat.url = prog->stat.url;
 
-    routine_singleton::instance()->sendXferStats(*prog);
+    routine_singleton::instance()->sendXferStats(dl_ptr);
 
     return 0;
 }
@@ -852,3 +861,6 @@ void GekkoFyre::CmnRoutines::curlCleanup(GekkoFyre::CmnRoutines::CurlInit curl_i
     free(curl_init.conn_info);
     return;
 }
+
+void GekkoFyre::CmnRoutines::recvStopDownload(const QString &url)
+{}

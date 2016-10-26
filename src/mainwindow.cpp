@@ -61,6 +61,10 @@
 #include <Windows.h>
 #endif
 
+extern "C" {
+#include <qmetatype.h>
+}
+
 namespace fs = boost::filesystem;
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
@@ -109,7 +113,7 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->downloadView->setContextMenuPolicy(Qt::CustomContextMenu);
 
     QObject::connect(ui->downloadView, SIGNAL(customContextMenuRequested(QPoint)), this, SLOT(on_downloadView_customContextMenuRequested(QPoint)));
-    QObject::connect(routines, SIGNAL(sendXferStats(GekkoFyre::CmnRoutines::CurlProgressPtr)), this, SLOT(recvXferStats(GekkoFyre::CmnRoutines::CurlProgressPtr)));
+    QObject::connect(this, SIGNAL(sendStopDownload(QString)), routines, SLOT(recvStopDownload(QString)));
     QObject::connect(this, SIGNAL(updateDlStats()), this, SLOT(manageDlStats()));
 
     readFromHistoryFile();
@@ -204,7 +208,7 @@ void MainWindow::insertNewRow(const std::string &fileName, const double &fileSiz
     dlModel->setData(index, routines->extractFilename(QString::fromStdString(fileName)), Qt::DisplayRole);
 
     index = dlModel->index(0, MN_FILESIZE_COL, QModelIndex());
-    dlModel->setData(index, routines->bytesToKilobytes(fileSize), Qt::DisplayRole);
+    dlModel->setData(index, routines->bytesToMegabytes(fileSize), Qt::DisplayRole);
 
     index = dlModel->index(0, MN_DOWNLOADED_COL, QModelIndex());
     dlModel->setData(index, QString::number(downloaded), Qt::DisplayRole);
@@ -364,7 +368,12 @@ void MainWindow::on_dlstartToolBtn_clicked()
                             routines->modifyDlState(url, GekkoFyre::DownloadStatus::Downloading);
                             dlModel->updateCol(index, routines->convDlStat_toString(GekkoFyre::DownloadStatus::Downloading), MN_STATUS_COL);
 
+                            QObject::connect(GekkoFyre::routine_singleton::instance(), SIGNAL(sendXferStats(GekkoFyre::CmnRoutines::CurlProgressPtr)), this, SLOT(recvXferStats(GekkoFyre::CmnRoutines::CurlProgressPtr)));
                             QObject::connect(GekkoFyre::routine_singleton::instance(), SIGNAL(sendDlFinished(QString)), this, SLOT(recvDlFinished(QString)));
+
+                            // This is required for signaling, otherwise QVariant does not know the type.
+                            qRegisterMetaType<GekkoFyre::CmnRoutines::CurlProgressPtr>("curlProgressPtr");
+
                             fileStrFutWatch = new QFutureWatcher<bool>(this);
                             QFuture<bool> fileStrFut = QtConcurrent::run(&GekkoFyre::CmnRoutines::fileStream, url, QString::fromStdString(oss_dest.str()));
                             fileStrFutWatch->setFuture(fileStrFut);
@@ -518,7 +527,7 @@ void MainWindow::sendDetails(const std::string &fileName, const double &fileSize
  * @note   <http://stackoverflow.com/questions/9086372/how-to-compare-pointers>
  * @param info is the struct related to the download info.
  */
-void MainWindow::recvXferStats(GekkoFyre::CmnRoutines::CurlProgressPtr info)
+void MainWindow::recvXferStats(const GekkoFyre::CmnRoutines::CurlProgressPtr &info)
 {
     GekkoFyre::CmnRoutines::CurlProgressPtr prog_temp;
     prog_temp.stat.dlnow = info.stat.dlnow;
@@ -530,8 +539,9 @@ void MainWindow::recvXferStats(GekkoFyre::CmnRoutines::CurlProgressPtr info)
 
     bool alreadyExists = false;
     for (size_t i = 0; i < dl_stat.size(); ++i) {
-        if (dl_stat.at(i).stat.url == prog_temp.stat.url) { // Compare memory address for equality
+        if (dl_stat.at(i).stat.url == prog_temp.stat.url) {
             alreadyExists = true;
+            break;
         }
     }
 
@@ -539,8 +549,19 @@ void MainWindow::recvXferStats(GekkoFyre::CmnRoutines::CurlProgressPtr info)
         dl_stat.push_back(prog_temp);
         emit updateDlStats();
         return;
+    } else {
+        for (size_t i = 0; i < dl_stat.size(); ++i) {
+            if (dl_stat.at(i).stat.url == prog_temp.stat.url) {
+                dl_stat.at(i).stat.dlnow = prog_temp.stat.dlnow;
+                dl_stat.at(i).stat.dltotal = prog_temp.stat.dltotal;
+                dl_stat.at(i).stat.upnow = prog_temp.stat.upnow;
+                dl_stat.at(i).stat.uptotal = prog_temp.stat.uptotal;
+                dl_stat.at(i).stat.cur_time = prog_temp.stat.cur_time;
+                emit updateDlStats();
+                return;
+            }
+        }
     }
-
     return;
 }
 
@@ -557,10 +578,9 @@ void MainWindow::manageDlStats()
         for (size_t j = 0; j < dl_stat.size(); ++j) {
             if (ui->downloadView->model()->data(find_index).toString().toStdString() == dl_stat.at(j).stat.url) {
                 try {
-                    dlModel->setData(dlModel->index(i, MN_DOWNSPEED_COL), QString::number(dl_stat.at(j).stat.dlnow), Qt::DisplayRole); // Download speed
-                    dlModel->setData(dlModel->index(i, MN_DOWNLOADED_COL), QString::number(dl_stat.at(j).stat.dltotal), Qt::DisplayRole); // Downloaded total
-
-                    dlModel->setData(dlModel->index(i, MN_UPSPEED_COL), QString::number(dl_stat.at(j).stat.upnow), Qt::DisplayRole); // Upload speed
+                    dlModel->updateCol(dlModel->index(i, MN_DOWNSPEED_COL), QString::number(dl_stat.at(j).stat.dlnow), MN_DOWNSPEED_COL);
+                    dlModel->updateCol(dlModel->index(i, MN_DOWNLOADED_COL), QString::number(dl_stat.at(j).stat.dltotal), MN_DOWNLOADED_COL);
+                    dlModel->updateCol(dlModel->index(i, MN_UPSPEED_COL), QString::number(dl_stat.at(j).stat.upnow), MN_UPSPEED_COL);
                 } catch (const std::exception &e) {
                     QMessageBox::warning(this, tr("Error!"), QString("%1").arg(e.what()), QMessageBox::Ok);
                     return;
