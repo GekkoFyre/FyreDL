@@ -60,6 +60,8 @@
 #define MN_DESTINATION_COL 7
 #define MN_URL_COL 8
 
+#define CURL_MAX_WAIT_MSECS 15000
+
 namespace GekkoFyre {
 enum DownloadStatus {
     Downloading,

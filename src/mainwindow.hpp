@@ -106,7 +106,7 @@ private slots:
                      const std::string &destination);
     void recvXferStats(const GekkoFyre::CmnRoutines::CurlProgressPtr &info);
     void manageDlStats();
-    void recvDlFinished(const QString &url);
+    void recvDlFinished(const GekkoFyre::CmnRoutines::DlStatusMsg &status);
 
 private:
     Ui::MainWindow *ui;

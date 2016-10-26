@@ -78,12 +78,20 @@ private:
         std::ofstream *stream; // File object stream
     };
 
+    // Global information, common to all connections
+    struct GlobalInfo {
+        CURLM *multi;
+        int still_running;
+        int msgs_left;
+    };
+
     // Information associated with a specific easy handle
     struct ConnInfo {
+        GlobalInfo glob_info;
         CURL *easy;
         std::string url;
         char error[CURL_ERROR_SIZE];
-        CURLcode curl_res;
+        CURLMcode curl_res;
     };
 
 public:
@@ -111,6 +119,11 @@ public:
         curl_off_t upnow;   // Current upload
         double cur_time;
         std::string url;    // The URL in question
+    };
+
+    struct DlStatusMsg {
+        bool dl_compl_succ; // Whether the download was completed successfully or aborted with an error
+        QString url;        // The URL of the download in question
     };
 
     struct CurlProgressPtr {
@@ -151,13 +164,13 @@ public:
     bool modifyDlState(const QString &effec_url, const DownloadStatus &status,
                        const std::string &xmlCfgFile = CFG_HISTORY_FILE);
 
-    CurlInfo verifyFileExists(const QString &url);
-    CurlInfoExt curlGrabInfo(const QString &url);
+    static CurlInfo verifyFileExists(const QString &url);
+    static CurlInfoExt curlGrabInfo(const QString &url);
     static bool fileStream(const QString &url, const QString &file_loc);
 
 signals:
     void sendXferStats(const GekkoFyre::CmnRoutines::CurlProgressPtr &dl_stat);
-    void sendDlFinished(const QString &url);
+    void sendDlFinished(const GekkoFyre::CmnRoutines::DlStatusMsg &status);
 
 private:
     struct CurlInit {
@@ -167,7 +180,21 @@ private:
         CurlProgressPtr prog;
     };
 
+    static void mcode_or_die(const char *where, CURLMcode code);
+
+    static void check_multi_info(GlobalInfo *g);
+    static void event_cb(GlobalInfo *g, boost::asio::ip::tcp::socket *tcp_socket, int action);
+    static void timer_cb(const boost::system::error_code &error, GlobalInfo *g);
+    static int multi_timer_cb(CURLM *multi, long timeout_ms, GlobalInfo *g);
+
+    static void remsock(int *f, GlobalInfo *g);
+    static void setsock(int *fdp, curl_socket_t s, CURL *e, int act, GlobalInfo *g);
+    static void addsock(curl_socket_t s, CURL *easy, int action, GlobalInfo *g);
+    static int sock_cb(CURL *e, curl_socket_t s, int what, void *cbp, void *sockp); // https://curl.haxx.se/libcurl/c/CURLMOPT_SOCKETFUNCTION.html
+
     static int curl_xferinfo(void *p, curl_off_t dltotal, curl_off_t dlnow, curl_off_t ultotal, curl_off_t ulnow); // https://curl.haxx.se/libcurl/c/CURLOPT_PROGRESSFUNCTION.html
+    static curl_socket_t opensocket(void *clientp, curlsocktype purpose, struct curl_sockaddr *address); // https://curl.haxx.se/libcurl/c/CURLOPT_OPENSOCKETFUNCTION.html
+    static int close_socket(void *clientp, curl_socket_t item); // https://curl.haxx.se/libcurl/c/CURLOPT_CLOSESOCKETFUNCTION.html
     static size_t curl_write_memory_callback(void *ptr, size_t size, size_t nmemb, void *userp);
     static size_t curl_write_file_callback(char *buffer, size_t size, size_t nmemb, void *userdata);
     static CurlInit new_conn(const QString &url, bool grabHeaderOnly = false, bool writeToMemory = false,
@@ -183,4 +210,5 @@ typedef SingletonEmit<CmnRoutines> routine_singleton;
 
 // This is required for signaling, otherwise QVariant does not know the type.
 Q_DECLARE_METATYPE(GekkoFyre::CmnRoutines::CurlProgressPtr);
+Q_DECLARE_METATYPE(GekkoFyre::CmnRoutines::DlStatusMsg);
 #endif // CMNROUTINES_HPP

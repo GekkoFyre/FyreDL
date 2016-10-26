@@ -369,10 +369,11 @@ void MainWindow::on_dlstartToolBtn_clicked()
                             dlModel->updateCol(index, routines->convDlStat_toString(GekkoFyre::DownloadStatus::Downloading), MN_STATUS_COL);
 
                             QObject::connect(GekkoFyre::routine_singleton::instance(), SIGNAL(sendXferStats(GekkoFyre::CmnRoutines::CurlProgressPtr)), this, SLOT(recvXferStats(GekkoFyre::CmnRoutines::CurlProgressPtr)));
-                            QObject::connect(GekkoFyre::routine_singleton::instance(), SIGNAL(sendDlFinished(QString)), this, SLOT(recvDlFinished(QString)));
+                            QObject::connect(GekkoFyre::routine_singleton::instance(), SIGNAL(sendDlFinished(GekkoFyre::CmnRoutines::DlStatusMsg)), this, SLOT(recvDlFinished(GekkoFyre::CmnRoutines::DlStatusMsg)));
 
                             // This is required for signaling, otherwise QVariant does not know the type.
                             qRegisterMetaType<GekkoFyre::CmnRoutines::CurlProgressPtr>("curlProgressPtr");
+                            qRegisterMetaType<GekkoFyre::CmnRoutines::DlStatusMsg>("DlStatusMsg");
 
                             fileStrFutWatch = new QFutureWatcher<bool>(this);
                             QFuture<bool> fileStrFut = QtConcurrent::run(&GekkoFyre::CmnRoutines::fileStream, url, QString::fromStdString(oss_dest.str()));
@@ -597,16 +598,16 @@ void MainWindow::manageDlStats()
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
  * @date   2016-10-15
  */
-void MainWindow::recvDlFinished(const QString &url)
+void MainWindow::recvDlFinished(const GekkoFyre::CmnRoutines::DlStatusMsg &status)
 {
     try {
         for (int i = 0; i < dlModel->getList().size(); ++i) {
             QModelIndex find_index = dlModel->index(i, MN_URL_COL);
-            if (ui->downloadView->model()->data(find_index).toString() == url) {
+            if (ui->downloadView->model()->data(find_index).toString() == status.url) {
 
                 QModelIndex stat_index = dlModel->index(i, MN_STATUS_COL);
                 if (routines->convDlStat_StringToEnum(ui->downloadView->model()->data(stat_index).toString()) == GekkoFyre::DownloadStatus::Downloading) {
-                    routines->modifyDlState(url, GekkoFyre::DownloadStatus::Completed);
+                    routines->modifyDlState(status.url, GekkoFyre::DownloadStatus::Completed);
                     dlModel->updateCol(stat_index, routines->convDlStat_toString(GekkoFyre::DownloadStatus::Completed), MN_STATUS_COL);
                     return;
                 }
