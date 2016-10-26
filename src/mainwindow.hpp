@@ -51,6 +51,7 @@
 #include <QMainWindow>
 #include <QString>
 #include <QtConcurrent/QtConcurrent>
+#include <QThread>
 
 namespace Ui {
 class MainWindow;
@@ -80,9 +81,13 @@ private:
     std::vector<GekkoFyre::CmnRoutines::CurlProgressPtr> dl_stat;
     QFutureWatcher<bool> *fileStrFutWatch;
 
+    // http://stackoverflow.com/questions/10121560/stdthread-naming-your-thread
+    QThread *curl_thread;
+
 signals:
     void updateDlStats();
     void sendStopDownload(const QString &url);
+    void sendStartDownload(const QString &url, const QString &file_loc);
 
 private slots:
     void on_action_Open_a_File_triggered();

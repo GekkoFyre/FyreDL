@@ -106,6 +106,15 @@ MainWindow::MainWindow(QWidget *parent) :
 
     routines = new GekkoFyre::CmnRoutines();
 
+    // http://wiki.qt.io/QThreads_general_usage
+    curl_thread = new QThread;
+    routines->moveToThread(curl_thread);
+    QObject::connect(this, SIGNAL(sendStartDownload(QString,QString)), routines, SLOT(fileStream(QString,QString)));
+    QObject::connect(routines, SIGNAL(sendGlobFin()), curl_thread, SLOT(quit()));
+    QObject::connect(routines, SIGNAL(sendGlobFin()), curl_thread, SLOT(deleteLater()));
+    QObject::connect(routines, SIGNAL(sendGlobFin()), routines, SLOT(deleteLater()));
+    curl_thread->start();
+
     dlModel = new downloadModel(this);
     ui->downloadView->setModel(dlModel);
     ui->downloadView->setSelectionMode(QAbstractItemView::SingleSelection);
@@ -375,9 +384,7 @@ void MainWindow::on_dlstartToolBtn_clicked()
                             qRegisterMetaType<GekkoFyre::CmnRoutines::CurlProgressPtr>("curlProgressPtr");
                             qRegisterMetaType<GekkoFyre::CmnRoutines::DlStatusMsg>("DlStatusMsg");
 
-                            fileStrFutWatch = new QFutureWatcher<bool>(this);
-                            QFuture<bool> fileStrFut = QtConcurrent::run(&GekkoFyre::CmnRoutines::fileStream, url, QString::fromStdString(oss_dest.str()));
-                            fileStrFutWatch->setFuture(fileStrFut);
+                            emit sendStartDownload(url, QString::fromStdString(oss_dest.str()));
                         }
                     }
                 }

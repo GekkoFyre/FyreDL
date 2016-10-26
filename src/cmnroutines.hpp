@@ -166,11 +166,14 @@ public:
 
     static CurlInfo verifyFileExists(const QString &url);
     static CurlInfoExt curlGrabInfo(const QString &url);
-    static bool fileStream(const QString &url, const QString &file_loc);
+
+public slots:
+    bool fileStream(const QString &url, const QString &file_loc);
 
 signals:
     void sendXferStats(const GekkoFyre::CmnRoutines::CurlProgressPtr &dl_stat);
     void sendDlFinished(const GekkoFyre::CmnRoutines::DlStatusMsg &status);
+    void sendGlobFin();
 
 private:
     struct CurlInit {
