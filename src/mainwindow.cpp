@@ -46,6 +46,7 @@
 #include "singleton_proc.hpp"
 #include <boost/filesystem.hpp>
 #include <boost/exception/all.hpp>
+#include <qmetatype.h>
 #include <QInputDialog>
 #include <QModelIndex>
 #include <QMessageBox>
@@ -60,10 +61,6 @@
 #include <SDKDDKVer.h>
 #include <Windows.h>
 #endif
-
-extern "C" {
-#include <qmetatype.h>
-}
 
 namespace fs = boost::filesystem;
 MainWindow::MainWindow(QWidget *parent) :
@@ -125,7 +122,11 @@ MainWindow::MainWindow(QWidget *parent) :
     QObject::connect(this, SIGNAL(sendStopDownload(QString)), routines, SLOT(recvStopDownload(QString)));
     QObject::connect(this, SIGNAL(updateDlStats()), this, SLOT(manageDlStats()));
 
-    readFromHistoryFile();
+    try {
+        readFromHistoryFile();
+    } catch (const std::exception &e) {
+        QMessageBox::warning(this, tr("Error!"), QString("%1").arg(e.what()), QMessageBox::Ok);
+    }
 }
 
 MainWindow::~MainWindow()

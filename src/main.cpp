@@ -36,6 +36,8 @@
 #include "mainwindow.hpp"
 #include <QApplication>
 
+#define BOOST_FILESYSTEM_NO_DEPRECATED
+
 int main(int argc, char *argv[])
 {
     QApplication a(argc, argv);

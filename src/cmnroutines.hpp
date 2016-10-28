@@ -52,13 +52,15 @@
 #include <QDateTime>
 #include <string>
 #include <cstdio>
+#include <utility>
+#include <unordered_map>
+#include <qmetatype.h>
 #include <QString>
 #include <QObject>
 #include <QEvent>
 
 extern "C" {
 #include <curl/curl.h>
-#include <qmetatype.h>
 }
 
 namespace GekkoFyre {
@@ -74,20 +76,12 @@ private:
     };
 
     struct FileStream {
-        const char *file_loc;  // Name to store file as if download /and/ disk writing is successful
+        char *file_loc;  // Name to store file as if download /and/ disk writing is successful
         std::ofstream *stream; // File object stream
-    };
-
-    // Global information, common to all connections
-    struct GlobalInfo {
-        CURLM *multi;
-        int still_running;
-        int msgs_left;
     };
 
     // Information associated with a specific easy handle
     struct ConnInfo {
-        GlobalInfo glob_info;
         CURL *easy;
         std::string url;
         char error[CURL_ERROR_SIZE];
@@ -132,6 +126,13 @@ public:
         CurlDlStats stat;
     };
 
+    // Global information, common to all connections
+    struct GlobalInfo {
+        CURLM *multi;
+        int still_running;
+        int msgs_left;
+    };
+
     struct CurlDlInfo {
         std::string file_loc;               // The location of the downloaded file being streamed towards
         unsigned int cId;                   // Automatically incremented Content ID for each download/file
@@ -150,6 +151,8 @@ public:
     QString bytesToMegabytes(const QVariant &value);
     QString numberSeperators(const QVariant &value);
     double percentDownloaded(const double &content_length, const double &amountDl);
+    static std::string generateUUID();
+    static bool mapExists(const std::string &name);
 
     int convDlStat_toInt(const GekkoFyre::DownloadStatus &status);
     GekkoFyre::DownloadStatus convDlStat_IntToEnum(const int &s);
@@ -167,6 +170,9 @@ public:
     static CurlInfo verifyFileExists(const QString &url);
     static CurlInfoExt curlGrabInfo(const QString &url);
 
+    // http://stackoverflow.com/questions/5134614/c-const-map-element-access
+    static std::unordered_map<std::string, GekkoFyre::CmnRoutines::GlobalInfo *> curl_map; // <map, value>
+
 public slots:
     bool fileStream(const QString &url, const QString &file_loc);
 
@@ -181,6 +187,7 @@ private:
         MemoryStruct mem_chunk;
         FileStream file_buf;
         CurlProgressPtr prog;
+        std::vector<std::string> uuid;
     };
 
     static void mcode_or_die(const char *where, CURLMcode code);
@@ -200,8 +207,8 @@ private:
     static int close_socket(void *clientp, curl_socket_t item); // https://curl.haxx.se/libcurl/c/CURLOPT_CLOSESOCKETFUNCTION.html
     static size_t curl_write_memory_callback(void *ptr, size_t size, size_t nmemb, void *userp);
     static size_t curl_write_file_callback(char *buffer, size_t size, size_t nmemb, void *userdata);
-    static CurlInit new_conn(const QString &url, bool grabHeaderOnly = false, bool writeToMemory = false,
-                             const QString &fileLoc = "", bool grabStats = false);
+    static std::pair<std::string, CurlInit *> new_conn(const QString &url, bool grabHeaderOnly = false, bool writeToMemory = false,
+                                                       const QString &fileLoc = "", bool grabStats = false);
     static void curlCleanup(CurlInit curl_init);
 
 private slots:
