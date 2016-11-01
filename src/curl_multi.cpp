@@ -62,7 +62,6 @@ GekkoFyre::CurlMulti::CurlMulti()
 {
     setlocale (LC_ALL, "");
     curl_global_init(CURL_GLOBAL_DEFAULT); // https://curl.haxx.se/libcurl/c/curl_global_init.html
-    gi = new GekkoFyre::GkCurl::GlobalInfo;
 }
 
 GekkoFyre::CurlMulti::~CurlMulti()
@@ -133,7 +132,7 @@ bool GekkoFyre::CurlMulti::fileStream()
                 curl_struct = new GekkoFyre::GkCurl::CurlInit;
                 for (auto const &entry : eh_vec) {
                     // http://www.boost.org/doc/libs/1_49_0/libs/ptr_container/doc/ptr_container.html
-                    if (msg->easy_handle == entry.second) {
+                    if (msg->easy_handle == entry.second->conn_info->easy) {
                         ptr_uuid = entry.first;
                         curl_struct = &eh_vec[ptr_uuid];
                         continue;
@@ -167,25 +166,20 @@ bool GekkoFyre::CurlMulti::fileStream()
 
 void GekkoFyre::CurlMulti::recvNewDl(const QString &url, const QString &fileLoc)
 {
-    if (gi != nullptr) {
-        if (gi->multi == nullptr) {
-            // Global multi-handle does not exist, so create it
-            gi->multi = curl_multi_init(); // Initiate the libcurl session
-            curl_multi_setopt(gi->multi, CURLMOPT_SOCKETFUNCTION, sock_cb);
-            curl_multi_setopt(gi->multi, CURLMOPT_SOCKETDATA, gi);
-            curl_multi_setopt(gi->multi, CURLMOPT_TIMERFUNCTION, multi_timer_cb);
-            curl_multi_setopt(gi->multi, CURLMOPT_TIMERDATA, gi);
-        }
-
-        std::string uuid;
-        if (fileLoc.isEmpty()) { throw std::invalid_argument(tr("An invalid file location has been given!").toStdString()); }
-        uuid = new_conn(url, gi, false, false, fileLoc, true);
+    if (gi == nullptr) {
+        // Global multi-handle does not exist, so create it
+        gi = new GekkoFyre::GkCurl::GlobalInfo;
+        gi->multi = curl_multi_init(); // Initiate the libcurl session
+        curl_multi_setopt(gi->multi, CURLMOPT_SOCKETFUNCTION, sock_cb);
+        curl_multi_setopt(gi->multi, CURLMOPT_SOCKETDATA, gi);
+        curl_multi_setopt(gi->multi, CURLMOPT_TIMERFUNCTION, multi_timer_cb);
+        curl_multi_setopt(gi->multi, CURLMOPT_TIMERDATA, gi);
     }
 
-    if (gi->still_running == 1) {
-        // Only launch this function once for every set of handles...
-        fileStream();
-    }
+    std::string uuid;
+    if (fileLoc.isEmpty()) { throw std::invalid_argument(tr("An invalid file location has been given!").toStdString()); }
+    uuid = new_conn(url, gi, false, false, fileLoc, true);
+    fileStream();
 }
 
 void GekkoFyre::CurlMulti::mcode_or_die(const char *where, CURLMcode code)
