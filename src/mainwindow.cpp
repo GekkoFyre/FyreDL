@@ -44,6 +44,7 @@
 #include "ui_mainwindow.h"
 #include "settings.hpp"
 #include "singleton_proc.hpp"
+#include "curl_easy.hpp"
 #include <boost/filesystem.hpp>
 #include <boost/exception/all.hpp>
 #include <qmetatype.h>
@@ -54,7 +55,6 @@
 #include <QList>
 #include <QSortFilterProxyModel>
 #include <QItemSelectionModel>
-#include <QtConcurrent/qtconcurrentrun.h>
 
 #ifdef _WIN32
 #define _WIN32_WINNT 0x06000100
@@ -92,7 +92,7 @@ MainWindow::MainWindow(QWidget *parent) :
         }
         #endif
     } catch (const std::exception &e) {
-        QMessageBox::information(this, tr("Problem!"), QString("%1").arg(e.what()));
+        QMessageBox::information(this, tr("Problem!"), QString("%1").arg(e.what()), QMessageBox::Ok);
         QCoreApplication::quit(); // Exit with status code '0'
         return;
     }
@@ -102,15 +102,16 @@ MainWindow::MainWindow(QWidget *parent) :
                          QMessageBox::Ok);
 
     routines = new GekkoFyre::CmnRoutines();
+    curl_multi = new GekkoFyre::CurlMulti();
 
     // http://wiki.qt.io/QThreads_general_usage
-    curl_thread = new QThread;
-    routines->moveToThread(curl_thread);
-    QObject::connect(this, SIGNAL(sendStartDownload(QString,QString)), routines, SLOT(fileStream(QString,QString)));
-    QObject::connect(routines, SIGNAL(sendGlobFin()), curl_thread, SLOT(quit()));
-    QObject::connect(routines, SIGNAL(sendGlobFin()), curl_thread, SLOT(deleteLater()));
-    QObject::connect(routines, SIGNAL(sendGlobFin()), routines, SLOT(deleteLater()));
-    curl_thread->start();
+    curl_multi_thread = new QThread;
+    curl_multi->moveToThread(curl_multi_thread);
+    QObject::connect(this, SIGNAL(sendStartDownload(QString,QString)), curl_multi, SLOT(recvNewDl(QString,QString)));
+    QObject::connect(curl_multi, SIGNAL(sendGlobFin()), curl_multi_thread, SLOT(quit()));
+    QObject::connect(curl_multi, SIGNAL(sendGlobFin()), curl_multi_thread, SLOT(deleteLater()));
+    QObject::connect(curl_multi, SIGNAL(sendGlobFin()), curl_multi, SLOT(deleteLater()));
+    curl_multi_thread->start();
 
     dlModel = new downloadModel(this);
     ui->downloadView->setModel(dlModel);
@@ -119,7 +120,7 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->downloadView->setContextMenuPolicy(Qt::CustomContextMenu);
 
     QObject::connect(ui->downloadView, SIGNAL(customContextMenuRequested(QPoint)), this, SLOT(on_downloadView_customContextMenuRequested(QPoint)));
-    QObject::connect(this, SIGNAL(sendStopDownload(QString)), routines, SLOT(recvStopDownload(QString)));
+    QObject::connect(this, SIGNAL(sendStopDownload(QString)), curl_multi, SLOT(recvStopDownload(QString)));
     QObject::connect(this, SIGNAL(updateDlStats()), this, SLOT(manageDlStats()));
 
     try {
@@ -162,7 +163,7 @@ void MainWindow::addDownload()
  */
 void MainWindow::readFromHistoryFile()
 {
-    std::vector<GekkoFyre::CmnRoutines::CurlDlInfo> dl_history;
+    std::vector<GekkoFyre::GkCurl::CurlDlInfo> dl_history;
     if (fs::exists(routines->findCfgFile(CFG_HISTORY_FILE)) &&
             fs::is_regular_file(routines->findCfgFile(CFG_HISTORY_FILE))) {
         try {
@@ -372,18 +373,19 @@ void MainWindow::on_dlstartToolBtn_clicked()
                 const GekkoFyre::DownloadStatus status = routines->convDlStat_StringToEnum(ui->downloadView->model()->data(index).toString());
 
                 if (status != GekkoFyre::DownloadStatus::Completed) {
-                    GekkoFyre::CmnRoutines::CurlInfo verify = routines->verifyFileExists(url);
+                    // TODO: QFutureWatcher<GekkoFyre::CurlMulti::CurlInfo> *verifyFileFutWatch;
+                    GekkoFyre::GkCurl::CurlInfo verify = GekkoFyre::CurlEasy::verifyFileExists(url);
                     if (verify.response_code == 200) {
                         if (status != GekkoFyre::DownloadStatus::Downloading) {
                             routines->modifyDlState(url, GekkoFyre::DownloadStatus::Downloading);
                             dlModel->updateCol(index, routines->convDlStat_toString(GekkoFyre::DownloadStatus::Downloading), MN_STATUS_COL);
 
-                            QObject::connect(GekkoFyre::routine_singleton::instance(), SIGNAL(sendXferStats(GekkoFyre::CmnRoutines::CurlProgressPtr)), this, SLOT(recvXferStats(GekkoFyre::CmnRoutines::CurlProgressPtr)));
-                            QObject::connect(GekkoFyre::routine_singleton::instance(), SIGNAL(sendDlFinished(GekkoFyre::CmnRoutines::DlStatusMsg)), this, SLOT(recvDlFinished(GekkoFyre::CmnRoutines::DlStatusMsg)));
+                            QObject::connect(GekkoFyre::routine_singleton::instance(), SIGNAL(sendXferStats(GekkoFyre::GkCurl::CurlProgressPtr)), this, SLOT(recvXferStats(GekkoFyre::GkCurl::CurlProgressPtr)));
+                            QObject::connect(GekkoFyre::routine_singleton::instance(), SIGNAL(sendDlFinished(GekkoFyre::GkCurl::DlStatusMsg)), this, SLOT(recvDlFinished(GekkoFyre::GkCurl::DlStatusMsg)));
 
                             // This is required for signaling, otherwise QVariant does not know the type.
-                            qRegisterMetaType<GekkoFyre::CmnRoutines::CurlProgressPtr>("curlProgressPtr");
-                            qRegisterMetaType<GekkoFyre::CmnRoutines::DlStatusMsg>("DlStatusMsg");
+                            qRegisterMetaType<GekkoFyre::GkCurl::CurlProgressPtr>("curlProgressPtr");
+                            qRegisterMetaType<GekkoFyre::GkCurl::DlStatusMsg>("DlStatusMsg");
 
                             emit sendStartDownload(url, QString::fromStdString(oss_dest.str()));
                         }
@@ -536,9 +538,9 @@ void MainWindow::sendDetails(const std::string &fileName, const double &fileSize
  * @note   <http://stackoverflow.com/questions/9086372/how-to-compare-pointers>
  * @param info is the struct related to the download info.
  */
-void MainWindow::recvXferStats(const GekkoFyre::CmnRoutines::CurlProgressPtr &info)
+void MainWindow::recvXferStats(const GekkoFyre::GkCurl::CurlProgressPtr &info)
 {
-    GekkoFyre::CmnRoutines::CurlProgressPtr prog_temp;
+    GekkoFyre::GkCurl::CurlProgressPtr prog_temp;
     prog_temp.stat.dlnow = info.stat.dlnow;
     prog_temp.stat.dltotal = info.stat.dltotal;
     prog_temp.stat.upnow = info.stat.upnow;
@@ -606,7 +608,7 @@ void MainWindow::manageDlStats()
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
  * @date   2016-10-15
  */
-void MainWindow::recvDlFinished(const GekkoFyre::CmnRoutines::DlStatusMsg &status)
+void MainWindow::recvDlFinished(const GekkoFyre::GkCurl::DlStatusMsg &status)
 {
     try {
         for (int i = 0; i < dlModel->getList().size(); ++i) {

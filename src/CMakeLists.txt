@@ -70,6 +70,10 @@ set(SOURCE_FILES
     addurl.cpp
     cmnroutines.hpp
     cmnroutines.cpp
+    curl_easy.hpp
+    curl_easy.cpp
+    curl_multi.hpp
+    curl_multi.cpp
     default_var.hpp
     dl_view.hpp
     dl_view.cpp

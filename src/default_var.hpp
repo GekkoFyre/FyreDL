@@ -45,6 +45,12 @@
 
 #include <locale>
 #include <string>
+#include <fstream>
+#include <QString>
+
+extern "C" {
+#include <curl/curl.h>
+}
 
 #define CFG_HISTORY_FILE "fyredl_history.xml"
 #define MINIMAL_PROGRESS_FUNCTIONALITY_INTERVAL 3
@@ -63,20 +69,101 @@
 #define CURL_MAX_WAIT_MSECS 15000
 
 namespace GekkoFyre {
-enum DownloadStatus {
-    Downloading,
-    Completed,
-    Failed,
-    Paused,
-    Stopped,
-    Unknown
-};
+    enum DownloadStatus {
+        Downloading,
+        Completed,
+        Failed,
+        Paused,
+        Stopped,
+        Unknown
+    };
 
-enum DownloadType {
-    HTTP,
-    FTP,
-    Torrent
-};
+    enum DownloadType {
+        HTTP,
+        FTP,
+        Torrent
+    };
+
+    enum CurlGrabMethod {
+        Header,
+        File
+    };
+
+    namespace GkCurl {
+        struct FileStream {
+            char *file_loc;  // Name to store file as if download /and/ disk writing is successful
+            std::ofstream *stream; // File object stream
+        };
+
+        // Global information, common to all connections
+        struct GlobalInfo {
+            CURLM *multi;
+            int still_running;
+        };
+
+        struct MemoryStruct {
+            std::string memory;
+            size_t size;
+        };
+
+        // Information associated with a specific easy handle
+        struct ConnInfo {
+            CURL *easy;
+            std::string url;
+            char error[CURL_ERROR_SIZE];
+            CURLMcode curl_res;
+        };
+
+        struct CurlInfo {
+            long response_code;        // The HTTP/FTP response code
+            std::string effective_url; // In cases when you've asked libcurl to follow redirects, it may very well not be the same value you set with 'CURLOPT_URL'
+        };
+
+        struct CurlInfoExt {
+            bool status_ok;            // Whether 'CURLE_OK' was returned or not
+            std::string status_msg;    // The status message, if any, returned by the libcurl functions
+            long long response_code;   // The HTTP/FTP response code
+            double elapsed;            // Total time in seconds for the previous transfer (including name resolving, TCP connect, etc.)
+            std::string effective_url; // In cases when you've asked libcurl to follow redirects, it may very well not be the same value you set with 'CURLOPT_URL'
+            double content_length;     // The size of the download, i.e. content length
+        };
+
+        struct CurlDlStats {
+            curl_off_t dltotal; // Total downloaded
+            curl_off_t uptotal; // Total uploaded
+            double dlnow;       // Current download
+            curl_off_t upnow;   // Current upload
+            double cur_time;
+            std::string url;    // The URL in question
+        };
+
+        struct DlStatusMsg {
+            bool dl_compl_succ; // Whether the download was completed successfully or aborted with an error
+            QString url;        // The URL of the download in question
+        };
+
+        struct CurlProgressPtr {
+            double lastruntime;
+            CURL *curl;
+            CurlDlStats stat;
+        };
+
+        struct CurlDlInfo {
+            std::string file_loc;               // The location of the downloaded file being streamed towards
+            unsigned int cId;                   // Automatically incremented Content ID for each download/file
+            uint timestamp;                     // The date/time of the download/file having been inserted into the history file
+            GekkoFyre::DownloadStatus dlStatus; // Status of the downloading file(s) in question
+            CurlInfoExt ext_info;               // Extended info about the file(s) themselves
+        };
+
+        struct CurlInit {
+            ConnInfo *conn_info;
+            MemoryStruct mem_chunk;
+            FileStream file_buf;
+            CurlProgressPtr prog;
+            std::string uuid;
+        };
+    }
 }
 
 #endif // DEFVAR_HPP

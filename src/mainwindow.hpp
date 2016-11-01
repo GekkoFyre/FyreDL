@@ -46,6 +46,7 @@
 #include "default_var.hpp"
 #include "dl_view.hpp"
 #include "cmnroutines.hpp"
+#include "curl_multi.hpp"
 #include "addurl.hpp"
 #include <vector>
 #include <QMainWindow>
@@ -77,12 +78,12 @@ private:
 
     downloadModel *dlModel;
     GekkoFyre::CmnRoutines *routines;
+    GekkoFyre::CurlMulti *curl_multi;
     GekkoFyre::DownloadStatus status;
-    std::vector<GekkoFyre::CmnRoutines::CurlProgressPtr> dl_stat;
-    QFutureWatcher<bool> *fileStrFutWatch;
+    std::vector<GekkoFyre::GkCurl::CurlProgressPtr> dl_stat;
 
     // http://stackoverflow.com/questions/10121560/stdthread-naming-your-thread
-    QThread *curl_thread;
+    QThread *curl_multi_thread;
 
 signals:
     void updateDlStats();
@@ -109,9 +110,9 @@ private slots:
                      const double &progress, const int &upSpeed, const int &downSpeed,
                      const GekkoFyre::DownloadStatus &status, const std::string &url,
                      const std::string &destination);
-    void recvXferStats(const GekkoFyre::CmnRoutines::CurlProgressPtr &info);
+    void recvXferStats(const GekkoFyre::GkCurl::CurlProgressPtr &info);
     void manageDlStats();
-    void recvDlFinished(const GekkoFyre::CmnRoutines::DlStatusMsg &status);
+    void recvDlFinished(const GekkoFyre::GkCurl::DlStatusMsg &status);
 
 private:
     Ui::MainWindow *ui;

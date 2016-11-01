@@ -2,6 +2,8 @@
 #include "ui_addurl.h"
 #include "default_var.hpp"
 #include "dl_view.hpp"
+#include "curl_multi.hpp"
+#include "curl_easy.hpp"
 #include <QMessageBox>
 #include <QFileDialog>
 #include <QDir>
@@ -25,9 +27,9 @@ AddURL::~AddURL()
 
 void AddURL::on_buttonBox_accepted()
 {
-    GekkoFyre::CmnRoutines::CurlInfo info;
-    GekkoFyre::CmnRoutines::CurlInfoExt info_ext;
-    GekkoFyre::CmnRoutines::CurlDlInfo dl_info;
+    GekkoFyre::GkCurl::CurlInfo info;
+    GekkoFyre::GkCurl::CurlInfoExt info_ext;
+    GekkoFyre::GkCurl::CurlDlInfo dl_info;
     QString url_plaintext;
 
     switch (ui->inputTabWidget->currentIndex()) {
@@ -43,10 +45,10 @@ void AddURL::on_buttonBox_accepted()
         } else {
             try {
                 url_plaintext = ui->url_plainTextEdit->toPlainText();
-                info = routines->verifyFileExists(url_plaintext);
+                info = GekkoFyre::CurlEasy::verifyFileExists(url_plaintext);
 
                 if (info.response_code == 200) {
-                    info_ext = routines->curlGrabInfo(url_plaintext);
+                    info_ext = GekkoFyre::CurlEasy::curlGrabInfo(url_plaintext);
                     dl_info.dlStatus = GekkoFyre::DownloadStatus::Unknown;
                     dl_info.file_loc = ui->url_dest_lineEdit->text().toStdString().c_str();
                     dl_info.ext_info.content_length = info_ext.content_length;
@@ -74,7 +76,7 @@ void AddURL::on_buttonBox_accepted()
                                      QMessageBox::Ok);
             return AddURL::done(QDialog::Rejected);
         } else {
-            info = routines->verifyFileExists(ui->file_dest_lineEdit->text());
+            info = GekkoFyre::CurlEasy::verifyFileExists(ui->file_dest_lineEdit->text());
             return AddURL::done(QDialog::Accepted);
         }
     default:
