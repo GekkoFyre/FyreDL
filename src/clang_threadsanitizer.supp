@@ -1,0 +1,16 @@
+# https://github.com/google/sanitizers/wiki/ThreadSanitizerCppManual
+# https://github.com/google/sanitizers/wiki/ThreadSanitizerSuppressions
+# http://clang.llvm.org/docs/ThreadSanitizer.html
+
+# Ignore the entire source file
+src:/home/phobos/Programming/FyreDL/src/main.cpp
+
+# Suppress various errors from external libraries
+called_from_lib:libQt5Core.so
+called_from_lib:libc.so
+called_from_lib:libQt5XcbQpa.so
+called_from_lib:libglib-2.0.so
+called_from_lib:libdbus-1.so
+called_from_lib:libxcb.so
+called_from_lib:libQt5DBus.so
+called_from_lib:libstdc++.so

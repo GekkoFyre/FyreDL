@@ -33,16 +33,40 @@
  **
  ********************************************************************************/
 
-#include "mainwindow.hpp"
-#include <QApplication>
+/**
+ * @file curl_multi.hpp
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @date 2016-11-01
+ * @brief This is the easy-interface to libcurl. It's good for verifying, checking, etc. and where a full
+ * download of the file is not required, but just the header.
+ */
 
-#define BOOST_FILESYSTEM_NO_DEPRECATED
+#ifndef FYREDL_CURLEASY_HPP
+#define FYREDL_CURLEASY_HPP
 
-int main(int argc, char *argv[])
-{
-    QApplication a(argc, argv);
-    MainWindow w;
-    w.show();
+#include "curl_multi.hpp"
+#include <QObject>
+#include <QString>
 
-    return a.exec();
+extern "C" {
+#include <curl/curl.h>
 }
+
+namespace GekkoFyre {
+class CurlEasy : public QObject {
+    Q_OBJECT
+public:
+    CurlEasy();
+    ~CurlEasy();
+
+    static GekkoFyre::GkCurl::CurlInfo verifyFileExists(const QString &url);
+    static GekkoFyre::GkCurl::CurlInfoExt curlGrabInfo(const QString &url);
+
+private:
+    static size_t curl_write_memory_callback(void *ptr, size_t size, size_t nmemb, void *userp);
+    static GekkoFyre::GkCurl::CurlInit new_easy_handle(const QString &url);
+    static void curlCleanup(GekkoFyre::GkCurl::CurlInit &curl_init);
+};
+}
+
+#endif // FYREDL_CURLEASY_HPP

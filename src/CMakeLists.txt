@@ -40,23 +40,58 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release")
 endif()
 
+# Instruct CMake to run moc automatically when needed.
+set(CMAKE_AUTOMOC ON)
+
+# https://cmake.org/cmake/help/v3.0/prop_tgt/AUTOUIC.html
+set(CMAKE_AUTOUIC ON)
+
+# https://wiki.qt.io/Using_CMake_build_system
+set(CMAKE_AUTORCC ON)
+
 # As moc files are generated in the binary dir, tell CMake
 # to always look for includes there
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
-# Instruct CMake to run moc automatically when needed.
-set(CMAKE_AUTOMOC ON)
+set_directory_properties(PROPERTIES CLEAN_NO_CUSTOM 1)
 
+# http://doc.qt.io/qt-5/cmake-manual.html
+# https://gist.github.com/02JanDal/70a39f2cc3d2002b3588
 # Find the Qt libraries
 find_package(Qt5Core REQUIRED)
 find_package(Qt5Widgets REQUIRED)
+find_package(Qt5Gui REQUIRED)
+find_package(Qt5LinguistTools REQUIRED)
 
 set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/Modules/")
 
 set(SOURCE_FILES
+    addurl.hpp
+    addurl.cpp
     cmnroutines.hpp
     cmnroutines.cpp
-    main.cpp)
+    curl_easy.hpp
+    curl_easy.cpp
+    curl_multi.hpp
+    curl_multi.cpp
+    default_var.hpp
+    dl_view.hpp
+    dl_view.cpp
+    main.cpp
+    mainwindow.hpp
+    mainwindow.cpp
+    settings.hpp
+    settings.cpp
+    singleton_emit.hpp
+    singleton_proc.hpp)
+
+# http://www.executionunit.com/blog/2014/01/22/moving-from-qmake-to-cmake/
+qt5_wrap_ui(UI_HEADERS
+            mainwindow.ui
+            addurl.ui
+            settings.ui)
+
+qt5_add_resources(UI_RESOURCES assets.qrc)
 
 # Create the main executable and name it depending on the operating system
 set(EXE_NAME "fyredl" CACHE STRING "The name of the executable.")
@@ -66,7 +101,7 @@ elseif (${CMAKE_SYSTEM_NAME} MATCHES "Windows" OR "mingw" OR "cygwin")
     set_property(CACHE EXE_NAME PROPERTY STRINGS "fyredl.exe")
 endif()
 
-add_executable("${EXE_NAME}" ${SOURCE_FILES})
+add_executable("${EXE_NAME}" ${SOURCE_FILES} ${UI_HEADERS} ${UI_RESOURCES})
 set_property(TARGET ${EXE_NAME} PROPERTY CXX_STANDARD 14)
 set_property(TARGET ${EXE_NAME} PROPERTY CXX_STANDARD_REQUIRED ON)
 
@@ -81,8 +116,7 @@ foreach(i ${known_features})
 endforeach()
 
 # https://cmake.org/cmake/help/v3.1/prop_gbl/CMAKE_CXX_KNOWN_FEATURES.html
-set(GK_NEEDED_FEATURES cxx_aggregate_default_initializers
-                       cxx_auto_type
+set(GK_NEEDED_FEATURES cxx_auto_type
                        cxx_decltype
                        cxx_decltype_auto
                        cxx_inline_namespaces
@@ -98,29 +132,6 @@ set(GK_NEEDED_FEATURES cxx_aggregate_default_initializers
 target_compile_features("${EXE_NAME}" PRIVATE ${GK_NEEDED_FEATURES})
 
 #
-# Generate the 'GetText' translation files
-#
-find_package(GettextTools REQUIRED)
-if (GETTEXT_FOUND)
-    set(stockDir "${CMAKE_CURRENT_SOURCE_DIR}/i18n")
-    set(langDir "${CMAKE_CURRENT_BINARY_DIR}/lang")
-    set(outDir "${CMAKE_CURRENT_BINARY_DIR}/locale")
-    gettext_make_target("lang"
-      HIERARCHY "{1}/{2}/{3}/{4}.mo"
-      KEYWORDS  "_"
-      DOMAIN    "gettexttools-dom"
-      STOCK_DIR "${stockDir}"
-      LANG_DIR  "${langDir}"
-      OUT_DIR   "${outDir}"
-      SOURCE    "${SOURCE_FILES}")
-    list(APPEND makeCleanFiles ${outDir})
-    set_directory_properties(PROPERTIES ADDITIONAL_MAKE_CLEAN_FILES "locale") # CLEANUP
-    message(STATUS "Gettext processes successfully finished!")
-else()
-    message(SEND_ERROR "The 'Gettext' library could not be found!")
-endif (GETTEXT_FOUND)
-
-#
 # Find the correct Boost C++ packages
 #
 set(Boost_USE_MULTITHREADED TRUE)
@@ -128,15 +139,18 @@ set(Boost_USE_MULTITHREADED TRUE)
 # set(Boost_USE_STATIC_RUNTIME FALSE)
 find_package(Boost 1.44.0 REQUIRED COMPONENTS "iostreams"
                                               "program_options"
-                                              "date_time"
                                               "filesystem"
                                               "system")
 if (Boost_FOUND)
     include_directories(${Boost_INCLUDE_DIRS})
     set(LIBS ${LIBS} ${Boost_LIBRARIES})
     message(STATUS "Boost C++ libraries have been found.")
+    add_definitions(-DBOOST_ALL_NO_LIB)
+
+    # http://stackoverflow.com/questions/9742003/platform-detection-in-cmake
+    add_definitions(-D_WIN32_WINNT=NTDDI_VISTASP1)
 else()
-    message(SEND_ERROR "The required 'Boost C++' libraries are either not installed, or not multithreaded and/or of not an up-to-date version.")
+    message(SEND_ERROR "The required 'Boost C++' libraries are either not installed, or not multithreaded and/or of not an up-to-date version. Boost C++ 1.44 is the minimally required version.")
 endif(Boost_FOUND)
 
 #
@@ -148,7 +162,7 @@ if (Threads_FOUND)
 endif(Threads_FOUND)
 
 #
-# Find 'wget'
+# Find 'libcurl'
 #
 find_package(CURL REQUIRED)
 if (CURL_FOUND)
@@ -156,13 +170,33 @@ if (CURL_FOUND)
 endif(CURL_FOUND)
 
 #
+# Find 'pugixml'
+#
+find_package(PugiXML REQUIRED)
+if (PUGIXML_FOUND)
+    include_directories(${PUGIXML_INCLUDE_DIR})
+    set(LIBS ${LIBS} ${PUGIXML_LIBRARIES})
+else()
+    message(SEND_ERROR "The 'pugixml' library could not be found!")
+endif(PUGIXML_FOUND)
+
+#
+# Qt5 translation routines
+#
+# file(GLOB TRANSLATION_FILES ${CMAKE_CURRENT_LIST_DIR}/*.ts)
+# qt5_create_translation(TRANSLATION_MESSAGES ${FILES_TO_TRANSLATE} ${TRANSLATION_FILES})
+# qt5_add_translation(TRANSLATION_QM ${TRANSLATION_FILES})
+# add_custom_target(translations_update DEPENDS ${TRANSLATION_MESSAGES})
+# add_custom_target(translations DEPENDS ${TRANSLATION_QM})
+
+#
 # Optionally, find 'Doxygen' and generate the API documentation
 #
-find_package(Doxygen OPTIONAL)
-if (DOXYGEN_FOUND)
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/Doxyfile.in ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile @ONLY)
-add_custom_target("api-doc" "${DOXYGEN_EXECUTABLE} ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}" COMMENT "Generating API documentation with Doxygen" VERBATIM)
-endif(DOXYGEN_FOUND)
+# find_package(Doxygen REQUIRED)
+# if (DOXYGEN_FOUND)
+# configure_file(${CMAKE_CURRENT_SOURCE_DIR}/Doxyfile.in ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile @ONLY)
+# add_custom_target("api-doc" "${DOXYGEN_EXECUTABLE} ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}" COMMENT "Generating API documentation with Doxygen" VERBATIM)
+# endif(DOXYGEN_FOUND)
 
 IF(CMAKE_BUILD_TYPE MATCHES "Debug")
     set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "./debug/bin")
@@ -184,7 +218,7 @@ ENDIF()
 #
 # Link the (static?) executable with the other, required external libraries
 #
-target_link_libraries(fyredl Qt5::Core Qt5::Widgets ${LIBS})
+target_link_libraries(fyredl Qt5::Core Qt5::Widgets Qt5::Gui ${LIBS})
 
 INCLUDE(CMakeDetermineSystem)
 IF(${CMAKE_SYSTEM_NAME} MATCHES "Windows" OR "cygwin" OR "mingw") # Check if we are on Microsoft Windows
@@ -193,11 +227,10 @@ IF(${CMAKE_SYSTEM_NAME} MATCHES "Windows" OR "cygwin" OR "mingw") # Check if we 
         # TODO: Determine if it's neccessary to add a DEBUG flag here!
     elseif(CMAKE_BUILD_TYPE MATCHES "Release")
         message(STATUS "Creating a Microsoft Windows RELEASE build.")
-    endif(CMAKE_BUILD_TYPE)
+    endif()
     if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC") # Check if we are using the Visual Studio compiler
         set (CMAKE_GENERATOR "Visual Studio")
-        CHECK_INCLUDE_FILES("Windows.h" HAVE_WINDOWS_H)
-        set_target_properties(gecho PROPERTIES LINK_FLAGS "/SUBSYSTEM:WINDOWS")
+        set_target_properties(fyredl PROPERTIES LINK_FLAGS "/SUBSYSTEM:CONSOLE")
         message(STATUS "Using the Microsoft Visual C++ compiler!")
     elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
         SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mwindows") # This is apparently not tested!
@@ -207,6 +240,7 @@ IF(${CMAKE_SYSTEM_NAME} MATCHES "Windows" OR "cygwin" OR "mingw") # Check if we 
         # TODO: Add support for 'mingw'!
     endif()
 elseif(${CMAKE_SYSTEM_NAME} MATCHES "Linux") # Check if we are on Linux
+    install(FILES ${TRANSLATION_QM} DESTINATION translations)
     if (CMAKE_BUILD_TYPE MATCHES "Debug")
         if("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
             # https://spin.atomicobject.com/2013/10/20/clang-compiler/

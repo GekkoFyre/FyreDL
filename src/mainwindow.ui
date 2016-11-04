@@ -1,0 +1,645 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>MainWindow</class>
+ <widget class="QMainWindow" name="MainWindow">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>1024</width>
+    <height>768</height>
+   </rect>
+  </property>
+  <property name="minimumSize">
+   <size>
+    <width>1024</width>
+    <height>768</height>
+   </size>
+  </property>
+  <property name="windowTitle">
+   <string>FyreDL</string>
+  </property>
+  <widget class="QWidget" name="centralWidget">
+   <layout class="QVBoxLayout" name="verticalLayout_3">
+    <item>
+     <layout class="QVBoxLayout" name="verticalPlaceholder">
+      <item>
+       <layout class="QHBoxLayout" name="horizBtnLayout">
+        <item>
+         <widget class="QToolButton" name="addfileToolBtn">
+          <property name="toolTip">
+           <string>Open a file</string>
+          </property>
+          <property name="icon">
+           <iconset resource="assets.qrc">
+            <normaloff>:/icons/assets-img/edit-add-4.png</normaloff>:/icons/assets-img/edit-add-4.png</iconset>
+          </property>
+          <property name="iconSize">
+           <size>
+            <width>64</width>
+            <height>64</height>
+           </size>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QToolButton" name="addurlToolBtn">
+          <property name="toolTip">
+           <string>Enter URL</string>
+          </property>
+          <property name="icon">
+           <iconset resource="assets.qrc">
+            <normaloff>:/icons/assets-img/applications-internet-3.png</normaloff>:/icons/assets-img/applications-internet-3.png</iconset>
+          </property>
+          <property name="iconSize">
+           <size>
+            <width>64</width>
+            <height>64</height>
+           </size>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QToolButton" name="printToolBtn">
+          <property name="toolTip">
+           <string>Print</string>
+          </property>
+          <property name="icon">
+           <iconset resource="assets.qrc">
+            <normaloff>:/icons/assets-img/printer-printing.png</normaloff>:/icons/assets-img/printer-printing.png</iconset>
+          </property>
+          <property name="iconSize">
+           <size>
+            <width>64</width>
+            <height>64</height>
+           </size>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QToolButton" name="dlstartToolBtn">
+          <property name="toolTip">
+           <string>Start</string>
+          </property>
+          <property name="icon">
+           <iconset resource="assets.qrc">
+            <normaloff>:/icons/assets-img/media-playback-start-3.png</normaloff>:/icons/assets-img/media-playback-start-3.png</iconset>
+          </property>
+          <property name="iconSize">
+           <size>
+            <width>64</width>
+            <height>64</height>
+           </size>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QToolButton" name="dlpauseToolBtn">
+          <property name="toolTip">
+           <string>Pause</string>
+          </property>
+          <property name="icon">
+           <iconset resource="assets.qrc">
+            <normaloff>:/icons/assets-img/media-playback-pause-3.png</normaloff>:/icons/assets-img/media-playback-pause-3.png</iconset>
+          </property>
+          <property name="iconSize">
+           <size>
+            <width>64</width>
+            <height>64</height>
+           </size>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QToolButton" name="dlstopToolBtn">
+          <property name="toolTip">
+           <string>Stop</string>
+          </property>
+          <property name="icon">
+           <iconset resource="assets.qrc">
+            <normaloff>:/icons/assets-img/media-playback-stop-3.png</normaloff>:/icons/assets-img/media-playback-stop-3.png</iconset>
+          </property>
+          <property name="iconSize">
+           <size>
+            <width>64</width>
+            <height>64</height>
+           </size>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QToolButton" name="removeToolBtn">
+          <property name="toolTip">
+           <string>Delete download</string>
+          </property>
+          <property name="icon">
+           <iconset resource="assets.qrc">
+            <normaloff>:/icons/assets-img/user-trash.png</normaloff>:/icons/assets-img/user-trash.png</iconset>
+          </property>
+          <property name="iconSize">
+           <size>
+            <width>64</width>
+            <height>64</height>
+           </size>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QToolButton" name="clearhistoryToolBtn">
+          <property name="toolTip">
+           <string>Cleanup completed downloads</string>
+          </property>
+          <property name="icon">
+           <iconset resource="assets.qrc">
+            <normaloff>:/icons/assets-img/edit-clear-3.png</normaloff>:/icons/assets-img/edit-clear-3.png</iconset>
+          </property>
+          <property name="iconSize">
+           <size>
+            <width>64</width>
+            <height>64</height>
+           </size>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QToolButton" name="settingsToolBtn">
+          <property name="toolTip">
+           <string>Preferences</string>
+          </property>
+          <property name="icon">
+           <iconset resource="assets.qrc">
+            <normaloff>:/icons/assets-img/applications-development-web.png</normaloff>:/icons/assets-img/applications-development-web.png</iconset>
+          </property>
+          <property name="iconSize">
+           <size>
+            <width>64</width>
+            <height>64</height>
+           </size>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <spacer name="horizontalSpacer">
+          <property name="orientation">
+           <enum>Qt::Horizontal</enum>
+          </property>
+          <property name="sizeHint" stdset="0">
+           <size>
+            <width>40</width>
+            <height>20</height>
+           </size>
+          </property>
+         </spacer>
+        </item>
+       </layout>
+      </item>
+      <item>
+       <layout class="QVBoxLayout" name="verticalLayout" stretch="70,30">
+        <item>
+         <layout class="QHBoxLayout" name="downloadListHolder">
+          <item>
+           <widget class="QTableView" name="downloadView"/>
+          </item>
+         </layout>
+        </item>
+        <item>
+         <layout class="QHBoxLayout" name="downloadInfoHolder">
+          <item>
+           <widget class="QTabWidget" name="tabStatusWidget">
+            <property name="currentIndex">
+             <number>0</number>
+            </property>
+            <widget class="QWidget" name="tabGeneral">
+             <attribute name="title">
+              <string>General</string>
+             </attribute>
+             <layout class="QVBoxLayout" name="verticalLayout_6">
+              <item>
+               <widget class="QScrollArea" name="generalScrollArea">
+                <property name="widgetResizable">
+                 <bool>true</bool>
+                </property>
+                <widget class="QWidget" name="generalScrollWidget">
+                 <property name="geometry">
+                  <rect>
+                   <x>0</x>
+                   <y>0</y>
+                   <width>962</width>
+                   <height>196</height>
+                  </rect>
+                 </property>
+                 <layout class="QVBoxLayout" name="verticalLayout_8">
+                  <item>
+                   <layout class="QFormLayout" name="generalFormLayout">
+                    <item row="0" column="0">
+                     <widget class="QLabel" name="fileNameLabel">
+                      <property name="text">
+                       <string>File Name: </string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="0" column="1">
+                     <widget class="QWidget" name="fileNameWidget" native="true"/>
+                    </item>
+                    <item row="1" column="0">
+                     <widget class="QLabel" name="destinationLabel">
+                      <property name="text">
+                       <string>Destination: </string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="1" column="1">
+                     <widget class="QWidget" name="destinationWidget" native="true"/>
+                    </item>
+                    <item row="2" column="0">
+                     <widget class="QLabel" name="totalSizeLabel">
+                      <property name="text">
+                       <string>Total Size: </string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="2" column="1">
+                     <widget class="QWidget" name="totalSizeWidget" native="true"/>
+                    </item>
+                    <item row="3" column="0">
+                     <widget class="QLabel" name="uRLLabel">
+                      <property name="text">
+                       <string>URL: </string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="3" column="1">
+                     <widget class="QWidget" name="uRLWidget" native="true"/>
+                    </item>
+                    <item row="4" column="0">
+                     <widget class="QLabel" name="createdTimeLabel">
+                      <property name="text">
+                       <string>Created Time: </string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="4" column="1">
+                     <widget class="QWidget" name="createdTimeWidget" native="true"/>
+                    </item>
+                    <item row="5" column="0">
+                     <widget class="QLabel" name="completedTimeLabel">
+                      <property name="text">
+                       <string>Completed Time: </string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="5" column="1">
+                     <widget class="QWidget" name="completedTimeWidget" native="true"/>
+                    </item>
+                    <item row="6" column="0">
+                     <widget class="QLabel" name="estimatedWaitTimeLabel">
+                      <property name="text">
+                       <string>Estimated Wait Time: </string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="6" column="1">
+                     <widget class="QWidget" name="estimatedWaitTimeWidget" native="true"/>
+                    </item>
+                   </layout>
+                  </item>
+                 </layout>
+                </widget>
+               </widget>
+              </item>
+             </layout>
+            </widget>
+            <widget class="QWidget" name="tabTransfer">
+             <attribute name="title">
+              <string>Transfer</string>
+             </attribute>
+             <layout class="QVBoxLayout" name="verticalLayout_2">
+              <item>
+               <widget class="QScrollArea" name="transferScrollArea">
+                <property name="widgetResizable">
+                 <bool>true</bool>
+                </property>
+                <widget class="QWidget" name="transferScrollWidget">
+                 <property name="geometry">
+                  <rect>
+                   <x>0</x>
+                   <y>0</y>
+                   <width>962</width>
+                   <height>300</height>
+                  </rect>
+                 </property>
+                 <layout class="QVBoxLayout" name="verticalLayout_5">
+                  <item>
+                   <layout class="QFormLayout" name="transFormLayout">
+                    <item row="0" column="0">
+                     <widget class="QLabel" name="statusLabel">
+                      <property name="text">
+                       <string>Status: </string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="0" column="1">
+                     <widget class="QWidget" name="statusWidget" native="true"/>
+                    </item>
+                    <item row="1" column="0">
+                     <widget class="QLabel" name="transferredUploadLabel">
+                      <property name="text">
+                       <string>Transferred (upload)</string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="1" column="1">
+                     <widget class="QWidget" name="transferredUploadWidget" native="true"/>
+                    </item>
+                    <item row="2" column="0">
+                     <widget class="QLabel" name="transferredDownloadLabel">
+                      <property name="text">
+                       <string>Transferred (download)</string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="2" column="1">
+                     <widget class="QWidget" name="transferredDownloadWidget" native="true"/>
+                    </item>
+                    <item row="3" column="0">
+                     <widget class="QLabel" name="progressLabel">
+                      <property name="text">
+                       <string>Progress</string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="3" column="1">
+                     <widget class="QWidget" name="progressWidget" native="true"/>
+                    </item>
+                    <item row="4" column="0">
+                     <widget class="QLabel" name="speedLabel">
+                      <property name="text">
+                       <string>Speed</string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="4" column="1">
+                     <widget class="QWidget" name="speedWidget" native="true"/>
+                    </item>
+                    <item row="5" column="0">
+                     <widget class="QLabel" name="totalPeersLabel">
+                      <property name="text">
+                       <string>Total peers: </string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="5" column="1">
+                     <widget class="QWidget" name="totalPeersWidget" native="true"/>
+                    </item>
+                    <item row="6" column="0">
+                     <widget class="QLabel" name="connectedPeersLabel">
+                      <property name="text">
+                       <string>Connected Peers: </string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="6" column="1">
+                     <widget class="QWidget" name="connectedPeersWidget" native="true"/>
+                    </item>
+                    <item row="7" column="0">
+                     <widget class="QLabel" name="totalPiecesLabel">
+                      <property name="text">
+                       <string>Total pieces: </string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="7" column="1">
+                     <widget class="QWidget" name="totalPiecesWidget" native="true"/>
+                    </item>
+                    <item row="8" column="0">
+                     <widget class="QLabel" name="downloadPiecesLabel">
+                      <property name="text">
+                       <string>Download pieces: </string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="8" column="1">
+                     <widget class="QWidget" name="downloadPiecesWidget" native="true"/>
+                    </item>
+                    <item row="9" column="0">
+                     <widget class="QLabel" name="startTimeLabel">
+                      <property name="text">
+                       <string>Start time: </string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="9" column="1">
+                     <widget class="QWidget" name="startTimeWidget" native="true"/>
+                    </item>
+                    <item row="10" column="0">
+                     <widget class="QLabel" name="timeLeftLabel">
+                      <property name="text">
+                       <string>Time left: </string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="10" column="1">
+                     <widget class="QWidget" name="timeLeftWidget" native="true"/>
+                    </item>
+                   </layout>
+                  </item>
+                 </layout>
+                </widget>
+               </widget>
+              </item>
+             </layout>
+            </widget>
+            <widget class="QWidget" name="tabContents">
+             <attribute name="title">
+              <string>Contents</string>
+             </attribute>
+             <layout class="QVBoxLayout" name="verticalLayout_4">
+              <item>
+               <widget class="QTableView" name="tableView"/>
+              </item>
+             </layout>
+            </widget>
+            <widget class="QWidget" name="tabLogging">
+             <attribute name="title">
+              <string>Log</string>
+             </attribute>
+             <layout class="QVBoxLayout" name="verticalLayout_7">
+              <item>
+               <widget class="QPlainTextEdit" name="logPlainText">
+                <property name="verticalScrollBarPolicy">
+                 <enum>Qt::ScrollBarAlwaysOn</enum>
+                </property>
+                <property name="horizontalScrollBarPolicy">
+                 <enum>Qt::ScrollBarAlwaysOff</enum>
+                </property>
+                <property name="readOnly">
+                 <bool>true</bool>
+                </property>
+                <property name="textInteractionFlags">
+                 <set>Qt::LinksAccessibleByMouse|Qt::TextSelectableByMouse</set>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </widget>
+           </widget>
+          </item>
+         </layout>
+        </item>
+       </layout>
+      </item>
+     </layout>
+    </item>
+   </layout>
+  </widget>
+  <widget class="QMenuBar" name="menuBar">
+   <property name="geometry">
+    <rect>
+     <x>0</x>
+     <y>0</y>
+     <width>1024</width>
+     <height>25</height>
+    </rect>
+   </property>
+   <widget class="QMenu" name="menu_File">
+    <property name="title">
+     <string>&amp;File</string>
+    </property>
+    <addaction name="action_Open_a_File"/>
+    <addaction name="actionEnter_URL"/>
+    <addaction name="separator"/>
+    <addaction name="actionE_xit"/>
+   </widget>
+   <widget class="QMenu" name="menu_Edit">
+    <property name="title">
+     <string>&amp;Edit</string>
+    </property>
+    <addaction name="action_Resume"/>
+    <addaction name="action_Pause"/>
+    <addaction name="action_Cleanup_erroneous_tasks"/>
+    <addaction name="separator"/>
+    <addaction name="actionEdi_t"/>
+    <addaction name="action_Delete"/>
+    <addaction name="separator"/>
+    <addaction name="actionC_ut"/>
+    <addaction name="actionC_opy"/>
+    <addaction name="actionP_aste"/>
+    <addaction name="separator"/>
+    <addaction name="actionPreference_s"/>
+   </widget>
+   <widget class="QMenu" name="menu_Tools">
+    <property name="title">
+     <string>&amp;Tools</string>
+    </property>
+    <addaction name="action_Limit_Upload_Download"/>
+   </widget>
+   <widget class="QMenu" name="menu_Window">
+    <property name="title">
+     <string>&amp;Window</string>
+    </property>
+   </widget>
+   <widget class="QMenu" name="menu_Help">
+    <property name="title">
+     <string>&amp;Help</string>
+    </property>
+    <addaction name="action_Documentation"/>
+    <addaction name="separator"/>
+    <addaction name="action_About"/>
+   </widget>
+   <addaction name="menu_File"/>
+   <addaction name="menu_Edit"/>
+   <addaction name="menu_Tools"/>
+   <addaction name="menu_Window"/>
+   <addaction name="menu_Help"/>
+  </widget>
+  <widget class="QToolBar" name="mainToolBar">
+   <attribute name="toolBarArea">
+    <enum>TopToolBarArea</enum>
+   </attribute>
+   <attribute name="toolBarBreak">
+    <bool>false</bool>
+   </attribute>
+  </widget>
+  <widget class="QStatusBar" name="statusBar"/>
+  <action name="action_Open_a_File">
+   <property name="text">
+    <string>&amp;Open a File...</string>
+   </property>
+  </action>
+  <action name="actionEnter_URL">
+   <property name="text">
+    <string>Enter &amp;URL...</string>
+   </property>
+  </action>
+  <action name="actionE_xit">
+   <property name="text">
+    <string>E&amp;xit</string>
+   </property>
+  </action>
+  <action name="action_Resume">
+   <property name="text">
+    <string>&amp;Resume</string>
+   </property>
+  </action>
+  <action name="action_Pause">
+   <property name="text">
+    <string>&amp;Pause</string>
+   </property>
+  </action>
+  <action name="action_Cleanup_erroneous_tasks">
+   <property name="text">
+    <string>&amp;Cleanup erroneous tasks</string>
+   </property>
+  </action>
+  <action name="actionEdi_t">
+   <property name="text">
+    <string>Edi&amp;t</string>
+   </property>
+  </action>
+  <action name="action_Delete">
+   <property name="text">
+    <string>&amp;Delete</string>
+   </property>
+  </action>
+  <action name="actionC_ut">
+   <property name="text">
+    <string>C&amp;ut</string>
+   </property>
+  </action>
+  <action name="actionC_opy">
+   <property name="text">
+    <string>C&amp;opy</string>
+   </property>
+  </action>
+  <action name="actionP_aste">
+   <property name="text">
+    <string>P&amp;aste</string>
+   </property>
+  </action>
+  <action name="actionPreference_s">
+   <property name="text">
+    <string>Preference&amp;s...</string>
+   </property>
+  </action>
+  <action name="action_Documentation">
+   <property name="text">
+    <string>&amp;Documentation</string>
+   </property>
+  </action>
+  <action name="action_About">
+   <property name="text">
+    <string>&amp;About...</string>
+   </property>
+  </action>
+  <action name="action_Limit_Upload_Download">
+   <property name="text">
+    <string>&amp;Limit Upload/Download...</string>
+   </property>
+  </action>
+ </widget>
+ <layoutdefault spacing="6" margin="11"/>
+ <resources>
+  <include location="assets.qrc"/>
+ </resources>
+ <connections/>
+</ui>

@@ -1,0 +1,30 @@
+<RCC>
+    <qresource prefix="/icons">
+        <file>assets-img/edit-add-4.png</file>
+        <file>assets-img/applications-internet-3.png</file>
+        <file>assets-img/media-playback-pause-3.png</file>
+        <file>assets-img/media-playback-start-3.png</file>
+        <file>assets-img/media-playback-stop-3.png</file>
+        <file>assets-img/user-trash.png</file>
+        <file>assets-img/user-trash-full-2.png</file>
+        <file>assets-img/edit-clear-3.png</file>
+        <file>assets-img/printer-printing.png</file>
+        <file>assets-img/applications-development-web.png</file>
+        <file>assets-img/gftp.png</file>
+        <file>assets-img/system-run-3.png</file>
+    </qresource>
+    <qresource lang="en">
+        <file alias="add_en.png">assets-img/edit-add-4.png</file>
+        <file alias="internet_en.png">assets-img/applications-internet-3.png</file>
+        <file alias="download_pause_en.png">assets-img/media-playback-pause-3.png</file>
+        <file alias="download_start_en.png">assets-img/media-playback-start-3.png</file>
+        <file alias="download_stop_en.png">assets-img/media-playback-stop-3.png</file>
+        <file alias="trash_bin_empty_en.png">assets-img/user-trash.png</file>
+        <file alias="trash_bin_full_en.png">assets-img/user-trash-full-2.png</file>
+        <file alias="clear_history_en.png">assets-img/edit-clear-3.png</file>
+        <file alias="print_en.png">assets-img/printer-printing.png</file>
+        <file alias="settings_en.png">assets-img/applications-development-web.png</file>
+        <file alias="gftp_en.png">assets-img/gftp.png</file>
+        <file alias="system_en.png">assets-img/system-run-3.png</file>
+    </qresource>
+</RCC>
