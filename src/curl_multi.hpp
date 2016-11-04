@@ -55,6 +55,7 @@
 #include <fstream>
 #include <QString>
 #include <QDateTime>
+#include <QMutex>
 #include <qmetatype.h>
 
 extern "C" {
@@ -89,6 +90,7 @@ private:
     // http://stackoverflow.com/questions/10333854/how-to-handle-a-map-with-pointers
     static boost::ptr_unordered_map<std::string, GekkoFyre::GkCurl::CurlInit> eh_vec; // Easy handle mapped to a ID, for managing each connection
     static GekkoFyre::GkCurl::GlobalInfo *gi;
+    static QMutex mutex;
 
     static std::string createId();
 
@@ -111,7 +113,7 @@ private:
     static size_t curl_write_file_callback(char *buffer, size_t size, size_t nmemb, void *userdata);
     static std::string new_conn(const QString &url, GekkoFyre::GkCurl::GlobalInfo *global, bool grabHeaderOnly,
                                 bool writeToMemory, const QString &fileLoc, bool grabStats);
-    static void curlCleanup(GekkoFyre::GkCurl::CurlInit curl_init);
+    static void curlCleanup(GekkoFyre::GkCurl::CurlInit &curl_init);
 
 private slots:
     void recvStopDownload(const QString &url);

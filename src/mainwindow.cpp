@@ -540,6 +540,7 @@ void MainWindow::sendDetails(const std::string &fileName, const double &fileSize
  */
 void MainWindow::recvXferStats(const GekkoFyre::GkCurl::CurlProgressPtr &info)
 {
+    curl_multi_mutex.lock();
     GekkoFyre::GkCurl::CurlProgressPtr prog_temp;
     prog_temp.stat.dlnow = info.stat.dlnow;
     prog_temp.stat.dltotal = info.stat.dltotal;
@@ -547,6 +548,7 @@ void MainWindow::recvXferStats(const GekkoFyre::GkCurl::CurlProgressPtr &info)
     prog_temp.stat.uptotal = info.stat.uptotal;
     prog_temp.stat.cur_time = info.stat.cur_time;
     prog_temp.stat.url = info.stat.url;
+    curl_multi_mutex.unlock();
 
     bool alreadyExists = false;
     for (size_t i = 0; i < dl_stat.size(); ++i) {

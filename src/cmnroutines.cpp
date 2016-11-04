@@ -220,7 +220,7 @@ std::vector<GekkoFyre::GkCurl::CurlDlInfo> GekkoFyre::CmnRoutines::readDownloadI
  * @param xmlCfgFile
  * @return
  */
-bool GekkoFyre::CmnRoutines::writeDownloadItem(GekkoFyre::GkCurl::CurlDlInfo dl_info,
+bool GekkoFyre::CmnRoutines::writeDownloadItem(GekkoFyre::GkCurl::CurlDlInfo &dl_info,
                                                const std::string &xmlCfgFile)
 {
     fs::path xmlCfgFile_loc = findCfgFile(xmlCfgFile);

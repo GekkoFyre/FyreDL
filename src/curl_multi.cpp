@@ -57,16 +57,18 @@ std::map<curl_socket_t, boost::asio::ip::tcp::socket *> socket_map;
 time_t lastTime = 0;
 boost::ptr_unordered_map<std::string, GekkoFyre::GkCurl::CurlInit> GekkoFyre::CurlMulti::eh_vec;
 GekkoFyre::GkCurl::GlobalInfo *GekkoFyre::CurlMulti::gi;
+QMutex GekkoFyre::CurlMulti::mutex;
 
 GekkoFyre::CurlMulti::CurlMulti()
 {
     setlocale (LC_ALL, "");
-    curl_global_init(CURL_GLOBAL_DEFAULT); // https://curl.haxx.se/libcurl/c/curl_global_init.html
+    // curl_global_init(CURL_GLOBAL_DEFAULT); // https://curl.haxx.se/libcurl/c/curl_global_init.html
 }
 
 GekkoFyre::CurlMulti::~CurlMulti()
 {
     // curl_global_cleanup(); // We're done with libcurl, globally, so clean it up!
+    delete gi;
 }
 
 /**
@@ -152,6 +154,7 @@ bool GekkoFyre::CurlMulti::fileStream()
                     }
                 }
 
+                curlCleanup(*curl_struct);
                 status_msg.dl_compl_succ = true;
                 routine_singleton::instance()->sendDlFinished(status_msg);
                 return true;
@@ -179,7 +182,7 @@ void GekkoFyre::CurlMulti::recvNewDl(const QString &url, const QString &fileLoc)
     std::string uuid;
     if (fileLoc.isEmpty()) { throw std::invalid_argument(tr("An invalid file location has been given!").toStdString()); }
     uuid = new_conn(url, gi, false, false, fileLoc, true);
-    fileStream();
+    fileStream(); // TODO: Fix race-condition here
 }
 
 void GekkoFyre::CurlMulti::mcode_or_die(const char *where, CURLMcode code)
@@ -433,7 +436,9 @@ int GekkoFyre::CurlMulti::curl_xferinfo(void *p, curl_off_t dltotal, curl_off_t 
     dl_ptr.stat.uptotal = ultotal;
     dl_ptr.stat.url = prog->stat.url;
 
+    mutex.lock();
     routine_singleton::instance()->sendXferStats(dl_ptr);
+    mutex.unlock();
 
     return 0;
 }
@@ -660,7 +665,7 @@ std::string GekkoFyre::CurlMulti::new_conn(const QString &url, GekkoFyre::GkCurl
     return uuid;
 }
 
-void GekkoFyre::CurlMulti::curlCleanup(GekkoFyre::GkCurl::CurlInit curl_init)
+void GekkoFyre::CurlMulti::curlCleanup(GekkoFyre::GkCurl::CurlInit &curl_init)
 {
     if (!curl_init.mem_chunk.memory.empty()) {
         curl_init.mem_chunk.memory.clear();
@@ -691,11 +696,14 @@ std::string GekkoFyre::CurlMulti::createId()
     rng.seed(std::random_device()());
     std::uniform_int_distribution<std::mt19937::result_type> dist10(0,9);
     std::ostringstream oss;
-    oss << dist10(rng);
+
+    for (size_t i = 0; i < 11; ++i) {
+        oss << dist10(rng);
+    }
 
     auto search = eh_vec.find(oss.str());
     if (search != eh_vec.end()) {
-        throw std::invalid_argument(tr("A given UUID already exists!").toStdString());
+        throw std::invalid_argument(tr("A given ID already exists!").toStdString());
     }
 
     return oss.str();

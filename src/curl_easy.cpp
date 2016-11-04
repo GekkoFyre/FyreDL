@@ -108,6 +108,8 @@ GekkoFyre::GkCurl::CurlInit GekkoFyre::CurlEasy::new_easy_handle(const QString &
     curl_easy_setopt(ci->conn_info->easy, CURLOPT_LOW_SPEED_TIME, 3L);
     curl_easy_setopt(ci->conn_info->easy, CURLOPT_LOW_SPEED_LIMIT, 10L);
 
+    ci->file_buf.file_loc = nullptr;
+    ci->file_buf.stream = nullptr;
     return *ci;
 }
 
@@ -134,10 +136,13 @@ GekkoFyre::GkCurl::CurlInfo GekkoFyre::CurlEasy::verifyFileExists(const QString 
 
             std::memcpy(&info.response_code, &rescode, sizeof(unsigned long)); // Must be trivially copyable otherwise UB!
             info.effective_url = effec_url;
+            return info;
         }
     }
 
     curlCleanup(curl_struct);
+    info.effective_url = "";
+    info.response_code = -1;
     return info;
 }
 
@@ -168,14 +173,15 @@ GekkoFyre::GkCurl::CurlInfoExt GekkoFyre::CurlEasy::curlGrabInfo(const QString &
             info.effective_url = effec_url;
             info.status_msg = curl_struct.conn_info->error;
             info.status_ok = true;
+            return info;
         }
     }
 
     curlCleanup(curl_struct);
-    return info;
+    return GekkoFyre::GkCurl::CurlInfoExt();
 }
 
-void GekkoFyre::CurlEasy::curlCleanup(GekkoFyre::GkCurl::CurlInit curl_init)
+void GekkoFyre::CurlEasy::curlCleanup(GekkoFyre::GkCurl::CurlInit &curl_init)
 {
     // curl_easy_cleanup(), to clean up the context
     // curl_global_cleanup(), to tear down the curl library (once per program)

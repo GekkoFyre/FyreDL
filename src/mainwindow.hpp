@@ -53,6 +53,7 @@
 #include <QString>
 #include <QtConcurrent/QtConcurrent>
 #include <QThread>
+#include <QMutex>
 
 namespace Ui {
 class MainWindow;
@@ -84,6 +85,7 @@ private:
 
     // http://stackoverflow.com/questions/10121560/stdthread-naming-your-thread
     QThread *curl_multi_thread;
+    QMutex curl_multi_mutex;
 
 signals:
     void updateDlStats();

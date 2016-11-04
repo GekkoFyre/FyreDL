@@ -73,7 +73,7 @@ public:
 
     std::string findCfgFile(const std::string &cfgFileName);
     std::vector<GekkoFyre::GkCurl::CurlDlInfo> readDownloadInfo(const std::string &xmlCfgFile = CFG_HISTORY_FILE);
-    bool writeDownloadItem(GekkoFyre::GkCurl::CurlDlInfo dl_info_list, const std::string &xmlCfgFile = CFG_HISTORY_FILE);
+    bool writeDownloadItem(GekkoFyre::GkCurl::CurlDlInfo &dl_info_list, const std::string &xmlCfgFile = CFG_HISTORY_FILE);
     pugi::xml_node createNewXmlFile(const std::string &xmlCfgFile = CFG_HISTORY_FILE);
     bool delDownloadItem(const QString &effec_url, const std::string &xmlCfgFile = CFG_HISTORY_FILE);
     bool modifyDlState(const QString &effec_url, const DownloadStatus &status,
