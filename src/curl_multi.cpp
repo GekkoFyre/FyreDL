@@ -132,12 +132,13 @@ bool GekkoFyre::CurlMulti::fileStream()
                 std::string ptr_uuid;
                 GekkoFyre::GkCurl::CurlInit *curl_struct;
                 curl_struct = new GekkoFyre::GkCurl::CurlInit;
+                curl_struct->conn_info = new GekkoFyre::GkCurl::ConnInfo;
                 for (auto const &entry : eh_vec) {
                     // http://www.boost.org/doc/libs/1_49_0/libs/ptr_container/doc/ptr_container.html
                     if (msg->easy_handle == entry.second->conn_info->easy) {
                         ptr_uuid = entry.first;
                         curl_struct = &eh_vec[ptr_uuid];
-                        continue;
+                        break;
                     }
                 }
 
@@ -154,7 +155,7 @@ bool GekkoFyre::CurlMulti::fileStream()
                     }
                 }
 
-                curlCleanup(*curl_struct);
+                curlCleanup(curl_struct);
                 status_msg.dl_compl_succ = true;
                 routine_singleton::instance()->sendDlFinished(status_msg);
                 return true;
@@ -569,7 +570,7 @@ std::string GekkoFyre::CurlMulti::new_conn(const QString &url, GekkoFyre::GkCurl
 
     if (writeToMemory) {
         ci->mem_chunk.size = 0; // No data at this point
-        ci->file_buf.file_loc = NULL;
+        ci->file_buf.file_loc = "";
 
         curl_easy_setopt(ci->conn_info->easy, CURLOPT_NOPROGRESS, 1L);
 
@@ -581,8 +582,7 @@ std::string GekkoFyre::CurlMulti::new_conn(const QString &url, GekkoFyre::GkCurl
         curl_easy_setopt(ci->conn_info->easy, CURLOPT_WRITEDATA, &ci->mem_chunk);
     } else {
         if (!fileLoc.isEmpty()) {
-            ci->file_buf.file_loc = new char[(strlen(fileLoc.toStdString().c_str() + 1) * sizeof(char *))];
-            std::strcpy(ci->file_buf.file_loc, fileLoc.toStdString().c_str());
+            ci->file_buf.file_loc = fileLoc.toStdString();
         } else {
             throw std::invalid_argument(tr("An invalid file location has been given (empty parameter)!").toStdString());
         }
@@ -665,15 +665,15 @@ std::string GekkoFyre::CurlMulti::new_conn(const QString &url, GekkoFyre::GkCurl
     return uuid;
 }
 
-void GekkoFyre::CurlMulti::curlCleanup(GekkoFyre::GkCurl::CurlInit &curl_init)
+void GekkoFyre::CurlMulti::curlCleanup(GekkoFyre::GkCurl::CurlInit *curl_init)
 {
-    if (!curl_init.mem_chunk.memory.empty()) {
-        curl_init.mem_chunk.memory.clear();
+    if (!curl_init->mem_chunk.memory.empty()) {
+        curl_init->mem_chunk.memory.clear();
     }
 
-    curl_init.conn_info->easy = nullptr;
-    curl_init.conn_info->url.clear();
-    delete curl_init.conn_info;
+    curl_init->conn_info->easy = nullptr;
+    curl_init->conn_info->url.clear();
+    delete curl_init->conn_info;
     return;
 }
 

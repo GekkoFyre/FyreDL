@@ -650,3 +650,6 @@ void MainWindow::on_downloadView_customContextMenuRequested(const QPoint &pos)
 
     menu->popup(ui->downloadView->viewport()->mapToGlobal(pos));
 }
+
+void MainWindow::on_downloadView_activated(const QModelIndex &index)
+{}

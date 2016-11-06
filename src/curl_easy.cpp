@@ -108,7 +108,7 @@ GekkoFyre::GkCurl::CurlInit GekkoFyre::CurlEasy::new_easy_handle(const QString &
     curl_easy_setopt(ci->conn_info->easy, CURLOPT_LOW_SPEED_TIME, 3L);
     curl_easy_setopt(ci->conn_info->easy, CURLOPT_LOW_SPEED_LIMIT, 10L);
 
-    ci->file_buf.file_loc = nullptr;
+    ci->file_buf.file_loc = "";
     ci->file_buf.stream = nullptr;
     return *ci;
 }
@@ -156,6 +156,9 @@ GekkoFyre::GkCurl::CurlInfoExt GekkoFyre::CurlEasy::curlGrabInfo(const QString &
         if (curl_res != CURLE_OK) {
             info.response_code = curl_res;
             info.effective_url = curl_struct.conn_info->error;
+            info.status_ok = false;
+            info.elapsed = -1;
+            info.content_length = -1;
             return info;
         } else {
             long rescode;

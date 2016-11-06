@@ -238,18 +238,12 @@
                       </property>
                      </widget>
                     </item>
-                    <item row="0" column="1">
-                     <widget class="QWidget" name="fileNameWidget" native="true"/>
-                    </item>
                     <item row="1" column="0">
                      <widget class="QLabel" name="destinationLabel">
                       <property name="text">
                        <string>Destination: </string>
                       </property>
                      </widget>
-                    </item>
-                    <item row="1" column="1">
-                     <widget class="QWidget" name="destinationWidget" native="true"/>
                     </item>
                     <item row="2" column="0">
                      <widget class="QLabel" name="totalSizeLabel">
@@ -258,18 +252,12 @@
                       </property>
                      </widget>
                     </item>
-                    <item row="2" column="1">
-                     <widget class="QWidget" name="totalSizeWidget" native="true"/>
-                    </item>
                     <item row="3" column="0">
-                     <widget class="QLabel" name="uRLLabel">
+                     <widget class="QLabel" name="urlLabel">
                       <property name="text">
                        <string>URL: </string>
                       </property>
                      </widget>
-                    </item>
-                    <item row="3" column="1">
-                     <widget class="QWidget" name="uRLWidget" native="true"/>
                     </item>
                     <item row="4" column="0">
                      <widget class="QLabel" name="createdTimeLabel">
@@ -278,18 +266,12 @@
                       </property>
                      </widget>
                     </item>
-                    <item row="4" column="1">
-                     <widget class="QWidget" name="createdTimeWidget" native="true"/>
-                    </item>
                     <item row="5" column="0">
                      <widget class="QLabel" name="completedTimeLabel">
                       <property name="text">
                        <string>Completed Time: </string>
                       </property>
                      </widget>
-                    </item>
-                    <item row="5" column="1">
-                     <widget class="QWidget" name="completedTimeWidget" native="true"/>
                     </item>
                     <item row="6" column="0">
                      <widget class="QLabel" name="estimatedWaitTimeLabel">
@@ -298,8 +280,54 @@
                       </property>
                      </widget>
                     </item>
+                    <item row="0" column="1">
+                     <widget class="QLabel" name="fileNameDataLabel">
+                      <property name="text">
+                       <string>N/A</string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="1" column="1">
+                     <widget class="QLabel" name="destDataLabel">
+                      <property name="text">
+                       <string>N/A</string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="2" column="1">
+                     <widget class="QLabel" name="totSizeDataLabel">
+                      <property name="text">
+                       <string>N/A</string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="3" column="1">
+                     <widget class="QLabel" name="urlDataLabel">
+                      <property name="text">
+                       <string>N/A</string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="4" column="1">
+                     <widget class="QLabel" name="createTimeDataLabel">
+                      <property name="text">
+                       <string>N/A</string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="5" column="1">
+                     <widget class="QLabel" name="compTimeDataLabel">
+                      <property name="text">
+                       <string>N/A</string>
+                      </property>
+                     </widget>
+                    </item>
                     <item row="6" column="1">
-                     <widget class="QWidget" name="estimatedWaitTimeWidget" native="true"/>
+                     <widget class="QLabel" name="estWaitTimeDataLabel">
+                      <property name="text">
+                       <string>N/A</string>
+                      </property>
+                     </widget>
                     </item>
                    </layout>
                   </item>
@@ -323,7 +351,7 @@
                  <property name="geometry">
                   <rect>
                    <x>0</x>
-                   <y>0</y>
+                   <y>-178</y>
                    <width>962</width>
                    <height>300</height>
                   </rect>
@@ -338,48 +366,33 @@
                       </property>
                      </widget>
                     </item>
-                    <item row="0" column="1">
-                     <widget class="QWidget" name="statusWidget" native="true"/>
-                    </item>
                     <item row="1" column="0">
                      <widget class="QLabel" name="transferredUploadLabel">
                       <property name="text">
-                       <string>Transferred (upload)</string>
+                       <string>Transferred (upload):</string>
                       </property>
                      </widget>
-                    </item>
-                    <item row="1" column="1">
-                     <widget class="QWidget" name="transferredUploadWidget" native="true"/>
                     </item>
                     <item row="2" column="0">
                      <widget class="QLabel" name="transferredDownloadLabel">
                       <property name="text">
-                       <string>Transferred (download)</string>
+                       <string>Transferred (download):</string>
                       </property>
                      </widget>
-                    </item>
-                    <item row="2" column="1">
-                     <widget class="QWidget" name="transferredDownloadWidget" native="true"/>
                     </item>
                     <item row="3" column="0">
                      <widget class="QLabel" name="progressLabel">
                       <property name="text">
-                       <string>Progress</string>
+                       <string>Progress:</string>
                       </property>
                      </widget>
-                    </item>
-                    <item row="3" column="1">
-                     <widget class="QWidget" name="progressWidget" native="true"/>
                     </item>
                     <item row="4" column="0">
                      <widget class="QLabel" name="speedLabel">
                       <property name="text">
-                       <string>Speed</string>
+                       <string>Speed:</string>
                       </property>
                      </widget>
-                    </item>
-                    <item row="4" column="1">
-                     <widget class="QWidget" name="speedWidget" native="true"/>
                     </item>
                     <item row="5" column="0">
                      <widget class="QLabel" name="totalPeersLabel">
@@ -388,18 +401,12 @@
                       </property>
                      </widget>
                     </item>
-                    <item row="5" column="1">
-                     <widget class="QWidget" name="totalPeersWidget" native="true"/>
-                    </item>
                     <item row="6" column="0">
                      <widget class="QLabel" name="connectedPeersLabel">
                       <property name="text">
                        <string>Connected Peers: </string>
                       </property>
                      </widget>
-                    </item>
-                    <item row="6" column="1">
-                     <widget class="QWidget" name="connectedPeersWidget" native="true"/>
                     </item>
                     <item row="7" column="0">
                      <widget class="QLabel" name="totalPiecesLabel">
@@ -408,18 +415,12 @@
                       </property>
                      </widget>
                     </item>
-                    <item row="7" column="1">
-                     <widget class="QWidget" name="totalPiecesWidget" native="true"/>
-                    </item>
                     <item row="8" column="0">
                      <widget class="QLabel" name="downloadPiecesLabel">
                       <property name="text">
                        <string>Download pieces: </string>
                       </property>
                      </widget>
-                    </item>
-                    <item row="8" column="1">
-                     <widget class="QWidget" name="downloadPiecesWidget" native="true"/>
                     </item>
                     <item row="9" column="0">
                      <widget class="QLabel" name="startTimeLabel">
@@ -428,9 +429,6 @@
                       </property>
                      </widget>
                     </item>
-                    <item row="9" column="1">
-                     <widget class="QWidget" name="startTimeWidget" native="true"/>
-                    </item>
                     <item row="10" column="0">
                      <widget class="QLabel" name="timeLeftLabel">
                       <property name="text">
@@ -438,8 +436,82 @@
                       </property>
                      </widget>
                     </item>
+                    <item row="0" column="1">
+                     <widget class="QLabel" name="statusDataLabel">
+                      <property name="text">
+                       <string>N/A</string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="1" column="1">
+                     <widget class="QLabel" name="upTransfDataLabel">
+                      <property name="text">
+                       <string>N/A</string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="2" column="1">
+                     <widget class="QLabel" name="downTransfDataLabel">
+                      <property name="text">
+                       <string>N/A</string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="3" column="1">
+                     <widget class="QLabel" name="progDataLabel">
+                      <property name="text">
+                       <string>N/A</string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="4" column="1">
+                     <widget class="QLabel" name="speedDataLabel">
+                      <property name="text">
+                       <string>N/A</string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="5" column="1">
+                     <widget class="QLabel" name="totPeersDataLabel">
+                      <property name="text">
+                       <string>N/A</string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="6" column="1">
+                     <widget class="QLabel" name="connPeersDataLabel">
+                      <property name="text">
+                       <string>N/A</string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="7" column="1">
+                     <widget class="QLabel" name="totPiecesDataLabel">
+                      <property name="text">
+                       <string>N/A</string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="8" column="1">
+                     <widget class="QLabel" name="downPiecesDataLabel">
+                      <property name="text">
+                       <string>N/A</string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="9" column="1">
+                     <widget class="QLabel" name="startTimeDataLabel">
+                      <property name="text">
+                       <string>N/A</string>
+                      </property>
+                     </widget>
+                    </item>
                     <item row="10" column="1">
-                     <widget class="QWidget" name="timeLeftWidget" native="true"/>
+                     <widget class="QLabel" name="timeLeftDataLabel">
+                      <property name="text">
+                       <string>N/A</string>
+                      </property>
+                     </widget>
                     </item>
                    </layout>
                   </item>
@@ -455,7 +527,11 @@
              </attribute>
              <layout class="QVBoxLayout" name="verticalLayout_4">
               <item>
-               <widget class="QTableView" name="tableView"/>
+               <widget class="QTreeView" name="treeView">
+                <property name="verticalScrollBarPolicy">
+                 <enum>Qt::ScrollBarAlwaysOn</enum>
+                </property>
+               </widget>
               </item>
              </layout>
             </widget>

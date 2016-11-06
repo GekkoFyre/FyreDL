@@ -91,7 +91,7 @@ namespace GekkoFyre {
 
     namespace GkCurl {
         struct FileStream {
-            char *file_loc;  // Name to store file as if download /and/ disk writing is successful
+            std::string file_loc;  // Name to store file as if download /and/ disk writing is successful
             std::ofstream *stream; // File object stream
         };
 
