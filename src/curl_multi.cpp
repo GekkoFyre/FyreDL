@@ -41,6 +41,7 @@
  */
 
 #include "curl_multi.hpp"
+#include "async_buf.hpp"
 #include <boost/filesystem.hpp>
 #include <iostream>
 #include <chrono>
@@ -147,13 +148,6 @@ bool GekkoFyre::CurlMulti::fileStream()
                 status_msg.url = QString::fromStdString(curl_struct->conn_info->url);
                 curl_multi_remove_handle(gi->multi, curl_struct->conn_info->easy);
                 curl_easy_cleanup(curl_struct->conn_info->easy);
-
-                if (curl_struct->file_buf.stream->is_open()) {
-                    curl_struct->file_buf.stream->close();
-                    if (curl_struct->file_buf.stream != nullptr) {
-                        delete curl_struct->file_buf.stream;
-                    }
-                }
 
                 curlCleanup(curl_struct);
                 status_msg.dl_compl_succ = true;
@@ -515,25 +509,26 @@ size_t GekkoFyre::CurlMulti::curl_write_memory_callback(void *ptr, size_t size, 
  * on the user's storage.
  * @author Daniel Stenberg <daniel@haxx.se>, et al.
  * @date   2015
- * @note   <https://curl.haxx.se/libcurl/c/ftpget.html>
- *         <https://curl.haxx.se/libcurl/c/url2file.html>
- *         <http://stackoverflow.com/questions/2329571/c-libcurl-get-output-into-a-string>
- *         <https://linustechtips.com/main/topic/663949-libcurl-curlopt_writefunction-callback-function-error/>
+ * @note   <https://linustechtips.com/main/topic/663949-libcurl-curlopt_writefunction-callback-function-error/>
  *         <https://www.apriorit.com/dev-blog/344-libcurl-usage-downloading-protocols>
- * @param ptr
+ *         <http://fwheel.net/aio.html>
+ *         <http://man7.org/linux/man-pages/man7/aio.7.html>
+ *         <https://gist.github.com/rsms/771059>
+ *         <http://stackoverflow.com/questions/21126950/asynchronously-writing-to-a-file-in-c-unix>
+ *         <https://linux.die.net/man/7/aio>
+ * @param buffer
  * @param size
  * @param nmemb
- * @param stream
+ * @param userdata
  * @return
  */
 size_t GekkoFyre::CurlMulti::curl_write_file_callback(char *buffer, size_t size, size_t nmemb, void *userdata)
 {
     GekkoFyre::GkCurl::FileStream *fs = static_cast<GekkoFyre::GkCurl::FileStream *>(userdata);
-    for (size_t i = 0; i < nmemb; ++i) {
-        *fs->stream << buffer[i];
-    }
-
-    return (size * nmemb);
+    size_t buf_size = (size * nmemb);
+    fs->astream->write(buffer, (long)buf_size);
+    fs->astream->flush();
+    return buf_size;
 }
 
 /**
@@ -587,11 +582,14 @@ std::string GekkoFyre::CurlMulti::new_conn(const QString &url, GekkoFyre::GkCurl
             throw std::invalid_argument(tr("An invalid file location has been given (empty parameter)!").toStdString());
         }
 
+        // Initialize these variables, even if they're not used... as it generates spurious errors otherwise.
         ci->mem_chunk.memory = "";
         ci->mem_chunk.size = 0;
 
-        ci->file_buf.stream = new std::ofstream;
-        ci->file_buf.stream->open(ci->file_buf.file_loc, std::ofstream::out | std::ios::app | std::ios::binary);
+        // http://stackoverflow.com/questions/18031357/why-the-constructor-of-stdostream-is-protected
+        async_buf *sbuf = new async_buf(ci->file_buf.file_loc);
+        std::ostream astream(sbuf);
+        ci->file_buf.astream = &astream;
 
         // Send all data to this function, via file streaming
         // NOTE: On Windows, 'CURLOPT_WRITEFUNCTION' /must/ be set, otherwise a crash will occur!
@@ -674,6 +672,7 @@ void GekkoFyre::CurlMulti::curlCleanup(GekkoFyre::GkCurl::CurlInit *curl_init)
     curl_init->conn_info->easy = nullptr;
     curl_init->conn_info->url.clear();
     delete curl_init->conn_info;
+    delete curl_init;
     return;
 }
 
@@ -707,4 +706,19 @@ std::string GekkoFyre::CurlMulti::createId()
     }
 
     return oss.str();
+}
+
+/**
+ * @brief GekkoFyre::CurlMulti::recvStopDl stops a download via GekkoFyre::CurlMulti::fileStream by
+ * intermittently looking at a variable that contains the status information.
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @date 2016-11-09
+ * @note <https://curl.haxx.se/libcurl/c/curl_multi_remove_handle.html>
+ * @param url
+ * @param fileLoc
+ */
+void GekkoFyre::CurlMulti::recvStopDl(const QString &url, const QString &fileLoc)
+{
+    Q_UNUSED(fileLoc);
+    Q_UNUSED(url);
 }

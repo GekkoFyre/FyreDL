@@ -109,7 +109,6 @@ GekkoFyre::GkCurl::CurlInit GekkoFyre::CurlEasy::new_easy_handle(const QString &
     curl_easy_setopt(ci->conn_info->easy, CURLOPT_LOW_SPEED_LIMIT, 10L);
 
     ci->file_buf.file_loc = "";
-    ci->file_buf.stream = nullptr;
     return *ci;
 }
 

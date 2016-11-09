@@ -80,6 +80,7 @@ public slots:
      */
 
     void recvNewDl(const QString &url, const QString &fileLoc);
+    void recvStopDl(const QString &url, const QString &fileLoc);
 
 signals:
     void sendXferStats(const GekkoFyre::GkCurl::CurlProgressPtr &dl_stat);

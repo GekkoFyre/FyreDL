@@ -207,7 +207,7 @@
           <item>
            <widget class="QTabWidget" name="tabStatusWidget">
             <property name="currentIndex">
-             <number>0</number>
+             <number>3</number>
             </property>
             <widget class="QWidget" name="tabGeneral">
              <attribute name="title">
@@ -351,7 +351,7 @@
                  <property name="geometry">
                   <rect>
                    <x>0</x>
-                   <y>-178</y>
+                   <y>0</y>
                    <width>962</width>
                    <height>300</height>
                   </rect>
@@ -531,6 +531,30 @@
                 <property name="verticalScrollBarPolicy">
                  <enum>Qt::ScrollBarAlwaysOn</enum>
                 </property>
+               </widget>
+              </item>
+             </layout>
+            </widget>
+            <widget class="QWidget" name="tabGraph">
+             <attribute name="title">
+              <string>Graph</string>
+             </attribute>
+             <layout class="QVBoxLayout" name="verticalLayout_10">
+              <item>
+               <widget class="QScrollArea" name="graphScrollArea">
+                <property name="widgetResizable">
+                 <bool>true</bool>
+                </property>
+                <widget class="QWidget" name="scrollAreaWidgetContents_2">
+                 <property name="geometry">
+                  <rect>
+                   <x>0</x>
+                   <y>0</y>
+                   <width>976</width>
+                   <height>122</height>
+                  </rect>
+                 </property>
+                </widget>
                </widget>
               </item>
              </layout>

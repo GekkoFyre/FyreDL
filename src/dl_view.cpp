@@ -135,13 +135,13 @@ QVariant downloadModel::headerData(int section, Qt::Orientation orientation, int
         case MN_FILESIZE_COL:
             return tr("File size");
         case MN_DOWNLOADED_COL:
-            return tr("Downloaded (KB)");
+            return tr("Downloaded");
         case MN_PROGRESS_COL:
             return tr("Progress");
         case MN_UPSPEED_COL:
-            return tr("Upload speed (KB/s)");
+            return tr("Upload speed");
         case MN_DOWNSPEED_COL:
-            return tr("Download speed (KB/s)");
+            return tr("Download speed");
         case MN_STATUS_COL:
             return tr("Status");
         case MN_DESTINATION_COL:

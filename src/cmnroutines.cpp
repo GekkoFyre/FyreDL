@@ -103,17 +103,17 @@ QString GekkoFyre::CmnRoutines::extractFilename(const QString &url)
  * @param content_length
  * @return
  */
-QString GekkoFyre::CmnRoutines::bytesToKilobytes(const QVariant &value)
+QString GekkoFyre::CmnRoutines::bytesToKilobytes(const double &value)
 {
     std::ostringstream oss;
-    oss << numberSeperators(std::round(value.toDouble() / 1024)).toStdString() << " KB";
+    oss << numberSeperators(std::round(value / 1024)).toStdString() << " KB";
     return QString::fromStdString(oss.str());
 }
 
-QString GekkoFyre::CmnRoutines::bytesToMegabytes(const QVariant &value)
+QString GekkoFyre::CmnRoutines::bytesToMegabytes(const double &value)
 {
     std::ostringstream oss;
-    oss << numberSeperators(std::round((value.toDouble() / 1024) / 1024)).toStdString() << " MB";
+    oss << numberSeperators(std::round((value / 1024) / 1024)).toStdString() << " MB";
     return QString::fromStdString(oss.str());
 }
 
@@ -519,5 +519,16 @@ GekkoFyre::DownloadStatus GekkoFyre::CmnRoutines::convDlStat_StringToEnum(const 
         return GekkoFyre::DownloadStatus::Unknown;
     } else {
         return GekkoFyre::DownloadStatus::Unknown;
+    }
+}
+
+QString GekkoFyre::CmnRoutines::numberConverter(const double &value)
+{
+    if (value < 1024) {
+        return bytesToKilobytes(value);
+    } else if (value > 1024) {
+        return bytesToMegabytes(value);
+    } else {
+        return bytesToKilobytes(value);
     }
 }

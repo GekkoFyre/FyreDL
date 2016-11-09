@@ -61,9 +61,10 @@ public:
     ~CmnRoutines();
 
     QString extractFilename(const QString &url);
-    QString bytesToKilobytes(const QVariant &value);
-    QString bytesToMegabytes(const QVariant &value);
+    QString bytesToKilobytes(const double &value);
+    QString bytesToMegabytes(const double &value);
     QString numberSeperators(const QVariant &value);
+    QString numberConverter(const double &value);
     double percentDownloaded(const double &content_length, const double &amountDl);
 
     int convDlStat_toInt(const GekkoFyre::DownloadStatus &status);

@@ -45,16 +45,33 @@
 
 #include <locale>
 #include <string>
-#include <fstream>
+#include <iostream>
 #include <QString>
 
 extern "C" {
 #include <curl/curl.h>
 }
 
+#ifdef _WIN32
+#define _WIN32_WINNT 0x06000100
+#include <SDKDDKVer.h>
+#include <Windows.h>
+
+#elif __linux__
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+
+extern "C" {
+}
+
+#else
+#error "Platform not supported!"
+#endif
+
 #define CFG_HISTORY_FILE "fyredl_history.xml"
-#define MINIMAL_PROGRESS_FUNCTIONALITY_INTERVAL 3
-#define MAX_WAIT_MSECS (30 * 1000) /* Wait max. 30 seconds */
+#define CURL_MAX_WAIT_MSECS 15000 // Measured in milliseconds
+#define WRITE_BUFFER_SIZE (1024 * 1024) // Measured in bytes
 
 #define MN_FILENAME_COL 0
 #define MN_FILESIZE_COL 1
@@ -65,8 +82,6 @@ extern "C" {
 #define MN_STATUS_COL 6
 #define MN_DESTINATION_COL 7
 #define MN_URL_COL 8
-
-#define CURL_MAX_WAIT_MSECS 15000
 
 namespace GekkoFyre {
     enum DownloadStatus {
@@ -92,7 +107,7 @@ namespace GekkoFyre {
     namespace GkCurl {
         struct FileStream {
             std::string file_loc;  // Name to store file as if download /and/ disk writing is successful
-            std::ofstream *stream; // File object stream
+            std::ostream *astream; // Async-I/O stream
         };
 
         // Global information, common to all connections

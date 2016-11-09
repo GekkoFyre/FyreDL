@@ -63,9 +63,7 @@
 #endif
 
 namespace fs = boost::filesystem;
-MainWindow::MainWindow(QWidget *parent) :
-    QMainWindow(parent),
-    ui(new Ui::MainWindow)
+MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
 
@@ -219,7 +217,7 @@ void MainWindow::insertNewRow(const std::string &fileName, const double &fileSiz
     dlModel->setData(index, routines->extractFilename(QString::fromStdString(fileName)), Qt::DisplayRole);
 
     index = dlModel->index(0, MN_FILESIZE_COL, QModelIndex());
-    dlModel->setData(index, routines->bytesToMegabytes(fileSize), Qt::DisplayRole);
+    dlModel->setData(index, routines->numberConverter(fileSize), Qt::DisplayRole);
 
     index = dlModel->index(0, MN_DOWNLOADED_COL, QModelIndex());
     dlModel->setData(index, QString::number(downloaded), Qt::DisplayRole);
@@ -329,6 +327,7 @@ void MainWindow::on_printToolBtn_clicked()
  *       <http://doc.qt.io/qt-5/examples-threadandconcurrent.html>
  *       <http://doc.qt.io/qt-5/qthreadpool.html>
  *       <http://doc.qt.io/qt-5/qthread.html>
+ *       <http://en.cppreference.com/w/cpp/thread/packaged_task>
  */
 void MainWindow::on_dlstartToolBtn_clicked()
 {
@@ -591,7 +590,9 @@ void MainWindow::manageDlStats()
         for (size_t j = 0; j < dl_stat.size(); ++j) {
             if (ui->downloadView->model()->data(find_index).toString().toStdString() == dl_stat.at(j).stat.url) {
                 try {
-                    dlModel->updateCol(dlModel->index(i, MN_DOWNSPEED_COL), QString::number(dl_stat.at(j).stat.dlnow), MN_DOWNSPEED_COL);
+                    std::ostringstream oss_dlnow;
+                    oss_dlnow << routines->numberConverter(dl_stat.at(j).stat.dlnow).toStdString() << tr("/sec").toStdString();
+                    dlModel->updateCol(dlModel->index(i, MN_DOWNSPEED_COL), QString::fromStdString(oss_dlnow.str()), MN_DOWNSPEED_COL);
                     dlModel->updateCol(dlModel->index(i, MN_DOWNLOADED_COL), QString::number(dl_stat.at(j).stat.dltotal), MN_DOWNLOADED_COL);
                     dlModel->updateCol(dlModel->index(i, MN_UPSPEED_COL), QString::number(dl_stat.at(j).stat.upnow), MN_UPSPEED_COL);
                 } catch (const std::exception &e) {
@@ -652,4 +653,6 @@ void MainWindow::on_downloadView_customContextMenuRequested(const QPoint &pos)
 }
 
 void MainWindow::on_downloadView_activated(const QModelIndex &index)
-{}
+{
+    Q_UNUSED(index);
+}
