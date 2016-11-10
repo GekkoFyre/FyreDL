@@ -118,7 +118,6 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
     ui->downloadView->setContextMenuPolicy(Qt::CustomContextMenu);
 
     QObject::connect(ui->downloadView, SIGNAL(customContextMenuRequested(QPoint)), this, SLOT(on_downloadView_customContextMenuRequested(QPoint)));
-    QObject::connect(this, SIGNAL(sendStopDownload(QString)), curl_multi, SLOT(recvStopDownload(QString)));
     QObject::connect(this, SIGNAL(updateDlStats()), this, SLOT(manageDlStats()));
 
     try {
@@ -438,6 +437,8 @@ void MainWindow::on_dlstopToolBtn_clicked()
             QModelIndex index = dlModel->index(indexes.at(0).row(), MN_STATUS_COL, QModelIndex());
             const GekkoFyre::DownloadStatus status = routines->convDlStat_StringToEnum(ui->downloadView->model()->data(index).toString());
             if (status != GekkoFyre::DownloadStatus::Stopped && status != GekkoFyre::DownloadStatus::Completed) {
+                QObject::connect(this, SIGNAL(sendStopDownload(QString)), curl_multi, SLOT(recvStopDl(QString)));
+                emit sendStopDownload(ui->downloadView->model()->data(ui->downloadView->model()->index(indexes.at(0).row(), MN_DESTINATION_COL)).toString());
                 routines->modifyDlState(url, GekkoFyre::DownloadStatus::Stopped);
                 dlModel->updateCol(index, routines->convDlStat_toString(GekkoFyre::DownloadStatus::Stopped), MN_STATUS_COL);
             }

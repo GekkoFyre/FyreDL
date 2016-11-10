@@ -89,7 +89,7 @@ private:
 
 signals:
     void updateDlStats();
-    void sendStopDownload(const QString &url);
+    void sendStopDownload(const QString &fileLoc);
     void sendStartDownload(const QString &url, const QString &file_loc);
 
 private slots:

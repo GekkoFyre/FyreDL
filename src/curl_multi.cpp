@@ -44,9 +44,9 @@
 #include "async_buf.hpp"
 #include <boost/filesystem.hpp>
 #include <iostream>
-#include <chrono>
-#include <thread>
+#include <future>
 #include <random>
+#include <ctime>
 
 namespace sys = boost::system;
 namespace fs = boost::filesystem;
@@ -55,7 +55,7 @@ boost::asio::io_service io_service;
 boost::asio::deadline_timer timer(io_service);
 std::map<curl_socket_t, boost::asio::ip::tcp::socket *> socket_map;
 
-time_t lastTime = 0;
+std::time_t lastTime = 0;
 boost::ptr_unordered_map<std::string, GekkoFyre::GkCurl::CurlInit> GekkoFyre::CurlMulti::eh_vec;
 GekkoFyre::GkCurl::GlobalInfo *GekkoFyre::CurlMulti::gi;
 QMutex GekkoFyre::CurlMulti::mutex;
@@ -408,34 +408,41 @@ int GekkoFyre::CurlMulti::sock_cb(CURL *e, curl_socket_t s, int what, void *cbp,
  */
 int GekkoFyre::CurlMulti::curl_xferinfo(void *p, curl_off_t dltotal, curl_off_t dlnow, curl_off_t ultotal, curl_off_t ulnow)
 {
-    Q_UNUSED(dlnow)
+    Q_UNUSED(dltotal);
     GekkoFyre::GkCurl::CurlProgressPtr *prog = static_cast<GekkoFyre::GkCurl::CurlProgressPtr *>(p);
-    CURL *curl = prog->curl;
-    GekkoFyre::GkCurl::CurlProgressPtr dl_ptr;
 
     /* Under certain circumstances it may be desirable for certain functionality
        to only run every N seconds, in order to do this the transaction time can
        be used */
-    time_t now = time(NULL);
+    std::time_t now = std::time(NULL);
     if (now - lastTime < 1) {
         return 0;
     }
 
     lastTime = now;
     double dlspeed = 0;
-    curl_easy_getinfo(curl, CURLINFO_SPEED_DOWNLOAD, &dlspeed);
+    curl_easy_getinfo(prog->curl, CURLINFO_SPEED_DOWNLOAD, &dlspeed);
 
-    dl_ptr.stat.dlnow = dlspeed;
-    dl_ptr.stat.dltotal = dltotal;
-    dl_ptr.stat.upnow = ulnow;
-    dl_ptr.stat.uptotal = ultotal;
-    dl_ptr.stat.url = prog->stat.url;
+    prog->stat.dlnow = dlspeed;
+    prog->stat.dltotal = dlnow;
+    prog->stat.upnow = ulnow;
+    prog->stat.uptotal = ultotal;
+    prog->stat.url = prog->stat.url;
 
     mutex.lock();
-    routine_singleton::instance()->sendXferStats(dl_ptr);
+    routine_singleton::instance()->sendXferStats(*prog);
     mutex.unlock();
 
-    return 0;
+    // Asynchronously check the download status and whether to stop/pause
+    std::future<int> status(std::async([&](GekkoFyre::GkCurl::CurlProgressPtr *stat_struct) {
+        if (stat_struct->status == DownloadStatus::Downloading) {
+            return 0;
+        } else {
+            return -1;
+        }
+    } , prog));
+
+    return status.get();
 }
 
 curl_socket_t GekkoFyre::CurlMulti::opensocket(void *clientp, curlsocktype purpose, curl_sockaddr *address)
@@ -588,8 +595,10 @@ std::string GekkoFyre::CurlMulti::new_conn(const QString &url, GekkoFyre::GkCurl
 
         // http://stackoverflow.com/questions/18031357/why-the-constructor-of-stdostream-is-protected
         async_buf *sbuf = new async_buf(ci->file_buf.file_loc);
-        std::ostream astream(sbuf);
-        ci->file_buf.astream = &astream;
+        std::ostream *out = new std::ostream(NULL);
+        out->rdbuf(sbuf);
+        ci->file_buf.astream = out;
+        ci->prog.status = DownloadStatus::Downloading;
 
         // Send all data to this function, via file streaming
         // NOTE: On Windows, 'CURLOPT_WRITEFUNCTION' /must/ be set, otherwise a crash will occur!
@@ -676,11 +685,6 @@ void GekkoFyre::CurlMulti::curlCleanup(GekkoFyre::GkCurl::CurlInit *curl_init)
     return;
 }
 
-void GekkoFyre::CurlMulti::recvStopDownload(const QString &url)
-{
-    Q_UNUSED(url);
-}
-
 /**
  * @brief GekkoFyre::CurlMulti::createUUID generates a unique UUID and returns the value.
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
@@ -717,8 +721,21 @@ std::string GekkoFyre::CurlMulti::createId()
  * @param url
  * @param fileLoc
  */
-void GekkoFyre::CurlMulti::recvStopDl(const QString &url, const QString &fileLoc)
+void GekkoFyre::CurlMulti::recvStopDl(const QString &fileLoc)
 {
-    Q_UNUSED(fileLoc);
-    Q_UNUSED(url);
+    std::string ptr_uuid;
+    GekkoFyre::GkCurl::CurlInit *curl_struct;
+    curl_struct = new GekkoFyre::GkCurl::CurlInit;
+    curl_struct->conn_info = new GekkoFyre::GkCurl::ConnInfo;
+    for (auto const &entry : eh_vec) {
+        // http://www.boost.org/doc/libs/1_49_0/libs/ptr_container/doc/ptr_container.html
+        if (fileLoc.toStdString() == entry.second->file_buf.file_loc) {
+            ptr_uuid = entry.first;
+            curl_struct = &eh_vec[ptr_uuid];
+            break;
+        }
+    }
+
+    curl_struct->prog.status = DownloadStatus::Stopped;
+    return;
 }

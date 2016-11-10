@@ -105,6 +105,7 @@ namespace GekkoFyre {
     };
 
     namespace GkCurl {
+        // http://stackoverflow.com/questions/18031357/why-the-constructor-of-stdostream-is-protected
         struct FileStream {
             std::string file_loc;  // Name to store file as if download /and/ disk writing is successful
             std::ostream *astream; // Async-I/O stream
@@ -159,8 +160,9 @@ namespace GekkoFyre {
 
         struct CurlProgressPtr {
             double lastruntime;
-            CURL *curl;
-            CurlDlStats stat;
+            CURL *curl;            // Easy interface pointer
+            DownloadStatus status; // Used to stop/pause a download mid-transfer
+            CurlDlStats stat;      // Download statistics struct
         };
 
         struct CurlDlInfo {

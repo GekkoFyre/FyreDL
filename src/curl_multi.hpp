@@ -80,7 +80,7 @@ public slots:
      */
 
     void recvNewDl(const QString &url, const QString &fileLoc);
-    void recvStopDl(const QString &url, const QString &fileLoc);
+    void recvStopDl(const QString &fileLoc);
 
 signals:
     void sendXferStats(const GekkoFyre::GkCurl::CurlProgressPtr &dl_stat);
@@ -117,8 +117,6 @@ private:
                                 bool writeToMemory, const QString &fileLoc, bool grabStats);
     static void curlCleanup(GekkoFyre::GkCurl::CurlInit *curl_init);
 
-private slots:
-    void recvStopDownload(const QString &url);
 };
     typedef SingletonEmit<CurlMulti> routine_singleton;
 }
