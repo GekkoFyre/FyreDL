@@ -43,7 +43,6 @@
 #include "cmnroutines.hpp"
 #include <boost/filesystem.hpp>
 #include <boost/exception/all.hpp>
-#include <exception>
 #include <cmath>
 #include <iostream>
 #include <QUrl>
@@ -51,6 +50,7 @@
 #include <QLocale>
 #include <QApplication>
 #include <QtCore/QDateTime>
+#include <QMessageBox>
 
 #ifdef _WIN32
 #define _WIN32_WINNT 0x06000100
@@ -103,17 +103,17 @@ QString GekkoFyre::CmnRoutines::extractFilename(const QString &url)
  * @param content_length
  * @return
  */
-QString GekkoFyre::CmnRoutines::bytesToKilobytes(const QVariant &value)
+QString GekkoFyre::CmnRoutines::bytesToKilobytes(const double &value)
 {
     std::ostringstream oss;
-    oss << numberSeperators(std::round(value.toDouble() / 1024)).toStdString() << " KB";
+    oss << numberSeperators(std::round(value / 1024)).toStdString() << " KB";
     return QString::fromStdString(oss.str());
 }
 
-QString GekkoFyre::CmnRoutines::bytesToMegabytes(const QVariant &value)
+QString GekkoFyre::CmnRoutines::bytesToMegabytes(const double &value)
 {
     std::ostringstream oss;
-    oss << numberSeperators(std::round((value.toDouble() / 1024) / 1024)).toStdString() << " MB";
+    oss << numberSeperators(std::round((value / 1024) / 1024)).toStdString() << " MB";
     return QString::fromStdString(oss.str());
 }
 
@@ -520,4 +520,33 @@ GekkoFyre::DownloadStatus GekkoFyre::CmnRoutines::convDlStat_StringToEnum(const 
     } else {
         return GekkoFyre::DownloadStatus::Unknown;
     }
+}
+
+QString GekkoFyre::CmnRoutines::numberConverter(const double &value)
+{
+    if (value < 1024) {
+        return bytesToKilobytes(value);
+    } else if (value > 1024) {
+        return bytesToMegabytes(value);
+    } else {
+        return bytesToKilobytes(value);
+    }
+}
+
+/**
+ * @brief GekkoFyre::CmnRoutines::print_exception_qmsgbox recursively prints out all the exceptions from the
+ * immediate cause.
+ * @date 2016-11-12
+ * @note <http://en.cppreference.com/w/cpp/error/throw_with_nested>
+ * @param e
+ * @param level
+ */
+void GekkoFyre::CmnRoutines::print_exception(const std::exception &e, int level)
+{
+    std::cerr << std::string((unsigned long)level, ' ') << tr("exception: ").toStdString() << e.what() << std::endl;
+    try {
+        std::rethrow_if_nested(e);
+    } catch (const std::exception &e) {
+        print_exception(e, (level + 1));
+    } catch (...) {}
 }

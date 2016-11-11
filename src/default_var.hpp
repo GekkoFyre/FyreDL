@@ -45,16 +45,36 @@
 
 #include <locale>
 #include <string>
-#include <fstream>
+#include <iostream>
 #include <QString>
+#include <memory>
 
 extern "C" {
 #include <curl/curl.h>
 }
 
+#ifdef _WIN32
+#define _WIN32_WINNT 0x06000100
+#include <SDKDDKVer.h>
+#include <Windows.h>
+
+#elif __linux__
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+
+extern "C" {
+}
+
+#else
+#error "Platform not supported!"
+#endif
+
 #define CFG_HISTORY_FILE "fyredl_history.xml"
-#define MINIMAL_PROGRESS_FUNCTIONALITY_INTERVAL 3
-#define MAX_WAIT_MSECS (30 * 1000) /* Wait max. 30 seconds */
+#define CURL_MAX_WAIT_MSECS 15000 // Measured in milliseconds
+#define WRITE_BUFFER_SIZE (1024 * 1024) // Measured in bytes
+
+#define FYREDL_USER_AGENT "FyreDL/0.0.1"
 
 #define MN_FILENAME_COL 0
 #define MN_FILESIZE_COL 1
@@ -65,8 +85,6 @@ extern "C" {
 #define MN_STATUS_COL 6
 #define MN_DESTINATION_COL 7
 #define MN_URL_COL 8
-
-#define CURL_MAX_WAIT_MSECS 15000
 
 namespace GekkoFyre {
     enum DownloadStatus {
@@ -90,9 +108,10 @@ namespace GekkoFyre {
     };
 
     namespace GkCurl {
+        // http://stackoverflow.com/questions/18031357/why-the-constructor-of-stdostream-is-protected
         struct FileStream {
-            char *file_loc;  // Name to store file as if download /and/ disk writing is successful
-            std::ofstream *stream; // File object stream
+            std::string file_loc;  // Name to store file as if download /and/ disk writing is successful
+            std::ostream *astream; // Async-I/O stream
         };
 
         // Global information, common to all connections
@@ -144,8 +163,9 @@ namespace GekkoFyre {
 
         struct CurlProgressPtr {
             double lastruntime;
-            CURL *curl;
-            CurlDlStats stat;
+            CURL *curl;            // Easy interface pointer
+            DownloadStatus status; // Used to stop/pause a download mid-transfer
+            CurlDlStats stat;      // Download statistics struct
         };
 
         struct CurlDlInfo {
@@ -157,7 +177,7 @@ namespace GekkoFyre {
         };
 
         struct CurlInit {
-            ConnInfo *conn_info;
+            std::shared_ptr<ConnInfo> conn_info;
             MemoryStruct mem_chunk;
             FileStream file_buf;
             CurlProgressPtr prog;

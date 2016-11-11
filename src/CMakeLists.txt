@@ -62,12 +62,14 @@ find_package(Qt5Core REQUIRED)
 find_package(Qt5Widgets REQUIRED)
 find_package(Qt5Gui REQUIRED)
 find_package(Qt5LinguistTools REQUIRED)
+find_package(Qt5Charts REQUIRED)
 
 set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/Modules/")
 
 set(SOURCE_FILES
     addurl.hpp
     addurl.cpp
+    async_buf.hpp
     cmnroutines.hpp
     cmnroutines.cpp
     curl_easy.hpp
@@ -218,7 +220,7 @@ ENDIF()
 #
 # Link the (static?) executable with the other, required external libraries
 #
-target_link_libraries(fyredl Qt5::Core Qt5::Widgets Qt5::Gui ${LIBS})
+target_link_libraries(fyredl Qt5::Core Qt5::Widgets Qt5::Gui Qt5::Charts ${LIBS})
 
 INCLUDE(CMakeDetermineSystem)
 IF(${CMAKE_SYSTEM_NAME} MATCHES "Windows" OR "cygwin" OR "mingw") # Check if we are on Microsoft Windows

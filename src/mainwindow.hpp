@@ -89,7 +89,7 @@ private:
 
 signals:
     void updateDlStats();
-    void sendStopDownload(const QString &url);
+    void sendStopDownload(const QString &fileLoc);
     void sendStartDownload(const QString &url, const QString &file_loc);
 
 private slots:
@@ -108,6 +108,7 @@ private slots:
     void on_clearhistoryToolBtn_clicked();
     void on_settingsToolBtn_clicked();
     void on_downloadView_customContextMenuRequested(const QPoint &pos);
+    void on_downloadView_activated(const QModelIndex &index);
     void sendDetails(const std::string &fileName, const double &fileSize, const int &downloaded,
                      const double &progress, const int &upSpeed, const int &downSpeed,
                      const GekkoFyre::DownloadStatus &status, const std::string &url,

@@ -63,9 +63,7 @@
 #endif
 
 namespace fs = boost::filesystem;
-MainWindow::MainWindow(QWidget *parent) :
-    QMainWindow(parent),
-    ui(new Ui::MainWindow)
+MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
 
@@ -120,7 +118,6 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->downloadView->setContextMenuPolicy(Qt::CustomContextMenu);
 
     QObject::connect(ui->downloadView, SIGNAL(customContextMenuRequested(QPoint)), this, SLOT(on_downloadView_customContextMenuRequested(QPoint)));
-    QObject::connect(this, SIGNAL(sendStopDownload(QString)), curl_multi, SLOT(recvStopDownload(QString)));
     QObject::connect(this, SIGNAL(updateDlStats()), this, SLOT(manageDlStats()));
 
     try {
@@ -219,7 +216,7 @@ void MainWindow::insertNewRow(const std::string &fileName, const double &fileSiz
     dlModel->setData(index, routines->extractFilename(QString::fromStdString(fileName)), Qt::DisplayRole);
 
     index = dlModel->index(0, MN_FILESIZE_COL, QModelIndex());
-    dlModel->setData(index, routines->bytesToMegabytes(fileSize), Qt::DisplayRole);
+    dlModel->setData(index, routines->numberConverter(fileSize), Qt::DisplayRole);
 
     index = dlModel->index(0, MN_DOWNLOADED_COL, QModelIndex());
     dlModel->setData(index, QString::number(downloaded), Qt::DisplayRole);
@@ -329,6 +326,7 @@ void MainWindow::on_printToolBtn_clicked()
  *       <http://doc.qt.io/qt-5/examples-threadandconcurrent.html>
  *       <http://doc.qt.io/qt-5/qthreadpool.html>
  *       <http://doc.qt.io/qt-5/qthread.html>
+ *       <http://en.cppreference.com/w/cpp/thread/packaged_task>
  */
 void MainWindow::on_dlstartToolBtn_clicked()
 {
@@ -392,7 +390,7 @@ void MainWindow::on_dlstartToolBtn_clicked()
                     }
                 }
             } catch (const std::exception &e) {
-                QMessageBox::warning(this, tr("Error!"), QString("%1").arg(e.what()), QMessageBox::Ok);
+                routines->print_exception(e);
                 return;
             }
         }
@@ -439,6 +437,8 @@ void MainWindow::on_dlstopToolBtn_clicked()
             QModelIndex index = dlModel->index(indexes.at(0).row(), MN_STATUS_COL, QModelIndex());
             const GekkoFyre::DownloadStatus status = routines->convDlStat_StringToEnum(ui->downloadView->model()->data(index).toString());
             if (status != GekkoFyre::DownloadStatus::Stopped && status != GekkoFyre::DownloadStatus::Completed) {
+                QObject::connect(this, SIGNAL(sendStopDownload(QString)), curl_multi, SLOT(recvStopDl(QString)));
+                emit sendStopDownload(ui->downloadView->model()->data(ui->downloadView->model()->index(indexes.at(0).row(), MN_DESTINATION_COL)).toString());
                 routines->modifyDlState(url, GekkoFyre::DownloadStatus::Stopped);
                 dlModel->updateCol(index, routines->convDlStat_toString(GekkoFyre::DownloadStatus::Stopped), MN_STATUS_COL);
             }
@@ -591,7 +591,9 @@ void MainWindow::manageDlStats()
         for (size_t j = 0; j < dl_stat.size(); ++j) {
             if (ui->downloadView->model()->data(find_index).toString().toStdString() == dl_stat.at(j).stat.url) {
                 try {
-                    dlModel->updateCol(dlModel->index(i, MN_DOWNSPEED_COL), QString::number(dl_stat.at(j).stat.dlnow), MN_DOWNSPEED_COL);
+                    std::ostringstream oss_dlnow;
+                    oss_dlnow << routines->numberConverter(dl_stat.at(j).stat.dlnow).toStdString() << tr("/sec").toStdString();
+                    dlModel->updateCol(dlModel->index(i, MN_DOWNSPEED_COL), QString::fromStdString(oss_dlnow.str()), MN_DOWNSPEED_COL);
                     dlModel->updateCol(dlModel->index(i, MN_DOWNLOADED_COL), QString::number(dl_stat.at(j).stat.dltotal), MN_DOWNLOADED_COL);
                     dlModel->updateCol(dlModel->index(i, MN_UPSPEED_COL), QString::number(dl_stat.at(j).stat.upnow), MN_UPSPEED_COL);
                 } catch (const std::exception &e) {
@@ -649,4 +651,9 @@ void MainWindow::on_downloadView_customContextMenuRequested(const QPoint &pos)
     menu->addAction(new QAction(tr("Delete"), this));
 
     menu->popup(ui->downloadView->viewport()->mapToGlobal(pos));
+}
+
+void MainWindow::on_downloadView_activated(const QModelIndex &index)
+{
+    Q_UNUSED(index);
 }
