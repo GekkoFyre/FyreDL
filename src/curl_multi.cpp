@@ -89,74 +89,81 @@ bool GekkoFyre::CurlMulti::fileStream()
     CURLMsg *msg; // For picking up messages with the transfer status
     int msgs_left = 0; // How many messages are left
     GekkoFyre::GkCurl::DlStatusMsg status_msg;
-    if (gi->multi != nullptr) {
-        multi_res = curl_multi_perform(gi->multi, &gi->still_running);
-        if (multi_res != CURLM_OK) {
-            mcode_or_die(tr("Download file routine: ").toStdString().c_str(), multi_res);
-        }
-
-        // You need to keep calling curl_multi_perform() to make things transfer. If you don't call
-        // it, nothing gets transferred. Everytime you call it, a piece of the transfer is made (if
-        // there's anything to do at the time).
-        // The function returns CURLM_CALL_MULTI_PERFORM only if you should call it again before you
-        // do select(), but you should always keep calling it until the transfer is done. Preferrably
-        // after waiting for action with select().
-        // If you want stuff to happen "in the background", you need to start a new thread and do the
-        // transfer there.
-        do {
-            CURLMcode mc; // curl_multi_wait() return code
-            int numfds; // Number of file descriptors
-
-            mc = curl_multi_wait(gi->multi, NULL, 0, CURL_MAX_WAIT_MSECS, &numfds);
-            if (mc != CURLM_OK) {
-                throw std::runtime_error(tr("curl_multi_wait() failed! Code: %1").arg(QString::number(mc)).toStdString());
+    try {
+        if (gi->multi != nullptr) {
+            multi_res = curl_multi_perform(gi->multi, &gi->still_running);
+            if (multi_res != CURLM_OK) {
+                mcode_or_die(tr("Download file routine: ").toStdString().c_str(), multi_res);
             }
 
-            // 'numfds' being zero means either a timeout or no file-descriptors to wait for. Try
-            // timeout on first occurrence, then assume no file descriptors and no file descriptors to
-            // wait for means wait for 100 milliseconds.
-            if (!numfds) {
-                repeats++;
+            // You need to keep calling curl_multi_perform() to make things transfer. If you don't call
+            // it, nothing gets transferred. Everytime you call it, a piece of the transfer is made (if
+            // there's anything to do at the time).
+            // The function returns CURLM_CALL_MULTI_PERFORM only if you should call it again before you
+            // do select(), but you should always keep calling it until the transfer is done. Preferrably
+            // after waiting for action with select().
+            // If you want stuff to happen "in the background", you need to start a new thread and do the
+            // transfer there.
+            do {
+                CURLMcode mc; // curl_multi_wait() return code
+                int numfds; // Number of file descriptors
 
-                if (repeats > 1) {
-                    std::this_thread::sleep_for(std::chrono::milliseconds(100)); // Sleep for 100 milliseconds
+                mc = curl_multi_wait(gi->multi, NULL, 0, CURL_MAX_WAIT_MSECS, &numfds);
+                if (mc != CURLM_OK) {
+                    throw std::runtime_error(tr("curl_multi_wait() failed! Code: %1").arg(QString::number(mc)).toStdString());
                 }
-            } else {
-                repeats = 0;
-            }
 
-            curl_multi_perform(gi->multi, &gi->still_running);
-        } while (gi->still_running);
+                // 'numfds' being zero means either a timeout or no file-descriptors to wait for. Try
+                // timeout on first occurrence, then assume no file descriptors and no file descriptors to
+                // wait for means wait for 100 milliseconds.
+                if (!numfds) {
+                    repeats++;
 
-        while ((msg = curl_multi_info_read(gi->multi, &msgs_left))) {
-            if (msg->msg == CURLMSG_DONE) {
-                std::string ptr_uuid;
-                GekkoFyre::GkCurl::CurlInit *curl_struct;
-                curl_struct = new GekkoFyre::GkCurl::CurlInit;
-                curl_struct->conn_info = new GekkoFyre::GkCurl::ConnInfo;
-                for (auto const &entry : eh_vec) {
-                    // http://www.boost.org/doc/libs/1_49_0/libs/ptr_container/doc/ptr_container.html
-                    if (msg->easy_handle == entry.second->conn_info->easy) {
-                        ptr_uuid = entry.first;
-                        curl_struct = &eh_vec[ptr_uuid];
-                        break;
+                    if (repeats > 1) {
+                        std::this_thread::sleep_for(std::chrono::milliseconds(100)); // Sleep for 100 milliseconds
                     }
+                } else {
+                    repeats = 0;
                 }
 
-                // The download has either completed successfully or been aborted! Either way, the handle
-                // is no longer needed.
-                status_msg.url = QString::fromStdString(curl_struct->conn_info->url);
-                curl_multi_remove_handle(gi->multi, curl_struct->conn_info->easy);
-                curl_easy_cleanup(curl_struct->conn_info->easy);
+                curl_multi_perform(gi->multi, &gi->still_running);
+            } while (gi->still_running);
 
-                curlCleanup(curl_struct);
-                status_msg.dl_compl_succ = true;
-                routine_singleton::instance()->sendDlFinished(status_msg);
-                return true;
+            while ((msg = curl_multi_info_read(gi->multi, &msgs_left))) {
+                if (msg->msg == CURLMSG_DONE) {
+                    std::string ptr_uuid;
+                    GekkoFyre::GkCurl::CurlInit *curl_struct;
+                    for (auto const &entry : eh_vec) {
+                        // http://www.boost.org/doc/libs/1_49_0/libs/ptr_container/doc/ptr_container.html
+                        if (msg->easy_handle == entry.second->conn_info->easy) {
+                            ptr_uuid = entry.first;
+                            curl_struct = &eh_vec[ptr_uuid];
+                            break;
+                        }
+                    }
+
+                    if (ptr_uuid.empty()) {
+                        // Display an error so that we do not read into uninitialized memory!
+                        throw std::runtime_error(tr("Warning, 'ptr_uuid' is empty!").toStdString());
+                    }
+
+                    // The download has either completed successfully or been aborted! Either way, the handle
+                    // is no longer needed.
+                    status_msg.url = QString::fromStdString(curl_struct->conn_info->url);
+                    curl_multi_remove_handle(gi->multi, curl_struct->conn_info->easy);
+                    curl_easy_cleanup(curl_struct->conn_info->easy);
+
+                    eh_vec.erase(ptr_uuid);
+                    status_msg.dl_compl_succ = true;
+                    routine_singleton::instance()->sendDlFinished(status_msg);
+                    return true;
+                }
             }
+        } else {
+            throw std::runtime_error(tr("multi-handle is NULL!").toStdString());
         }
-    } else {
-        throw std::runtime_error(tr("multi-handle is NULL!").toStdString());
+    } catch (const std::exception &e) {
+        std::throw_with_nested(std::runtime_error(e.what()));
     }
 
     return false;
@@ -164,59 +171,69 @@ bool GekkoFyre::CurlMulti::fileStream()
 
 void GekkoFyre::CurlMulti::recvNewDl(const QString &url, const QString &fileLoc)
 {
-    if (gi == nullptr) {
-        // Global multi-handle does not exist, so create it
-        gi = new GekkoFyre::GkCurl::GlobalInfo;
-        gi->multi = curl_multi_init(); // Initiate the libcurl session
-        curl_multi_setopt(gi->multi, CURLMOPT_SOCKETFUNCTION, sock_cb);
-        curl_multi_setopt(gi->multi, CURLMOPT_SOCKETDATA, gi);
-        curl_multi_setopt(gi->multi, CURLMOPT_TIMERFUNCTION, multi_timer_cb);
-        curl_multi_setopt(gi->multi, CURLMOPT_TIMERDATA, gi);
-    }
+    try {
+        if (gi == nullptr) {
+            // Global multi-handle does not exist, so create it
+            gi = new GekkoFyre::GkCurl::GlobalInfo;
+            gi->multi = curl_multi_init(); // Initiate the libcurl session
+            curl_multi_setopt(gi->multi, CURLMOPT_SOCKETFUNCTION, sock_cb);
+            curl_multi_setopt(gi->multi, CURLMOPT_SOCKETDATA, gi);
+            curl_multi_setopt(gi->multi, CURLMOPT_TIMERFUNCTION, multi_timer_cb);
+            curl_multi_setopt(gi->multi, CURLMOPT_TIMERDATA, gi);
+        }
 
-    std::string uuid;
-    if (fileLoc.isEmpty()) { throw std::invalid_argument(tr("An invalid file location has been given!").toStdString()); }
-    uuid = new_conn(url, gi, false, false, fileLoc, true);
-    fileStream(); // TODO: Fix race-condition here
+        std::string uuid;
+        if (fileLoc.isEmpty()) { throw std::invalid_argument(tr("An invalid file location has been given!").toStdString()); }
+        uuid = new_conn(url, gi, false, false, fileLoc, true);
+        fileStream(); // TODO: Fix race-condition here
+    } catch (const std::exception &e) {
+        std::throw_with_nested(std::runtime_error(tr("Error whilst downloading!\n\n%1").arg(e.what()).toStdString()));
+    }
 }
 
 void GekkoFyre::CurlMulti::mcode_or_die(const char *where, CURLMcode code)
 {
-    if(CURLM_OK != code) {
-        const char *s;
-        switch(code) {
-            case CURLM_CALL_MULTI_PERFORM:
-                s = "CURLM_CALL_MULTI_PERFORM";
-                break;
-            case CURLM_BAD_HANDLE:
-                s = "CURLM_BAD_HANDLE";
-                break;
-            case CURLM_BAD_EASY_HANDLE:
-                s = "CURLM_BAD_EASY_HANDLE";
-                break;
-            case CURLM_OUT_OF_MEMORY:
-                s = "CURLM_OUT_OF_MEMORY";
-                break;
-            case CURLM_INTERNAL_ERROR:
-                s = "CURLM_INTERNAL_ERROR";
-                break;
-            case CURLM_UNKNOWN_OPTION:
-                s = "CURLM_UNKNOWN_OPTION";
-                break;
-            case CURLM_LAST:
-                s = "CURLM_LAST";
-                break;
-            default:
-                s = "CURLM_unknown";
-                break;
-            case CURLM_BAD_SOCKET:
-                s = "CURLM_BAD_SOCKET";
-                /* ignore this error */
-                return;
-        }
+    try {
+        if(CURLM_OK != code) {
+            const char *s;
+            switch(code) {
+                case CURLM_CALL_MULTI_PERFORM:
+                    s = "CURLM_CALL_MULTI_PERFORM";
+                    break;
+                case CURLM_BAD_HANDLE:
+                    s = "CURLM_BAD_HANDLE";
+                    break;
+                case CURLM_BAD_EASY_HANDLE:
+                    s = "CURLM_BAD_EASY_HANDLE";
+                    break;
+                case CURLM_OUT_OF_MEMORY:
+                    s = "CURLM_OUT_OF_MEMORY";
+                    break;
+                case CURLM_INTERNAL_ERROR:
+                    s = "CURLM_INTERNAL_ERROR";
+                    break;
+                case CURLM_UNKNOWN_OPTION:
+                    s = "CURLM_UNKNOWN_OPTION";
+                    break;
+                case CURLM_LAST:
+                    s = "CURLM_LAST";
+                    break;
+                default:
+                    s = "CURLM_unknown";
+                    break;
+                case CURLM_BAD_SOCKET:
+                    s = "CURLM_BAD_SOCKET";
+                    /* ignore this error */
+                    return;
+            }
 
-        throw std::runtime_error(tr("ERROR: %1 returns %2").arg(where).arg(s).toStdString());
+            throw std::runtime_error(tr("ERROR: %1 returns %2").arg(where).arg(s).toStdString());
+        }
+    } catch (const std::exception &e) {
+        std::throw_with_nested(std::runtime_error(e.what()));
     }
+
+    return;
 }
 
 /**
@@ -554,135 +571,127 @@ std::string GekkoFyre::CurlMulti::new_conn(const QString &url, GekkoFyre::GkCurl
     std::string uuid = createId();
     GekkoFyre::GkCurl::CurlInit *ci;
     ci = new GekkoFyre::GkCurl::CurlInit;
-    ci->conn_info = new GekkoFyre::GkCurl::ConnInfo;
-    ci->conn_info->easy = curl_easy_init();
 
-    if (ci->conn_info->easy == nullptr) {
-        throw std::runtime_error(tr("'curl_easy_init()' failed, exiting!").toStdString());
-    }
+    try {
+        ci->conn_info.reset(new GekkoFyre::GkCurl::ConnInfo);
+        ci->conn_info->easy = curl_easy_init();
 
-    ci->conn_info->url = url.toStdString();
-    ci->uuid = uuid;
-    curl_easy_setopt(ci->conn_info->easy, CURLOPT_URL, ci->conn_info->url.c_str());
-
-    if (grabHeaderOnly) {
-        curl_easy_setopt(ci->conn_info->easy, CURLOPT_HEADER, 1);
-        curl_easy_setopt(ci->conn_info->easy, CURLOPT_NOBODY, 1);
-    }
-
-    if (writeToMemory) {
-        ci->mem_chunk.size = 0; // No data at this point
-        ci->file_buf.file_loc = "";
-
-        curl_easy_setopt(ci->conn_info->easy, CURLOPT_NOPROGRESS, 1L);
-
-        // Send all data to this function, via the computer's RAM
-        // NOTE: On Windows, 'CURLOPT_WRITEFUNCTION' /must/ be set, otherwise a crash will occur!
-        curl_easy_setopt(ci->conn_info->easy, CURLOPT_WRITEFUNCTION, &curl_write_memory_callback);
-
-        // We pass our 'chunk' struct to the callback function
-        curl_easy_setopt(ci->conn_info->easy, CURLOPT_WRITEDATA, &ci->mem_chunk);
-    } else {
-        if (!fileLoc.isEmpty()) {
-            ci->file_buf.file_loc = fileLoc.toStdString();
-        } else {
-            throw std::invalid_argument(tr("An invalid file location has been given (empty parameter)!").toStdString());
+        if (ci->conn_info->easy == nullptr) {
+            throw std::runtime_error(tr("'curl_easy_init()' failed, exiting!").toStdString());
         }
 
-        // Initialize these variables, even if they're not used... as it generates spurious errors otherwise.
-        ci->mem_chunk.memory = "";
-        ci->mem_chunk.size = 0;
+        ci->conn_info->url = url.toStdString();
+        ci->uuid = uuid;
+        curl_easy_setopt(ci->conn_info->easy, CURLOPT_URL, ci->conn_info->url.c_str());
 
-        // http://stackoverflow.com/questions/18031357/why-the-constructor-of-stdostream-is-protected
-        async_buf *sbuf = new async_buf(ci->file_buf.file_loc);
-        std::ostream *out = new std::ostream(NULL);
-        out->rdbuf(sbuf);
-        ci->file_buf.astream = out;
-        ci->prog.status = DownloadStatus::Downloading;
+        if (grabHeaderOnly) {
+            curl_easy_setopt(ci->conn_info->easy, CURLOPT_HEADER, 1);
+            curl_easy_setopt(ci->conn_info->easy, CURLOPT_NOBODY, 1);
+        }
 
-        // Send all data to this function, via file streaming
-        // NOTE: On Windows, 'CURLOPT_WRITEFUNCTION' /must/ be set, otherwise a crash will occur!
-        curl_easy_setopt(ci->conn_info->easy, CURLOPT_WRITEFUNCTION, &curl_write_file_callback);
+        if (writeToMemory) {
+            ci->mem_chunk.size = 0; // No data at this point
+            ci->file_buf.file_loc = "";
 
-        // We pass our 'chunk' struct to the callback function
-        curl_easy_setopt(ci->conn_info->easy, CURLOPT_WRITEDATA, &ci->file_buf);
-
-        if (grabStats) {
-            #if LIBCURL_VERSION_NUM >= 0x072000
-            curl_easy_setopt(ci->conn_info->easy, CURLOPT_NOPROGRESS, 0L);
-
-            ci->prog.stat.url = url.toStdString();
-            ci->prog.curl = ci->conn_info->easy;
-
-            /* xferinfo was introduced in 7.32.0, no earlier libcurl versions will
-               compile as they won't have the symbols around.
-               If built with a newer libcurl, but running with an older libcurl:
-               curl_easy_setopt() will fail in run-time trying to set the new
-               callback, making the older callback get used.
-               New libcurls will prefer the new callback and instead use that one even
-               if both callbacks are set. */
-            curl_easy_setopt(ci->conn_info->easy, CURLOPT_XFERINFOFUNCTION, &GekkoFyre::CurlMulti::curl_xferinfo);
-            // Pass the struct pointer into the xferinfo function, but note that this is an
-            // alias to CURLOPT_PROGRESSDATA
-            curl_easy_setopt(ci->conn_info->easy, CURLOPT_XFERINFODATA, &ci->prog);
-
-            #else
-            #error "Libcurl needs to be of version 7.32.0 or later! Certain features are missing otherwise..."
-            #endif
-        } else {
             curl_easy_setopt(ci->conn_info->easy, CURLOPT_NOPROGRESS, 1L);
+
+            // Send all data to this function, via the computer's RAM
+            // NOTE: On Windows, 'CURLOPT_WRITEFUNCTION' /must/ be set, otherwise a crash will occur!
+            curl_easy_setopt(ci->conn_info->easy, CURLOPT_WRITEFUNCTION, &curl_write_memory_callback);
+
+            // We pass our 'chunk' struct to the callback function
+            curl_easy_setopt(ci->conn_info->easy, CURLOPT_WRITEDATA, &ci->mem_chunk);
+        } else {
+            if (!fileLoc.isEmpty()) {
+                ci->file_buf.file_loc = fileLoc.toStdString();
+            } else {
+                throw std::invalid_argument(tr("An invalid file location has been given (empty parameter)!").toStdString());
+            }
+
+            // Initialize these variables, even if they're not used... as it generates spurious errors otherwise.
+            ci->mem_chunk.memory = "";
+            ci->mem_chunk.size = 0;
+
+            // http://stackoverflow.com/questions/18031357/why-the-constructor-of-stdostream-is-protected
+            async_buf *sbuf = new async_buf(ci->file_buf.file_loc);
+            std::ostream *out = new std::ostream(NULL);
+            out->rdbuf(sbuf);
+            ci->file_buf.astream = out;
+            ci->prog.status = DownloadStatus::Downloading;
+
+            // Send all data to this function, via file streaming
+            // NOTE: On Windows, 'CURLOPT_WRITEFUNCTION' /must/ be set, otherwise a crash will occur!
+            curl_easy_setopt(ci->conn_info->easy, CURLOPT_WRITEFUNCTION, &curl_write_file_callback);
+
+            // We pass our 'chunk' struct to the callback function
+            curl_easy_setopt(ci->conn_info->easy, CURLOPT_WRITEDATA, &ci->file_buf);
+
+            if (grabStats) {
+                #if LIBCURL_VERSION_NUM >= 0x072000
+                curl_easy_setopt(ci->conn_info->easy, CURLOPT_NOPROGRESS, 0L);
+
+                ci->prog.stat.url = url.toStdString();
+                ci->prog.curl = ci->conn_info->easy;
+
+                /* xferinfo was introduced in 7.32.0, no earlier libcurl versions will
+                   compile as they won't have the symbols around.
+                   If built with a newer libcurl, but running with an older libcurl:
+                   curl_easy_setopt() will fail in run-time trying to set the new
+                   callback, making the older callback get used.
+                   New libcurls will prefer the new callback and instead use that one even
+                   if both callbacks are set. */
+                curl_easy_setopt(ci->conn_info->easy, CURLOPT_XFERINFOFUNCTION, &GekkoFyre::CurlMulti::curl_xferinfo);
+                // Pass the struct pointer into the xferinfo function, but note that this is an
+                // alias to CURLOPT_PROGRESSDATA
+                curl_easy_setopt(ci->conn_info->easy, CURLOPT_XFERINFODATA, &ci->prog);
+
+                #else
+                #error "Libcurl needs to be of version 7.32.0 or later! Certain features are missing otherwise..."
+                #endif
+            } else {
+                curl_easy_setopt(ci->conn_info->easy, CURLOPT_NOPROGRESS, 1L);
+            }
         }
+
+        // A long parameter set to 1 tells the library to follow any Location: header that the server
+        // sends as part of a HTTP header in a 3xx response. The Location: header can specify a relative
+        // or an absolute URL to follow.
+        // https://curl.haxx.se/libcurl/c/CURLOPT_FOLLOWLOCATION.html
+        curl_easy_setopt(ci->conn_info->easy, CURLOPT_FOLLOWLOCATION, 1L);
+
+        // Some servers don't like requests that are made without a user-agent field, so we provide one
+        curl_easy_setopt(ci->conn_info->easy, CURLOPT_USERAGENT, FYREDL_USER_AGENT);
+
+        // The maximum redirection limit goes here
+        curl_easy_setopt(ci->conn_info->easy, CURLOPT_MAXREDIRS, 12L);
+
+        // Enable TCP keep-alive for this transfer
+        // https://curl.haxx.se/libcurl/c/CURLOPT_TCP_KEEPALIVE.html
+        curl_easy_setopt(ci->conn_info->easy, CURLOPT_TCP_KEEPALIVE, 1L);
+        curl_easy_setopt(ci->conn_info->easy, CURLOPT_TCP_KEEPIDLE, 120L); // Keep-alive idle time to 120 seconds
+        curl_easy_setopt(ci->conn_info->easy, CURLOPT_TCP_KEEPINTVL, 60L); // Interval time between keep-alive probes is 60 seconds
+
+        curl_easy_setopt(ci->conn_info->easy, CURLOPT_VERBOSE, 1L);
+        curl_easy_setopt(ci->conn_info->easy, CURLOPT_ERRORBUFFER, ci->conn_info->error);
+        curl_easy_setopt(ci->conn_info->easy, CURLOPT_PRIVATE, ci->conn_info.get());
+        curl_easy_setopt(ci->conn_info->easy, CURLOPT_LOW_SPEED_TIME, 3L);
+        curl_easy_setopt(ci->conn_info->easy, CURLOPT_LOW_SPEED_LIMIT, 10L);
+
+        // Call this function to get a socket
+        curl_easy_setopt(ci->conn_info->easy, CURLOPT_OPENSOCKETFUNCTION, opensocket);
+
+        // Call this function to close a socket
+        curl_easy_setopt(ci->conn_info->easy, CURLOPT_CLOSESOCKETFUNCTION, close_socket);
+
+        std::cout << QString("Adding easy to multi (%1)\n").arg(url).toStdString();
+        ci->conn_info->curl_res = curl_multi_add_handle(global->multi, ci->conn_info->easy);
+        mcode_or_die("new_conn: curl_multi_add_handle", ci->conn_info->curl_res);
+    } catch (const std::exception &e) {
+        std::throw_with_nested(std::runtime_error(tr("Error with internal libcurl function!\n\n%1").arg(e.what()).toStdString()));
     }
-
-    // A long parameter set to 1 tells the library to follow any Location: header that the server
-    // sends as part of a HTTP header in a 3xx response. The Location: header can specify a relative
-    // or an absolute URL to follow.
-    // https://curl.haxx.se/libcurl/c/CURLOPT_FOLLOWLOCATION.html
-    curl_easy_setopt(ci->conn_info->easy, CURLOPT_FOLLOWLOCATION, 1L);
-
-    // Some servers don't like requests that are made without a user-agent field, so we provide one
-    curl_easy_setopt(ci->conn_info->easy, CURLOPT_USERAGENT, "FyreDL/0.0.1");
-
-    // The maximum redirection limit goes here
-    curl_easy_setopt(ci->conn_info->easy, CURLOPT_MAXREDIRS, 12L);
-
-    // Enable TCP keep-alive for this transfer
-    // https://curl.haxx.se/libcurl/c/CURLOPT_TCP_KEEPALIVE.html
-    curl_easy_setopt(ci->conn_info->easy, CURLOPT_TCP_KEEPALIVE, 1L);
-    curl_easy_setopt(ci->conn_info->easy, CURLOPT_TCP_KEEPIDLE, 120L); // Keep-alive idle time to 120 seconds
-    curl_easy_setopt(ci->conn_info->easy, CURLOPT_TCP_KEEPINTVL, 60L); // Interval time between keep-alive probes is 60 seconds
-
-    curl_easy_setopt(ci->conn_info->easy, CURLOPT_VERBOSE, 1L);
-    curl_easy_setopt(ci->conn_info->easy, CURLOPT_ERRORBUFFER, ci->conn_info->error);
-    curl_easy_setopt(ci->conn_info->easy, CURLOPT_PRIVATE, ci->conn_info);
-    curl_easy_setopt(ci->conn_info->easy, CURLOPT_LOW_SPEED_TIME, 3L);
-    curl_easy_setopt(ci->conn_info->easy, CURLOPT_LOW_SPEED_LIMIT, 10L);
-
-    // Call this function to get a socket
-    curl_easy_setopt(ci->conn_info->easy, CURLOPT_OPENSOCKETFUNCTION, opensocket);
-
-    // Call this function to close a socket
-    curl_easy_setopt(ci->conn_info->easy, CURLOPT_CLOSESOCKETFUNCTION, close_socket);
-
-    std::cout << QString("Adding easy to multi (%1)\n").arg(url).toStdString();
-    ci->conn_info->curl_res = curl_multi_add_handle(global->multi, ci->conn_info->easy);
-    mcode_or_die("new_conn: curl_multi_add_handle", ci->conn_info->curl_res);
 
     eh_vec[uuid] = *ci;
     return uuid;
-}
-
-void GekkoFyre::CurlMulti::curlCleanup(GekkoFyre::GkCurl::CurlInit *curl_init)
-{
-    if (!curl_init->mem_chunk.memory.empty()) {
-        curl_init->mem_chunk.memory.clear();
-    }
-
-    curl_init->conn_info->easy = nullptr;
-    curl_init->conn_info->url.clear();
-    delete curl_init->conn_info;
-    delete curl_init;
-    return;
 }
 
 /**
@@ -726,7 +735,7 @@ void GekkoFyre::CurlMulti::recvStopDl(const QString &fileLoc)
     std::string ptr_uuid;
     GekkoFyre::GkCurl::CurlInit *curl_struct;
     curl_struct = new GekkoFyre::GkCurl::CurlInit;
-    curl_struct->conn_info = new GekkoFyre::GkCurl::ConnInfo;
+    curl_struct->conn_info.reset(new GekkoFyre::GkCurl::ConnInfo);
     for (auto const &entry : eh_vec) {
         // http://www.boost.org/doc/libs/1_49_0/libs/ptr_container/doc/ptr_container.html
         if (fileLoc.toStdString() == entry.second->file_buf.file_loc) {

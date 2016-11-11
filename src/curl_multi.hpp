@@ -115,7 +115,6 @@ private:
     static size_t curl_write_file_callback(char *buffer, size_t size, size_t nmemb, void *userdata);
     static std::string new_conn(const QString &url, GekkoFyre::GkCurl::GlobalInfo *global, bool grabHeaderOnly,
                                 bool writeToMemory, const QString &fileLoc, bool grabStats);
-    static void curlCleanup(GekkoFyre::GkCurl::CurlInit *curl_init);
 
 };
     typedef SingletonEmit<CurlMulti> routine_singleton;

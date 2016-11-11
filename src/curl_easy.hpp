@@ -64,7 +64,7 @@ public:
 
 private:
     static size_t curl_write_memory_callback(void *ptr, size_t size, size_t nmemb, void *userp);
-    static GekkoFyre::GkCurl::CurlInit new_easy_handle(const QString &url);
+    static GkCurl::CurlInit *new_easy_handle(const QString &url);
     static void curlCleanup(GekkoFyre::GkCurl::CurlInit &curl_init);
 };
 }

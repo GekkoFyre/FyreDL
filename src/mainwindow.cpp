@@ -390,7 +390,7 @@ void MainWindow::on_dlstartToolBtn_clicked()
                     }
                 }
             } catch (const std::exception &e) {
-                QMessageBox::warning(this, tr("Error!"), QString("%1").arg(e.what()), QMessageBox::Ok);
+                routines->print_exception(e);
                 return;
             }
         }

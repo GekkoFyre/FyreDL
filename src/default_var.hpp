@@ -47,6 +47,7 @@
 #include <string>
 #include <iostream>
 #include <QString>
+#include <memory>
 
 extern "C" {
 #include <curl/curl.h>
@@ -72,6 +73,8 @@ extern "C" {
 #define CFG_HISTORY_FILE "fyredl_history.xml"
 #define CURL_MAX_WAIT_MSECS 15000 // Measured in milliseconds
 #define WRITE_BUFFER_SIZE (1024 * 1024) // Measured in bytes
+
+#define FYREDL_USER_AGENT "FyreDL/0.0.1"
 
 #define MN_FILENAME_COL 0
 #define MN_FILESIZE_COL 1
@@ -174,7 +177,7 @@ namespace GekkoFyre {
         };
 
         struct CurlInit {
-            ConnInfo *conn_info;
+            std::shared_ptr<ConnInfo> conn_info;
             MemoryStruct mem_chunk;
             FileStream file_buf;
             CurlProgressPtr prog;

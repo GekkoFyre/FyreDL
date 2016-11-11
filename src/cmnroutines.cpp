@@ -43,7 +43,6 @@
 #include "cmnroutines.hpp"
 #include <boost/filesystem.hpp>
 #include <boost/exception/all.hpp>
-#include <exception>
 #include <cmath>
 #include <iostream>
 #include <QUrl>
@@ -51,6 +50,7 @@
 #include <QLocale>
 #include <QApplication>
 #include <QtCore/QDateTime>
+#include <QMessageBox>
 
 #ifdef _WIN32
 #define _WIN32_WINNT 0x06000100
@@ -531,4 +531,22 @@ QString GekkoFyre::CmnRoutines::numberConverter(const double &value)
     } else {
         return bytesToKilobytes(value);
     }
+}
+
+/**
+ * @brief GekkoFyre::CmnRoutines::print_exception_qmsgbox recursively prints out all the exceptions from the
+ * immediate cause.
+ * @date 2016-11-12
+ * @note <http://en.cppreference.com/w/cpp/error/throw_with_nested>
+ * @param e
+ * @param level
+ */
+void GekkoFyre::CmnRoutines::print_exception(const std::exception &e, int level)
+{
+    std::cerr << std::string((unsigned long)level, ' ') << tr("exception: ").toStdString() << e.what() << std::endl;
+    try {
+        std::rethrow_if_nested(e);
+    } catch (const std::exception &e) {
+        print_exception(e, (level + 1));
+    } catch (...) {}
 }

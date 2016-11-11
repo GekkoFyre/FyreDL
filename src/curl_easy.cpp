@@ -54,11 +54,11 @@ GekkoFyre::CurlEasy::~CurlEasy()
     // curl_global_cleanup(); // We're done with libcurl, globally, so clean it up!
 }
 
-GekkoFyre::GkCurl::CurlInit GekkoFyre::CurlEasy::new_easy_handle(const QString &url)
+GekkoFyre::GkCurl::CurlInit *GekkoFyre::CurlEasy::new_easy_handle(const QString &url)
 {
     GekkoFyre::GkCurl::CurlInit *ci;
     ci = new GekkoFyre::GkCurl::CurlInit;
-    ci->conn_info = (GekkoFyre::GkCurl::ConnInfo *) calloc(1, sizeof(GekkoFyre::GkCurl::ConnInfo));
+    ci->conn_info.reset(new GekkoFyre::GkCurl::ConnInfo);
 
     curl_global_init(CURL_GLOBAL_DEFAULT);
     ci->conn_info->easy = curl_easy_init(); // Initiate the curl session
@@ -91,7 +91,7 @@ GekkoFyre::GkCurl::CurlInit GekkoFyre::CurlEasy::new_easy_handle(const QString &
     curl_easy_setopt(ci->conn_info->easy, CURLOPT_FOLLOWLOCATION, 1L);
 
     // Some servers don't like requests that are made without a user-agent field, so we provide one
-    curl_easy_setopt(ci->conn_info->easy, CURLOPT_USERAGENT, "FyreDL/0.0.1");
+    curl_easy_setopt(ci->conn_info->easy, CURLOPT_USERAGENT, FYREDL_USER_AGENT);
 
     // The maximum redirection limit goes here
     curl_easy_setopt(ci->conn_info->easy, CURLOPT_MAXREDIRS, 12L);
@@ -104,12 +104,12 @@ GekkoFyre::GkCurl::CurlInit GekkoFyre::CurlEasy::new_easy_handle(const QString &
 
     curl_easy_setopt(ci->conn_info->easy, CURLOPT_VERBOSE, 1L);
     curl_easy_setopt(ci->conn_info->easy, CURLOPT_ERRORBUFFER, ci->conn_info->error);
-    curl_easy_setopt(ci->conn_info->easy, CURLOPT_PRIVATE, ci->conn_info);
+    curl_easy_setopt(ci->conn_info->easy, CURLOPT_PRIVATE, ci->conn_info.get());
     curl_easy_setopt(ci->conn_info->easy, CURLOPT_LOW_SPEED_TIME, 3L);
     curl_easy_setopt(ci->conn_info->easy, CURLOPT_LOW_SPEED_LIMIT, 10L);
 
     ci->file_buf.file_loc = "";
-    return *ci;
+    return ci;
 }
 
 GekkoFyre::GkCurl::CurlInfo GekkoFyre::CurlEasy::verifyFileExists(const QString &url)
@@ -118,20 +118,20 @@ GekkoFyre::GkCurl::CurlInfo GekkoFyre::CurlEasy::verifyFileExists(const QString 
 
     CURLcode curl_res;
     GekkoFyre::GkCurl::CurlInfo info;
-    GekkoFyre::GkCurl::CurlInit curl_struct = new_easy_handle(url);
-    if (curl_struct.conn_info->easy != nullptr) {
-        curl_res = curl_easy_perform(curl_struct.conn_info->easy);
+    std::unique_ptr<GekkoFyre::GkCurl::CurlInit> curl_struct(new_easy_handle(url));
+    if (curl_struct->conn_info->easy != nullptr) {
+        curl_res = curl_easy_perform(curl_struct->conn_info->easy);
         if (curl_res != CURLE_OK) {
             info.response_code = curl_res;
-            info.effective_url = curl_struct.conn_info->error;
+            info.effective_url = curl_struct->conn_info->error;
             return info;
         } else {
             // https://curl.haxx.se/libcurl/c/curl_easy_getinfo.html
             // http://stackoverflow.com/questions/14947821/how-do-i-use-strdup
             long rescode;
             char *effec_url;
-            curl_easy_getinfo(curl_struct.conn_info->easy, CURLINFO_RESPONSE_CODE, &rescode);
-            curl_easy_getinfo(curl_struct.conn_info->easy, CURLINFO_EFFECTIVE_URL, &effec_url);
+            curl_easy_getinfo(curl_struct->conn_info->easy, CURLINFO_RESPONSE_CODE, &rescode);
+            curl_easy_getinfo(curl_struct->conn_info->easy, CURLINFO_EFFECTIVE_URL, &effec_url);
 
             std::memcpy(&info.response_code, &rescode, sizeof(unsigned long)); // Must be trivially copyable otherwise UB!
             info.effective_url = effec_url;
@@ -139,7 +139,7 @@ GekkoFyre::GkCurl::CurlInfo GekkoFyre::CurlEasy::verifyFileExists(const QString 
         }
     }
 
-    curlCleanup(curl_struct);
+    // curlCleanup(curl_struct);
     info.effective_url = "";
     info.response_code = -1;
     return info;
@@ -149,12 +149,12 @@ GekkoFyre::GkCurl::CurlInfoExt GekkoFyre::CurlEasy::curlGrabInfo(const QString &
 {
     CURLcode curl_res;
     GekkoFyre::GkCurl::CurlInfoExt info;
-    GekkoFyre::GkCurl::CurlInit curl_struct = new_easy_handle(url);
-    if (curl_struct.conn_info->easy != nullptr) {
-        curl_res = curl_easy_perform(curl_struct.conn_info->easy);
+    std::unique_ptr<GekkoFyre::GkCurl::CurlInit> curl_struct(new_easy_handle(url));
+    if (curl_struct->conn_info->easy != nullptr) {
+        curl_res = curl_easy_perform(curl_struct->conn_info->easy);
         if (curl_res != CURLE_OK) {
             info.response_code = curl_res;
-            info.effective_url = curl_struct.conn_info->error;
+            info.effective_url = curl_struct->conn_info->error;
             info.status_ok = false;
             info.elapsed = -1;
             info.content_length = -1;
@@ -163,23 +163,23 @@ GekkoFyre::GkCurl::CurlInfoExt GekkoFyre::CurlEasy::curlGrabInfo(const QString &
             long rescode;
             double elapsed, content_length;
             char *effec_url;
-            curl_easy_getinfo(curl_struct.conn_info->easy, CURLINFO_RESPONSE_CODE, &rescode);
-            curl_easy_getinfo(curl_struct.conn_info->easy, CURLINFO_TOTAL_TIME, &elapsed);
-            curl_easy_getinfo(curl_struct.conn_info->easy, CURLINFO_EFFECTIVE_URL, &effec_url);
-            curl_easy_getinfo(curl_struct.conn_info->easy, CURLINFO_CONTENT_LENGTH_DOWNLOAD, &content_length);
+            curl_easy_getinfo(curl_struct->conn_info->easy, CURLINFO_RESPONSE_CODE, &rescode);
+            curl_easy_getinfo(curl_struct->conn_info->easy, CURLINFO_TOTAL_TIME, &elapsed);
+            curl_easy_getinfo(curl_struct->conn_info->easy, CURLINFO_EFFECTIVE_URL, &effec_url);
+            curl_easy_getinfo(curl_struct->conn_info->easy, CURLINFO_CONTENT_LENGTH_DOWNLOAD, &content_length);
 
             // Must be trivially copyable otherwise UB!
             std::memcpy(&info.response_code, &rescode, sizeof(unsigned long));
             std::memcpy(&info.elapsed, &elapsed, sizeof(double));
             std::memcpy(&info.content_length, &content_length, sizeof(double));
             info.effective_url = effec_url;
-            info.status_msg = curl_struct.conn_info->error;
+            info.status_msg = curl_struct->conn_info->error;
             info.status_ok = true;
             return info;
         }
     }
 
-    curlCleanup(curl_struct);
+    // curlCleanup(curl_struct);
     return GekkoFyre::GkCurl::CurlInfoExt();
 }
 
@@ -195,7 +195,6 @@ void GekkoFyre::CurlEasy::curlCleanup(GekkoFyre::GkCurl::CurlInit &curl_init)
 
     curl_init.conn_info->easy = nullptr;
     curl_init.conn_info->url.clear();
-    free(curl_init.conn_info);
     return;
 }
 

@@ -44,11 +44,13 @@
 #define CMNROUTINES_HPP
 
 #include "default_var.hpp"
+#include <pugixml.hpp>
 #include <string>
 #include <cstdio>
+#include <exception>
+#include <stdexcept>
 #include <QString>
 #include <QObject>
-#include <pugixml.hpp>
 
 namespace GekkoFyre {
 
@@ -66,6 +68,8 @@ public:
     QString numberSeperators(const QVariant &value);
     QString numberConverter(const double &value);
     double percentDownloaded(const double &content_length, const double &amountDl);
+
+    void print_exception(const std::exception &e, int level = 0);
 
     int convDlStat_toInt(const GekkoFyre::DownloadStatus &status);
     GekkoFyre::DownloadStatus convDlStat_IntToEnum(const int &s);
