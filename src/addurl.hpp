@@ -33,6 +33,13 @@
  **
  ********************************************************************************/
 
+/**
+ * @file addurl.hpp
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @date 2016-10
+ * @brief A Qt QDialog class that handles the adding of downloads to the application.
+ */
+
 #ifndef ADDURL_HPP
 #define ADDURL_HPP
 

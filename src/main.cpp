@@ -33,6 +33,13 @@
  **
  ********************************************************************************/
 
+/**
+ * @file main.cpp
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @date 2016-08
+ * @brief This file is self-explanatory.
+ */
+
 #include "mainwindow.hpp"
 #include <QApplication>
 

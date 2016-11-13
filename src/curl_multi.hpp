@@ -34,10 +34,10 @@
  ********************************************************************************/
 
 /**
- * @file curl_multi.hpp
+ * @file curl_multi.cpp
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
  * @date 2016-11-01
- * @brief Contains the routines for downloading files.
+ * @brief Contains the routines for downloading (and directly managing therof) any files, asynchronously.
  */
 
 #ifndef FYREDL_CURLMULTI_HPP

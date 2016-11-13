@@ -34,10 +34,10 @@
  ********************************************************************************/
 
 /**
- * @file cmnroutines.hpp
+ * @file mainwindow.hpp
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
  * @date 2016-09
- * @brief The C++ code behind the, 'mainwindow.ui', designer file.
+ * @brief The code and functions behind the, 'mainwindow.ui', designer file.
  */
 
 #ifndef MAINWINDOW_HPP

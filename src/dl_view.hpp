@@ -34,7 +34,7 @@
  ********************************************************************************/
 
 /**
- * @file cmnroutines.hpp
+ * @file dl_view.hpp
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
  * @date 2016-09
  * @brief The model definition for the object, 'downloadView', within the 'mainwindow.ui' designer file.

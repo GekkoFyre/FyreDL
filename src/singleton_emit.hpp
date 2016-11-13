@@ -33,6 +33,13 @@
  **
  ********************************************************************************/
 
+/**
+ * @file singleton_emit.hpp
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @date 2016-10
+ * @brief Handles the emitting of signals from a static object.
+ */
+
 #ifndef SINGLEEMIT_HPP
 #define SINGLEEMIT_HPP
 

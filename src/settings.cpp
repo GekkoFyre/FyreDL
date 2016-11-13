@@ -33,6 +33,13 @@
  **
  ********************************************************************************/
 
+/**
+ * @file settings.cpp
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @date 2016-10
+ * @brief The code and functions behind the, 'settings.ui', designer file.
+ */
+
 #include "settings.hpp"
 #include "ui_settings.h"
 #include <QFont>

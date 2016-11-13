@@ -34,7 +34,7 @@
  ********************************************************************************/
 
 /**
- * @file curl_multi.hpp
+ * @file curl_easy.hpp
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
  * @date 2016-11-01
  * @brief This is the easy-interface to libcurl. It's good for verifying, checking, etc. and where a full

@@ -34,10 +34,10 @@
  ********************************************************************************/
 
 /**
- * @file cmnroutines.hpp
+ * @file mainwindow.cpp
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
  * @date 2016-09
- * @brief The C++ code behind the, 'mainwindow.ui', designer file.
+ * @brief The code and functions behind the, 'mainwindow.ui', designer file.
  */
 
 #include "mainwindow.hpp"
@@ -674,6 +674,8 @@ void MainWindow::manageDlStats()
                     // Update the 'download speed' spline-graph
                     for (size_t k = 0; k < graph_init->size(); ++k) {
                         if (graph_init->at(k).down_speed->file_dest == dl_stat->at(j).file_dest) {
+                            // TODO: Fix the SIGSEGV bug relating to the code immediately below! NOTE: It only
+                            // occurs some of the time.
                             graph_init->at(k).down_speed->down_speed_series->append(dl_stat_element.dlnow,
                                                                                     dl_stat_element.cur_time);
                         }

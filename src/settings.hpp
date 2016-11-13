@@ -33,6 +33,13 @@
  **
  ********************************************************************************/
 
+/**
+ * @file settings.hpp
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @date 2016-10
+ * @brief The code and functions behind the, 'settings.ui', designer file.
+ */
+
 #ifndef SETTINGS_HPP
 #define SETTINGS_HPP
 
