@@ -135,6 +135,9 @@ GekkoFyre::GkCurl::CurlInfo GekkoFyre::CurlEasy::verifyFileExists(const QString 
 
             std::memcpy(&info.response_code, &rescode, sizeof(unsigned long)); // Must be trivially copyable otherwise UB!
             info.effective_url = effec_url;
+
+            curl_easy_cleanup(curl_struct->conn_info->easy);
+
             return info;
         }
     }
@@ -175,6 +178,9 @@ GekkoFyre::GkCurl::CurlInfoExt GekkoFyre::CurlEasy::curlGrabInfo(const QString &
             info.effective_url = effec_url;
             info.status_msg = curl_struct->conn_info->error;
             info.status_ok = true;
+
+            curl_easy_cleanup(curl_struct->conn_info->easy);
+
             return info;
         }
     }
