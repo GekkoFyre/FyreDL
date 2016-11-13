@@ -76,12 +76,15 @@ private:
                       const GekkoFyre::DownloadStatus &status, const std::string &url,
                       const std::string &destination);
     void removeSelRows();
+    void initCharts(const std::string &file_dest);
+    void displayCharts(const std::string &file_dest);
 
     downloadModel *dlModel;
     GekkoFyre::CmnRoutines *routines;
     GekkoFyre::CurlMulti *curl_multi;
     GekkoFyre::DownloadStatus status;
-    std::vector<GekkoFyre::GkCurl::CurlProgressPtr> dl_stat;
+    std::vector<GekkoFyre::GkCurl::CurlProgressPtr> *dl_stat;
+    std::vector<GekkoFyre::GkGraph::GraphInit> *graph_init;
 
     // http://stackoverflow.com/questions/10121560/stdthread-naming-your-thread
     QThread *curl_multi_thread;

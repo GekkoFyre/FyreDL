@@ -101,6 +101,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
 
     routines = new GekkoFyre::CmnRoutines();
     curl_multi = new GekkoFyre::CurlMulti();
+    dl_stat = new std::vector<GekkoFyre::GkCurl::CurlProgressPtr>();
 
     // http://wiki.qt.io/QThreads_general_usage
     curl_multi_thread = new QThread;
@@ -120,6 +121,8 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
     QObject::connect(ui->downloadView, SIGNAL(customContextMenuRequested(QPoint)), this, SLOT(on_downloadView_customContextMenuRequested(QPoint)));
     QObject::connect(this, SIGNAL(updateDlStats()), this, SLOT(manageDlStats()));
 
+    graph_init = new std::vector<GekkoFyre::GkGraph::GraphInit>();
+
     try {
         readFromHistoryFile();
     } catch (const std::exception &e) {
@@ -130,6 +133,9 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
 MainWindow::~MainWindow()
 {
     delete routines;
+    delete dl_stat;
+    graph_init->clear();
+    delete graph_init;
     delete ui;
 }
 
@@ -180,6 +186,9 @@ void MainWindow::readFromHistoryFile()
                              dl_history.at(i).ext_info.content_length, 0, 0, 0, 0,
                              dl_history.at(i).dlStatus, dl_history.at(i).ext_info.effective_url,
                              dl_history.at(i).file_loc);
+
+                // Initialize the graphs
+                initCharts(dl_history.at(i).file_loc);
             } else {
                 QMessageBox::information(this, tr("Problem!"), tr("The size of the download could not be "
                                                                   "determined. Please try again."),
@@ -270,6 +279,71 @@ void MainWindow::removeSelRows()
     }
 
     return;
+}
+
+/**
+ * @brief MainWindow::initCharts initializes the appropriate graph structs, so that the charts can be displayed
+ * to the user.
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @date 2016-11-13
+ * @param file_dest The file relating to the download in question, and thus the right graph in question.
+ */
+void MainWindow::initCharts(const std::string &file_dest)
+{
+    std::shared_ptr<GekkoFyre::GkGraph::DownSpeedGraph> down_speed_graph;
+    GekkoFyre::GkGraph::GraphInit create_graph;
+
+    // Initialize 'down_speed_graph' struct
+    down_speed_graph.reset(new GekkoFyre::GkGraph::DownSpeedGraph);
+
+    // Intialize the 'down_speed_series' QSplineSeries
+    down_speed_graph->down_speed_series.reset(new QtCharts::QSplineSeries());
+
+    // Set the file location of the download, and thus matching graph
+    down_speed_graph->file_dest = file_dest;
+
+    // Add the sub-struct to our main struct
+    create_graph.down_speed = down_speed_graph.get();
+
+    graph_init->push_back(create_graph);
+    return;
+}
+
+/**
+ * @brief MainWindow::displayCharts
+ * @date 2016-11-13
+ * @note <http://doc.qt.io/qt-5/qtcharts-index.html>
+ *       <http://doc.qt.io/qt-5/qtcharts-splinechart-example.html>
+ *       <http://en.cppreference.com/w/cpp/chrono/c/time>
+ * @param file_dest The file destination of the download in question, relating to the chart being displayed
+ */
+void MainWindow::displayCharts(const std::string &file_dest)
+{
+    for (size_t i = 0; i < graph_init->size(); ++i) {
+        if (ui->tabStatusWidget->currentIndex() == TAB_INDEX_GRAPH) {
+            if (graph_init->at(i).down_speed->down_speed_series == nullptr) {
+                throw std::invalid_argument(tr("Download-speed graph pointer is NULL! Index: %1").arg(QString::number(i)).toStdString());
+            }
+
+            if (graph_init->at(i).down_speed->file_dest == file_dest) {
+                std::unique_ptr<QtCharts::QSplineSeries> down_speed_series;
+                down_speed_series.reset(graph_init->at(i).down_speed->down_speed_series.get());
+
+                down_speed_series->setName(tr("Download speed spline %1").arg(i));
+
+                std::unique_ptr<QtCharts::QChart> chart(new QtCharts::QChart());
+                chart->legend()->show();
+                chart->addSeries(down_speed_series.get());
+                chart->setTitle(tr("Download Speed"));
+                chart->createDefaultAxes();
+                chart->axisY()->setTitleText(tr("Download speed (KB/sec)")); // The title of the y-axis
+                chart->axisX()->setTitleText(tr("Time passed (seconds)")); // The title of the x-axis
+
+                std::unique_ptr<QtCharts::QChartView> chartView(new QtCharts::QChartView(chart.get()));
+                chartView->setRenderHint(QPainter::Antialiasing);
+            }
+        }
+    }
 }
 
 void MainWindow::on_action_Open_a_File_triggered()
@@ -542,34 +616,29 @@ void MainWindow::recvXferStats(const GekkoFyre::GkCurl::CurlProgressPtr &info)
 {
     curl_multi_mutex.lock();
     GekkoFyre::GkCurl::CurlProgressPtr prog_temp;
-    prog_temp.stat.dlnow = info.stat.dlnow;
-    prog_temp.stat.dltotal = info.stat.dltotal;
-    prog_temp.stat.upnow = info.stat.upnow;
-    prog_temp.stat.uptotal = info.stat.uptotal;
-    prog_temp.stat.cur_time = info.stat.cur_time;
-    prog_temp.stat.url = info.stat.url;
+    prog_temp.stat = info.stat;
+    prog_temp.url = info.url;
     curl_multi_mutex.unlock();
 
     bool alreadyExists = false;
-    for (size_t i = 0; i < dl_stat.size(); ++i) {
-        if (dl_stat.at(i).stat.url == prog_temp.stat.url) {
+    for (size_t i = 0; i < dl_stat->size(); ++i) {
+        if (dl_stat->at(i).url == prog_temp.url) {
             alreadyExists = true;
             break;
         }
     }
 
     if (!alreadyExists) {
-        dl_stat.push_back(prog_temp);
+        // If it doesn't exist, push the whole of 'prog_temp' onto the private, class-global 'dl_stat' and
+        // thusly updateDlStats().
+        dl_stat->push_back(prog_temp);
         emit updateDlStats();
         return;
     } else {
-        for (size_t i = 0; i < dl_stat.size(); ++i) {
-            if (dl_stat.at(i).stat.url == prog_temp.stat.url) {
-                dl_stat.at(i).stat.dlnow = prog_temp.stat.dlnow;
-                dl_stat.at(i).stat.dltotal = prog_temp.stat.dltotal;
-                dl_stat.at(i).stat.upnow = prog_temp.stat.upnow;
-                dl_stat.at(i).stat.uptotal = prog_temp.stat.uptotal;
-                dl_stat.at(i).stat.cur_time = prog_temp.stat.cur_time;
+        // If it does exist, then only update certain elements instead and thusly updateDlStats() also.
+        for (size_t i = 0; i < dl_stat->size(); ++i) {
+            if (dl_stat->at(i).url == prog_temp.url) {
+                dl_stat->at(i).stat = prog_temp.stat;
                 emit updateDlStats();
                 return;
             }
@@ -579,7 +648,7 @@ void MainWindow::recvXferStats(const GekkoFyre::GkCurl::CurlProgressPtr &info)
 }
 
 /**
- * @brief MainWindow::manageDlStats
+ * @brief MainWindow::manageDlStats manages the statistics regarding a download and updates the relevant columns.
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
  * @date   2016-10-23
  * @note   <http://www.qtcentre.org/threads/18082-Hot-to-get-a-QModelIndexList-from-a-model>
@@ -588,14 +657,27 @@ void MainWindow::manageDlStats()
 {
     for (int i = 0; i < dlModel->getList().size(); ++i) {
         QModelIndex find_index = dlModel->index(i, MN_URL_COL);
-        for (size_t j = 0; j < dl_stat.size(); ++j) {
-            if (ui->downloadView->model()->data(find_index).toString().toStdString() == dl_stat.at(j).stat.url) {
+        for (size_t j = 0; j < dl_stat->size(); ++j) {
+            if (ui->downloadView->model()->data(find_index).toString().toStdString() == dl_stat->at(j).url) {
                 try {
+                    GekkoFyre::GkCurl::CurlDlStats dl_stat_element = dl_stat->at(j).stat.back();
                     std::ostringstream oss_dlnow;
-                    oss_dlnow << routines->numberConverter(dl_stat.at(j).stat.dlnow).toStdString() << tr("/sec").toStdString();
+                    std::ostringstream oss_upnow;
+                    oss_dlnow << routines->numberConverter(dl_stat_element.dlnow).toStdString() << tr("/sec").toStdString();
+                    oss_upnow << routines->numberConverter(dl_stat_element.upnow).toStdString() << tr("/sec").toStdString();
+
                     dlModel->updateCol(dlModel->index(i, MN_DOWNSPEED_COL), QString::fromStdString(oss_dlnow.str()), MN_DOWNSPEED_COL);
-                    dlModel->updateCol(dlModel->index(i, MN_DOWNLOADED_COL), QString::number(dl_stat.at(j).stat.dltotal), MN_DOWNLOADED_COL);
-                    dlModel->updateCol(dlModel->index(i, MN_UPSPEED_COL), QString::number(dl_stat.at(j).stat.upnow), MN_UPSPEED_COL);
+                    dlModel->updateCol(dlModel->index(i, MN_DOWNLOADED_COL), routines->numberConverter(dl_stat_element.dltotal), MN_DOWNLOADED_COL);
+                    dlModel->updateCol(dlModel->index(i, MN_UPSPEED_COL), QString::fromStdString(oss_upnow.str()), MN_UPSPEED_COL);
+                    // dlModel->updateCol(dlModel->index(i, MN_PROGRESS_COL), routines->percentDownloaded(, dl_stat_element.dltotal), MN_PROGRESS_COL);
+
+                    // Update the 'download speed' spline-graph
+                    for (size_t k = 0; k < graph_init->size(); ++k) {
+                        if (graph_init->at(k).down_speed->file_dest == dl_stat->at(j).file_dest) {
+                            graph_init->at(k).down_speed->down_speed_series->append(dl_stat_element.dlnow,
+                                                                                    dl_stat_element.cur_time);
+                        }
+                    }
                 } catch (const std::exception &e) {
                     QMessageBox::warning(this, tr("Error!"), QString("%1").arg(e.what()), QMessageBox::Ok);
                     return;
@@ -623,6 +705,10 @@ void MainWindow::recvDlFinished(const GekkoFyre::GkCurl::DlStatusMsg &status)
                 if (routines->convDlStat_StringToEnum(ui->downloadView->model()->data(stat_index).toString()) == GekkoFyre::DownloadStatus::Downloading) {
                     routines->modifyDlState(status.url, GekkoFyre::DownloadStatus::Completed);
                     dlModel->updateCol(stat_index, routines->convDlStat_toString(GekkoFyre::DownloadStatus::Completed), MN_STATUS_COL);
+
+                    // Update the 'downloaded amount' because the statistics routines are not always accurate, due to only
+                    // running every few seconds at most. This causes inconsistencies.
+                    dlModel->updateCol(dlModel->index(i, MN_DOWNLOADED_COL), routines->numberConverter(status.content_len), MN_DOWNLOADED_COL);
                     return;
                 }
             }

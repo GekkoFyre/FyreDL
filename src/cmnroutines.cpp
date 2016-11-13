@@ -135,9 +135,9 @@ QString GekkoFyre::CmnRoutines::numberSeperators(const QVariant &value)
  */
 double GekkoFyre::CmnRoutines::percentDownloaded(const double &content_length, const double &amountDl)
 {
-    double percent = ((amountDl / content_length) * 100);
+    double percent = (double)std::round((amountDl / content_length) * 100);
     if (percent >= 101) {
-        throw std::runtime_error(tr("Incorrect download percentage reported!").toStdString());
+        std::cerr << tr("Incorrect download percentage reported!").toStdString() << std::endl;
     }
 
     return percent;
@@ -171,8 +171,7 @@ std::string GekkoFyre::CmnRoutines::findCfgFile(const std::string &cfgFileName)
  * @param xmlCfgFile
  * @return
  */
-std::vector<GekkoFyre::GkCurl::CurlDlInfo> GekkoFyre::CmnRoutines::readDownloadInfo(
-        const std::string &xmlCfgFile)
+std::vector<GekkoFyre::GkCurl::CurlDlInfo> GekkoFyre::CmnRoutines::readDownloadInfo(const std::string &xmlCfgFile)
 {
     fs::path xmlCfgFile_loc = findCfgFile(xmlCfgFile);
     sys::error_code ec;
