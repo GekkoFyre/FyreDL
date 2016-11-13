@@ -138,10 +138,10 @@ namespace GekkoFyre {
 
         // Information associated with a specific easy handle
         struct ConnInfo {
-            CURL *easy;
-            std::string url;
-            char error[CURL_ERROR_SIZE];
-            CURLMcode curl_res;
+            CURL *easy;              // libcurl easy-interface pointer
+            std::string url;         // The effective URL of the download in question
+            std::vector<char> error; // Any reportable errors go here
+            CURLMcode curl_res;      // The return code from the easy-interface
         };
 
         struct CurlInfo {

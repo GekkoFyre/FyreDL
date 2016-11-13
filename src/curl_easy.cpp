@@ -103,7 +103,7 @@ GekkoFyre::GkCurl::CurlInit *GekkoFyre::CurlEasy::new_easy_handle(const QString 
     curl_easy_setopt(ci->conn_info->easy, CURLOPT_TCP_KEEPINTVL, 60L); // Interval time between keep-alive probes is 60 seconds
 
     curl_easy_setopt(ci->conn_info->easy, CURLOPT_VERBOSE, 1L);
-    curl_easy_setopt(ci->conn_info->easy, CURLOPT_ERRORBUFFER, ci->conn_info->error);
+    curl_easy_setopt(ci->conn_info->easy, CURLOPT_ERRORBUFFER, &ci->conn_info->error[0]);
     curl_easy_setopt(ci->conn_info->easy, CURLOPT_PRIVATE, ci->conn_info.get());
     curl_easy_setopt(ci->conn_info->easy, CURLOPT_LOW_SPEED_TIME, 3L);
     curl_easy_setopt(ci->conn_info->easy, CURLOPT_LOW_SPEED_LIMIT, 10L);
@@ -123,7 +123,7 @@ GekkoFyre::GkCurl::CurlInfo GekkoFyre::CurlEasy::verifyFileExists(const QString 
         curl_res = curl_easy_perform(curl_struct->conn_info->easy);
         if (curl_res != CURLE_OK) {
             info.response_code = curl_res;
-            info.effective_url = curl_struct->conn_info->error;
+            info.effective_url = &curl_struct->conn_info->error[0];
             return info;
         } else {
             // https://curl.haxx.se/libcurl/c/curl_easy_getinfo.html
@@ -157,7 +157,7 @@ GekkoFyre::GkCurl::CurlInfoExt GekkoFyre::CurlEasy::curlGrabInfo(const QString &
         curl_res = curl_easy_perform(curl_struct->conn_info->easy);
         if (curl_res != CURLE_OK) {
             info.response_code = curl_res;
-            info.effective_url = curl_struct->conn_info->error;
+            info.effective_url = &curl_struct->conn_info->error[0];
             info.status_ok = false;
             info.elapsed = -1;
             info.content_length = -1;
@@ -176,7 +176,7 @@ GekkoFyre::GkCurl::CurlInfoExt GekkoFyre::CurlEasy::curlGrabInfo(const QString &
             std::memcpy(&info.elapsed, &elapsed, sizeof(double));
             std::memcpy(&info.content_length, &content_length, sizeof(double));
             info.effective_url = effec_url;
-            info.status_msg = curl_struct->conn_info->error;
+            info.status_msg = curl_struct->conn_info->error.data();
             info.status_ok = true;
 
             curl_easy_cleanup(curl_struct->conn_info->easy);

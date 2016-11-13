@@ -152,7 +152,6 @@ set(Boost_USE_MULTITHREADED TRUE)
 # set(Boost_USE_STATIC_LIBS FALSE CACHE BOOL "Whether to use static libraries with regard to Boost C++ or not")
 # set(Boost_USE_STATIC_RUNTIME FALSE)
 find_package(Boost 1.54.0 REQUIRED COMPONENTS "iostreams"
-                                              "program_options"
                                               "filesystem"
                                               "system")
 if (Boost_FOUND)
@@ -166,7 +165,7 @@ if (Boost_FOUND)
         add_definitions(-D_WIN32_WINNT=NTDDI_VISTASP1)
     endif()
 else()
-    message(SEND_ERROR "The required 'Boost C++' libraries are either not installed, or not multithreaded and/or of not an up-to-date version. Boost C++ 1.44 is the minimally required version.")
+    message(SEND_ERROR "The required 'Boost C++' libraries are either not installed, or not multithreaded and/or of not an up-to-date version. Boost C++ 1.54.0 is the minimally required version.")
 endif(Boost_FOUND)
 
 #

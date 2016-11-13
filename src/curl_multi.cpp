@@ -262,7 +262,7 @@ void GekkoFyre::CurlMulti::check_multi_info(GekkoFyre::GkCurl::GlobalInfo *g)
             res = msg->data.result;
             curl_easy_getinfo(easy, CURLINFO_PRIVATE, &conn);
             curl_easy_getinfo(easy, CURLINFO_EFFECTIVE_URL, &eff_url);
-            std::cerr << QString("DONE: %1 => %2\n").arg(eff_url).arg(conn->error).toStdString();
+            std::cerr << QString("DONE: %1 => %2\n").arg(eff_url).arg(conn->error.data()).toStdString();
             curl_multi_remove_handle(g->multi, easy);
             conn->url.clear();
             curl_easy_cleanup(easy);
@@ -681,7 +681,7 @@ std::string GekkoFyre::CurlMulti::new_conn(const QString &url, GekkoFyre::GkCurl
         curl_easy_setopt(ci->conn_info->easy, CURLOPT_TCP_KEEPINTVL, 60L); // Interval time between keep-alive probes is 60 seconds
 
         curl_easy_setopt(ci->conn_info->easy, CURLOPT_VERBOSE, 1L);
-        curl_easy_setopt(ci->conn_info->easy, CURLOPT_ERRORBUFFER, ci->conn_info->error);
+        curl_easy_setopt(ci->conn_info->easy, CURLOPT_ERRORBUFFER, &ci->conn_info->error[0]);
         curl_easy_setopt(ci->conn_info->easy, CURLOPT_PRIVATE, ci->conn_info.get());
         curl_easy_setopt(ci->conn_info->easy, CURLOPT_LOW_SPEED_TIME, 3L);
         curl_easy_setopt(ci->conn_info->easy, CURLOPT_LOW_SPEED_LIMIT, 10L);
