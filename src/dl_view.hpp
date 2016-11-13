@@ -34,10 +34,13 @@
  ********************************************************************************/
 
 /**
- * @file cmnroutines.hpp
+ * @file dl_view.hpp
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
  * @date 2016-09
  * @brief The model definition for the object, 'downloadView', within the 'mainwindow.ui' designer file.
+ * @note <https://forum.qt.io/topic/56299/how-to-draw-and-correctly-animate-progress-bar-in-qtableview/8>
+ *       <http://doc.qt.io/qt-5/qabstractitemdelegate.html>
+ *       <http://stackoverflow.com/questions/3656306/how-to-put-an-image-and-a-qprogressbar-inside-a-qtableview>
  */
 
 #ifndef DL_VIEW_HPP

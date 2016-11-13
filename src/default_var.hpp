@@ -46,8 +46,12 @@
 #include <locale>
 #include <string>
 #include <iostream>
-#include <QString>
 #include <memory>
+#include <vector>
+#include <ctime>
+#include <QString>
+#include <QtCharts>
+#include <QSplineSeries>
 
 extern "C" {
 #include <curl/curl.h>
@@ -73,9 +77,9 @@ extern "C" {
 #define CFG_HISTORY_FILE "fyredl_history.xml"
 #define CURL_MAX_WAIT_MSECS 15000 // Measured in milliseconds
 #define WRITE_BUFFER_SIZE (1024 * 1024) // Measured in bytes
-
 #define FYREDL_USER_AGENT "FyreDL/0.0.1"
 
+// These determine the columns used in QTableView
 #define MN_FILENAME_COL 0
 #define MN_FILESIZE_COL 1
 #define MN_DOWNLOADED_COL 2
@@ -85,6 +89,13 @@ extern "C" {
 #define MN_STATUS_COL 6
 #define MN_DESTINATION_COL 7
 #define MN_URL_COL 8
+
+// This determines the currently selected tab at the bottom of the main window
+#define TAB_INDEX_GENERAL 0
+#define TAB_INDEX_TRANSFER 1
+#define TAB_INDEX_CONTENTS 2
+#define TAB_INDEX_GRAPH 3
+#define TAB_INDEX_LOG 4
 
 namespace GekkoFyre {
     enum DownloadStatus {
@@ -127,10 +138,10 @@ namespace GekkoFyre {
 
         // Information associated with a specific easy handle
         struct ConnInfo {
-            CURL *easy;
-            std::string url;
-            char error[CURL_ERROR_SIZE];
-            CURLMcode curl_res;
+            CURL *easy;              // libcurl easy-interface pointer
+            std::string url;         // The effective URL of the download in question
+            std::vector<char> error; // Any reportable errors go here
+            CURLMcode curl_res;      // The return code from the easy-interface
         };
 
         struct CurlInfo {
@@ -148,24 +159,28 @@ namespace GekkoFyre {
         };
 
         struct CurlDlStats {
-            curl_off_t dltotal; // Total downloaded
-            curl_off_t uptotal; // Total uploaded
-            double dlnow;       // Current download
-            curl_off_t upnow;   // Current upload
-            double cur_time;
-            std::string url;    // The URL in question
+            curl_off_t dltotal;   // Total amount downloaded
+            curl_off_t uptotal;   // Total amount uploaded
+            double dlnow;         // Current download speed
+            double upnow;         // Current upload speed
+            std::time_t cur_time; // Time since epoch at which these statistics were gathered (for charting facilities)
         };
 
         struct DlStatusMsg {
             bool dl_compl_succ; // Whether the download was completed successfully or aborted with an error
+            double content_len; // The content-length of the finished download
             QString url;        // The URL of the download in question
         };
 
         struct CurlProgressPtr {
             double lastruntime;
-            CURL *curl;            // Easy interface pointer
-            DownloadStatus status; // Used to stop/pause a download mid-transfer
-            CurlDlStats stat;      // Download statistics struct
+            CURL *curl;                    // Easy interface pointer
+            DownloadStatus status;         // Used to stop/pause a download mid-transfer
+            std::vector<CurlDlStats> stat; // Download statistics struct
+            std::string url;               // The URL in question
+            std::string file_dest;         // The destination of where the download is being saved to disk
+            std::time_t timer_begin;       // The time since epoch at which the timer begun (for charting facilities)
+            bool timer_set;                // Whether the timer, 'timer_begin' has been set for this object or not
         };
 
         struct CurlDlInfo {
@@ -182,6 +197,17 @@ namespace GekkoFyre {
             FileStream file_buf;
             CurlProgressPtr prog;
             std::string uuid;
+        };
+    }
+
+    namespace GkGraph {
+        struct DownSpeedGraph {
+            std::shared_ptr<QtCharts::QSplineSeries> down_speed_series;
+            std::string file_dest;
+        };
+
+        struct GraphInit {
+            DownSpeedGraph *down_speed;
         };
     }
 }

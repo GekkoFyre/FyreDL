@@ -33,6 +33,13 @@
  **
  ********************************************************************************/
 
+/**
+ * @file singleton_proc.hpp
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @date 2016-10
+ * @brief Verifies and /ensures/ that only a singal instance of this program is operational, for Linux systems.
+ */
+
 #ifndef SINGLEPROC_HPP
 #define SINGLEPROC_HPP
 

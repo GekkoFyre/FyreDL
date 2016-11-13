@@ -37,7 +37,7 @@
  * @file curl_multi.cpp
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
  * @date 2016-11-01
- * @brief Contains the routines for downloading files.
+ * @brief Contains the routines for downloading (and directly managing therof) any files, asynchronously.
  */
 
 #include "curl_multi.hpp"
@@ -146,6 +146,10 @@ bool GekkoFyre::CurlMulti::fileStream()
                         // Display an error so that we do not read into uninitialized memory!
                         throw std::runtime_error(tr("Warning, 'ptr_uuid' is empty!").toStdString());
                     }
+
+                    double content_length = 0;
+                    curl_easy_getinfo(curl_struct->conn_info->easy, CURLINFO_CONTENT_LENGTH_DOWNLOAD, &content_length);
+                    std::memcpy(&status_msg.content_len, &content_length, sizeof(double));
 
                     // The download has either completed successfully or been aborted! Either way, the handle
                     // is no longer needed.
@@ -258,7 +262,7 @@ void GekkoFyre::CurlMulti::check_multi_info(GekkoFyre::GkCurl::GlobalInfo *g)
             res = msg->data.result;
             curl_easy_getinfo(easy, CURLINFO_PRIVATE, &conn);
             curl_easy_getinfo(easy, CURLINFO_EFFECTIVE_URL, &eff_url);
-            std::cerr << QString("DONE: %1 => %2\n").arg(eff_url).arg(conn->error).toStdString();
+            std::cerr << QString("DONE: %1 => %2\n").arg(eff_url).arg(conn->error.data()).toStdString();
             curl_multi_remove_handle(g->multi, easy);
             conn->url.clear();
             curl_easy_cleanup(easy);
@@ -426,40 +430,43 @@ int GekkoFyre::CurlMulti::sock_cb(CURL *e, curl_socket_t s, int what, void *cbp,
 int GekkoFyre::CurlMulti::curl_xferinfo(void *p, curl_off_t dltotal, curl_off_t dlnow, curl_off_t ultotal, curl_off_t ulnow)
 {
     Q_UNUSED(dltotal);
+    Q_UNUSED(ultotal);
     GekkoFyre::GkCurl::CurlProgressPtr *prog = static_cast<GekkoFyre::GkCurl::CurlProgressPtr *>(p);
 
     /* Under certain circumstances it may be desirable for certain functionality
        to only run every N seconds, in order to do this the transaction time can
        be used */
-    std::time_t now = std::time(NULL);
+    std::time_t now = std::time(nullptr);
     if (now - lastTime < 1) {
         return 0;
     }
 
     lastTime = now;
     double dlspeed = 0;
+    double upspeed = 0;
     curl_easy_getinfo(prog->curl, CURLINFO_SPEED_DOWNLOAD, &dlspeed);
+    curl_easy_getinfo(prog->curl, CURLINFO_SPEED_UPLOAD, &upspeed);
 
-    prog->stat.dlnow = dlspeed;
-    prog->stat.dltotal = dlnow;
-    prog->stat.upnow = ulnow;
-    prog->stat.uptotal = ultotal;
-    prog->stat.url = prog->stat.url;
+    GekkoFyre::GkCurl::CurlDlStats dl_stat;
+    dl_stat.dlnow = dlspeed;
+    dl_stat.dltotal = dlnow;
+    dl_stat.upnow = upspeed;
+    dl_stat.uptotal = ulnow;
+
+    std::time_t cur_time = std::time(nullptr);
+    if (!prog->timer_set) {
+        prog->timer_begin = cur_time;
+        prog->timer_set = true;
+    }
+
+    dl_stat.cur_time = cur_time;
+    prog->stat.push_back(dl_stat);
 
     mutex.lock();
     routine_singleton::instance()->sendXferStats(*prog);
     mutex.unlock();
 
-    // Asynchronously check the download status and whether to stop/pause
-    std::future<int> status(std::async([&](GekkoFyre::GkCurl::CurlProgressPtr *stat_struct) {
-        if (stat_struct->status == DownloadStatus::Downloading) {
-            return 0;
-        } else {
-            return -1;
-        }
-    } , prog));
-
-    return status.get();
+    return 0;
 }
 
 curl_socket_t GekkoFyre::CurlMulti::opensocket(void *clientp, curlsocktype purpose, curl_sockaddr *address)
@@ -630,7 +637,9 @@ std::string GekkoFyre::CurlMulti::new_conn(const QString &url, GekkoFyre::GkCurl
                 #if LIBCURL_VERSION_NUM >= 0x072000
                 curl_easy_setopt(ci->conn_info->easy, CURLOPT_NOPROGRESS, 0L);
 
-                ci->prog.stat.url = url.toStdString();
+                ci->prog.url = url.toStdString();
+                ci->prog.file_dest = fileLoc.toStdString();
+                ci->prog.timer_set = false;
                 ci->prog.curl = ci->conn_info->easy;
 
                 /* xferinfo was introduced in 7.32.0, no earlier libcurl versions will
@@ -672,7 +681,7 @@ std::string GekkoFyre::CurlMulti::new_conn(const QString &url, GekkoFyre::GkCurl
         curl_easy_setopt(ci->conn_info->easy, CURLOPT_TCP_KEEPINTVL, 60L); // Interval time between keep-alive probes is 60 seconds
 
         curl_easy_setopt(ci->conn_info->easy, CURLOPT_VERBOSE, 1L);
-        curl_easy_setopt(ci->conn_info->easy, CURLOPT_ERRORBUFFER, ci->conn_info->error);
+        curl_easy_setopt(ci->conn_info->easy, CURLOPT_ERRORBUFFER, &ci->conn_info->error[0]);
         curl_easy_setopt(ci->conn_info->easy, CURLOPT_PRIVATE, ci->conn_info.get());
         curl_easy_setopt(ci->conn_info->easy, CURLOPT_LOW_SPEED_TIME, 3L);
         curl_easy_setopt(ci->conn_info->easy, CURLOPT_LOW_SPEED_LIMIT, 10L);

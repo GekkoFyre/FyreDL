@@ -27,7 +27,7 @@
  ##
  #################################################################################
 
-cmake_minimum_required(VERSION 3.2.0 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.3.0 FATAL_ERROR)
 project(FyreDL C CXX) # http://stackoverflow.com/questions/15193785/how-to-get-cmake-to-recognize-pthread-on-ubuntu
 
 set(CMAKE_VERBOSE_MAKEFILE ON)
@@ -56,13 +56,21 @@ set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set_directory_properties(PROPERTIES CLEAN_NO_CUSTOM 1)
 
 # http://doc.qt.io/qt-5/cmake-manual.html
-# https://gist.github.com/02JanDal/70a39f2cc3d2002b3588
 # Find the Qt libraries
 find_package(Qt5Core REQUIRED)
 find_package(Qt5Widgets REQUIRED)
 find_package(Qt5Gui REQUIRED)
 find_package(Qt5LinguistTools REQUIRED)
 find_package(Qt5Charts REQUIRED)
+
+if (Qt5Widgets_FOUND)
+    if (Qt5Widgets_VERSION VERSION_LESS 5.7.0)
+        message(FATAL_ERROR "Minimum supported Qt5 version is 5.70, due to the need for graphing
+        libraries. Unless Qt5 is not installed on your system?")
+    endif()
+else()
+    message(SEND_ERROR "The Qt5Widgets library could not be found!")
+endif(Qt5Widgets_FOUND)
 
 set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/Modules/")
 
@@ -121,7 +129,10 @@ endforeach()
 set(GK_NEEDED_FEATURES cxx_auto_type
                        cxx_decltype
                        cxx_decltype_auto
+                       cxx_digit_separators
+                       cxx_explicit_conversions
                        cxx_inline_namespaces
+                       cxx_lambdas
                        cxx_long_long_type
                        cxx_nullptr
                        cxx_range_for
@@ -136,11 +147,11 @@ target_compile_features("${EXE_NAME}" PRIVATE ${GK_NEEDED_FEATURES})
 #
 # Find the correct Boost C++ packages
 #
+INCLUDE(CMakeDetermineSystem)
 set(Boost_USE_MULTITHREADED TRUE)
-# set(Boost_USE_STATIC_LIBS TRUE)
+# set(Boost_USE_STATIC_LIBS FALSE CACHE BOOL "Whether to use static libraries with regard to Boost C++ or not")
 # set(Boost_USE_STATIC_RUNTIME FALSE)
-find_package(Boost 1.44.0 REQUIRED COMPONENTS "iostreams"
-                                              "program_options"
+find_package(Boost 1.54.0 REQUIRED COMPONENTS "iostreams"
                                               "filesystem"
                                               "system")
 if (Boost_FOUND)
@@ -149,10 +160,12 @@ if (Boost_FOUND)
     message(STATUS "Boost C++ libraries have been found.")
     add_definitions(-DBOOST_ALL_NO_LIB)
 
-    # http://stackoverflow.com/questions/9742003/platform-detection-in-cmake
-    add_definitions(-D_WIN32_WINNT=NTDDI_VISTASP1)
+    if (${CMAKE_SYSTEM_NAME} MATCHES "Windows" OR "cygwin" OR "mingw")
+        # http://stackoverflow.com/questions/9742003/platform-detection-in-cmake
+        add_definitions(-D_WIN32_WINNT=NTDDI_VISTASP1)
+    endif()
 else()
-    message(SEND_ERROR "The required 'Boost C++' libraries are either not installed, or not multithreaded and/or of not an up-to-date version. Boost C++ 1.44 is the minimally required version.")
+    message(SEND_ERROR "The required 'Boost C++' libraries are either not installed, or not multithreaded and/or of not an up-to-date version. Boost C++ 1.54.0 is the minimally required version.")
 endif(Boost_FOUND)
 
 #
@@ -184,6 +197,10 @@ endif(PUGIXML_FOUND)
 
 #
 # Qt5 translation routines
+# http://stackoverflow.com/questions/19193121/automated-translation-management-with-cmake-and-qt5
+# http://stackoverflow.com/questions/24095800/qt-internationalization-and-cmake-how-to-update-ts-and-dont-lose-them
+# https://gist.github.com/02JanDal/70a39f2cc3d2002b3588
+# https://github.com/JPNaude/dev_notes/wiki/Using-Google-Translate-to-translate-your-Qt-application
 #
 # file(GLOB TRANSLATION_FILES ${CMAKE_CURRENT_LIST_DIR}/*.ts)
 # qt5_create_translation(TRANSLATION_MESSAGES ${FILES_TO_TRANSLATE} ${TRANSLATION_FILES})
@@ -194,11 +211,16 @@ endif(PUGIXML_FOUND)
 #
 # Optionally, find 'Doxygen' and generate the API documentation
 #
-# find_package(Doxygen REQUIRED)
-# if (DOXYGEN_FOUND)
-# configure_file(${CMAKE_CURRENT_SOURCE_DIR}/Doxyfile.in ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile @ONLY)
-# add_custom_target("api-doc" "${DOXYGEN_EXECUTABLE} ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}" COMMENT "Generating API documentation with Doxygen" VERBATIM)
-# endif(DOXYGEN_FOUND)
+set(BUILD_API_DOC FALSE CACHE BOOL "This determines if you want to build the doxygen documentation or not")
+if (BUILD_API_DOC)
+    find_package(Doxygen)
+    if (DOXYGEN_FOUND)
+        configure_file(${CMAKE_SOURCE_DIR}/Doxyfile.in ${CMAKE_BINARY_DIR}/Doxyfile @ONLY)
+        add_custom_target("api-doc" "${DOXYGEN_EXECUTABLE} ${CMAKE_BINARY_DIR}/Doxyfile WORKING_DIRECTORY ${CMAKE_BINARY_DIR}" COMMENT "Generating API documentation with Doxygen" VERBATIM)
+    else()
+        message(SEND_ERROR "Could not find Doxygen, despite '-DBUILD_API_DOC' being set to true! Maybe disable this variable?")
+    endif(DOXYGEN_FOUND)
+endif(BUILD_API_DOC)
 
 IF(CMAKE_BUILD_TYPE MATCHES "Debug")
     set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "./debug/bin")
@@ -222,7 +244,6 @@ ENDIF()
 #
 target_link_libraries(fyredl Qt5::Core Qt5::Widgets Qt5::Gui Qt5::Charts ${LIBS})
 
-INCLUDE(CMakeDetermineSystem)
 IF(${CMAKE_SYSTEM_NAME} MATCHES "Windows" OR "cygwin" OR "mingw") # Check if we are on Microsoft Windows
     if (CMAKE_BUILD_TYPE MATCHES "Debug")
         message(STATUS "Creating a Microsoft Windows DEBUG build.")

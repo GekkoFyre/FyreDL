@@ -33,6 +33,13 @@
  **
  ********************************************************************************/
 
+/**
+ * @file addurl.cpp
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @date 2016-10
+ * @brief A Qt QDialog class that handles the adding of downloads to the application.
+ */
+
 #include "addurl.hpp"
 #include "ui_addurl.h"
 #include "default_var.hpp"
