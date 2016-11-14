@@ -188,7 +188,10 @@ void MainWindow::readFromHistoryFile()
                              dl_history.at(i).file_loc);
 
                 // Initialize the graphs
-                initCharts(dl_history.at(i).file_loc);
+                std::ostringstream oss;
+                oss << dl_history.at(i).file_loc << fs::path::preferred_separator
+                    << routines->extractFilename(QString::fromStdString(dl_history.at(i).ext_info.effective_url)).toStdString();
+                initCharts(oss.str()); // Please forgive me for converting above from std::string, to QString, back to std::string :<
             } else {
                 QMessageBox::information(this, tr("Problem!"), tr("The size of the download could not be "
                                                                   "determined. Please try again."),
@@ -252,10 +255,12 @@ void MainWindow::insertNewRow(const std::string &fileName, const double &fileSiz
 }
 
 /**
- * @brief MainWindow::removeSelRows
+ * @brief MainWindow::removeSelRows will remove/delete the currently selected rows from QTableView, 'downloadView',
+ * and the appropriate XML history file.
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
- * @date   2016-10-12
- * @note   <http://doc.qt.io/qt-5/qtwidgets-itemviews-addressbook-example.html>
+ * @date 2016-10-12
+ * @note <http://doc.qt.io/qt-5/qtwidgets-itemviews-addressbook-example.html>
+ * @see MainWindow::on_removeToolBtn_clicked()
  */
 void MainWindow::removeSelRows()
 {
@@ -267,14 +272,25 @@ void MainWindow::removeSelRows()
     if (indexes.size() > 0) {
         if (indexes.at(0).isValid()) {
             try {
-                routines->delDownloadItem(ui->downloadView->model()->data(ui->downloadView->model()->index(indexes.at(0).row(), MN_URL_COL)).toString());
+                QString url = ui->downloadView->model()->data(ui->downloadView->model()->index(indexes.at(0).row(), MN_URL_COL)).toString();
+
+                // Now remove the row from the XML file...
+                routines->delDownloadItem(url);
+
+                // Remove the associated graph(s) from memory
+                std::ostringstream oss;
+                oss << ui->downloadView->model()->data(ui->downloadView->model()->index(indexes.at(0).row(), MN_DESTINATION_COL)).toString().toStdString()
+                    << fs::path::preferred_separator << routines->extractFilename(url).toStdString();
+                delCharts(oss.str());
+
+                // ...and then the GUI
+                dlModel->removeRows(indexes.at(0).row(), countRow, QModelIndex());
+
+                return;
             } catch (const std::exception &e) {
                 QMessageBox::warning(this, tr("Error!"), QString("%1").arg(e.what()), QMessageBox::Ok);
                 return;
             }
-
-            dlModel->removeRows(indexes.at(0).row(), countRow, QModelIndex());
-            return;
         }
     }
 
@@ -290,7 +306,7 @@ void MainWindow::removeSelRows()
  */
 void MainWindow::initCharts(const std::string &file_dest)
 {
-    std::shared_ptr<GekkoFyre::GkGraph::DownSpeedGraph> down_speed_graph;
+    std::unique_ptr<GekkoFyre::GkGraph::DownSpeedGraph> down_speed_graph;
     GekkoFyre::GkGraph::GraphInit create_graph;
 
     // Initialize 'down_speed_graph' struct
@@ -303,14 +319,16 @@ void MainWindow::initCharts(const std::string &file_dest)
     down_speed_graph->file_dest = file_dest;
 
     // Add the sub-struct to our main struct
-    create_graph.down_speed = down_speed_graph.get();
+    create_graph.down_speed = down_speed_graph.release();
 
     graph_init->push_back(create_graph);
     return;
 }
 
 /**
- * @brief MainWindow::displayCharts
+ * @brief MainWindow::displayCharts when giving the appropriate information, a chart will be displayed in
+ * 'ui->tabStatusWidget', at index 'TAB_INDEX_GRAPH'.
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
  * @date 2016-11-13
  * @note <http://doc.qt.io/qt-5/qtcharts-index.html>
  *       <http://doc.qt.io/qt-5/qtcharts-splinechart-example.html>
@@ -326,11 +344,13 @@ void MainWindow::displayCharts(const std::string &file_dest)
             }
 
             if (graph_init->at(i).down_speed->file_dest == file_dest) {
+                // Create the needed 'series'
                 std::unique_ptr<QtCharts::QSplineSeries> down_speed_series;
                 down_speed_series.reset(graph_init->at(i).down_speed->down_speed_series.get());
 
                 down_speed_series->setName(tr("Download speed spline %1").arg(i));
 
+                // Create the needed QChart and set its initial properties
                 std::unique_ptr<QtCharts::QChart> chart(new QtCharts::QChart());
                 chart->legend()->show();
                 chart->addSeries(down_speed_series.get());
@@ -339,11 +359,38 @@ void MainWindow::displayCharts(const std::string &file_dest)
                 chart->axisY()->setTitleText(tr("Download speed (KB/sec)")); // The title of the y-axis
                 chart->axisX()->setTitleText(tr("Time passed (seconds)")); // The title of the x-axis
 
+                // Create the QChartView, which displays the graph, and set some initial properties
                 std::unique_ptr<QtCharts::QChartView> chartView(new QtCharts::QChartView(chart.get()));
                 chartView->setRenderHint(QPainter::Antialiasing);
+                return;
             }
         }
     }
+
+    return;
+}
+
+/**
+ * @brief MainWindow::delCharts will delete a chart and remove it from user-view when given the right
+ * information. It is primarily used for when a download is deleted and/or the user switches away from
+ * 'ui->tabStatusWidget', at index 'TAB_INDEX_GRAPH'.
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @date 2016-11-13
+ * @param file_dest The file destination of the download in question, relating to the chart being displayed
+ * @see MainWindow::removeSelRows(), MainWindow::on_clearhistoryToolBtn_clicked()
+ */
+void MainWindow::delCharts(const std::string &file_dest)
+{
+    for (size_t i = graph_init->size(); i > 0; --i) {
+        // QString test = QString::fromStdString(graph_init->at(i - 1).down_speed->file_dest);
+        if (graph_init->at(i - 1).down_speed->file_dest == file_dest) {
+            graph_init->erase(graph_init->begin() - (long)i);
+            return;
+        }
+    }
+
+    throw std::invalid_argument(tr("'delCharts()' failed with being unable to find file:\n\n%1")
+                                        .arg(QString::fromStdString(file_dest)).toStdString());
 }
 
 void MainWindow::on_action_Open_a_File_triggered()
@@ -529,7 +576,10 @@ void MainWindow::on_removeToolBtn_clicked()
 }
 
 /**
- * @brief MainWindow::on_clearhistoryToolBtn_clicked
+ * @brief MainWindow::on_clearhistoryToolBtn_clicked will clear any completed downloads from the QTableView, 'downloadView',
+ * and from the corresponding XML history file.
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @date 2016-09
  * @note  <http://stackoverflow.com/questions/8613737/how-can-i-remove-elements-from-a-qlist-while-iterating-over-it-using-foreach>
  */
 void MainWindow::on_clearhistoryToolBtn_clicked()
@@ -552,9 +602,15 @@ void MainWindow::on_clearhistoryToolBtn_clicked()
             if (stat_string == routines->convDlStat_toString(GekkoFyre::DownloadStatus::Completed)) {
                 indexes.push_back(find_index);
                 QModelIndex url_index = dlModel->index(i, MN_URL_COL);
+                QModelIndex file_dest_index = dlModel->index(i, MN_DESTINATION_COL);
                 const QString url_string = ui->downloadView->model()->data(url_index).toString();
 
+                std::ostringstream oss;
+                oss << ui->downloadView->model()->data(file_dest_index).toString().toStdString()
+                    << fs::path::preferred_separator << routines->extractFilename(url_string).toStdString();
+
                 try {
+                    delCharts(oss.str());
                     routines->delDownloadItem(url_string);
                 } catch (const std::exception &e) {
                     QMessageBox::warning(this, tr("Error!"), QString("%1").arg(e.what()), QMessageBox::Ok);
@@ -573,6 +629,8 @@ void MainWindow::on_clearhistoryToolBtn_clicked()
         return;
     case QMessageBox::Cancel:
         return;
+    default:
+        return;
     }
 
     return;
@@ -583,6 +641,18 @@ void MainWindow::on_settingsToolBtn_clicked()
     Settings *settingsUi = new Settings(this);
     settingsUi->setAttribute(Qt::WA_DeleteOnClose, true);
     settingsUi->open();
+}
+
+/**
+ * @brief MainWindow::on_tabStatusWidget_currentChanged detects when the QTabWidget, 'tabStatusWidget', changes indexes.
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @date 2016-11-13
+ * @param index The newly changed index.
+ */
+void MainWindow::on_tabStatusWidget_currentChanged(int index)
+{
+    Q_UNUSED(index);
+    return;
 }
 
 void MainWindow::sendDetails(const std::string &fileName, const double &fileSize, const int &downloaded,

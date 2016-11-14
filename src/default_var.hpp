@@ -79,6 +79,11 @@ extern "C" {
 #define WRITE_BUFFER_SIZE (1024 * 1024) // Measured in bytes
 #define FYREDL_USER_AGENT "FyreDL/0.0.1"
 
+//
+// DO NOT MODIFY BELOW THIS LINE!
+// ##############################
+//
+
 // These determine the columns used in QTableView
 #define MN_FILENAME_COL 0
 #define MN_FILESIZE_COL 1
@@ -173,7 +178,6 @@ namespace GekkoFyre {
         };
 
         struct CurlProgressPtr {
-            double lastruntime;
             CURL *curl;                    // Easy interface pointer
             DownloadStatus status;         // Used to stop/pause a download mid-transfer
             std::vector<CurlDlStats> stat; // Download statistics struct

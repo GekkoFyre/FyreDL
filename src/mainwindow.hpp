@@ -78,6 +78,7 @@ private:
     void removeSelRows();
     void initCharts(const std::string &file_dest);
     void displayCharts(const std::string &file_dest);
+    void delCharts(const std::string &file_dest);
 
     downloadModel *dlModel;
     GekkoFyre::CmnRoutines *routines;
@@ -110,6 +111,7 @@ private slots:
     void on_removeToolBtn_clicked();
     void on_clearhistoryToolBtn_clicked();
     void on_settingsToolBtn_clicked();
+    void on_tabStatusWidget_currentChanged(int index);
     void on_downloadView_customContextMenuRequested(const QPoint &pos);
     void on_downloadView_activated(const QModelIndex &index);
     void sendDetails(const std::string &fileName, const double &fileSize, const int &downloaded,

@@ -176,7 +176,7 @@ GekkoFyre::GkCurl::CurlInfoExt GekkoFyre::CurlEasy::curlGrabInfo(const QString &
             std::memcpy(&info.elapsed, &elapsed, sizeof(double));
             std::memcpy(&info.content_length, &content_length, sizeof(double));
             info.effective_url = effec_url;
-            info.status_msg = curl_struct->conn_info->error.data();
+            // info.status_msg = curl_struct->conn_info->error.data();
             info.status_ok = true;
 
             curl_easy_cleanup(curl_struct->conn_info->easy);

@@ -3,9 +3,9 @@ Project (name, author, <URL>, license)
 It is with the help and hard work of these libraries that Gecho was made possible. We owe our sincere thanks to the following authors, contributors, helpers, and communities below:
 
 
-Gettext by Daiki Ueno et al.
-	<https://www.gnu.org/software/gettext/>
-		Free Software Foundation, Inc.
+Qt5 by Qt Project et al.
+	<https://www.qt.io/>
+		GNU Lesser General Public License (LGPL, version 3)
 
 Boost C++ Libraries by various
 	<http://www.boost.org/>
@@ -14,6 +14,18 @@ Boost C++ Libraries by various
 CMake (Cross Platform Makefile Generator) by Kitware
 	<https://cmake.org/>
 		BSD 3-clause License
+
+libcurl by Daniel Stenberg et al.
+	<https://curl.haxx.se/libcurl/>
+		MIT/X derivate license
+
+PugiXML by Arseny Kapoulkine et al.
+	<http://pugixml.org/>
+		MIT License
+
+Doxygen by Dimitri van Heesch et al.
+	<http://www.stack.nl/~dimitri/doxygen/>
+		GNU General Public License (GPL, version 2)
 
 FindGettextTools.cmake by Jookia
 	<https://github.com/Jookia/GettextTools/>
