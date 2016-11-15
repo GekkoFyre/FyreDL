@@ -1,0 +1,111 @@
+{
+   async_buf::worker()::{lambda()#1}::operator()() const[Memcheck:Cond]
+   Memcheck:Cond
+   fun:_ZZN9async_buf6workerEvENKUlvE_clEv
+   fun:_ZNSt18condition_variable4waitIZN9async_buf6workerEvEUlvE_EEvRSt11unique_lockISt5mutexET_
+   fun:_ZN9async_buf6workerEv
+   fun:_ZSt13__invoke_implIvRKM9async_bufFvvERPS0_JEET_St21__invoke_memfun_derefOT0_OT1_DpOT2_
+   fun:_ZSt8__invokeIRKM9async_bufFvvEJRPS0_EENSt9result_ofIFOT_DpOT0_EE4typeES9_SC_
+   fun:_ZNKSt12_Mem_fn_baseIM9async_bufFvvELb1EEclIJRPS0_EEEDTcl8__invokedtdefpT6_M_pmfspcl7forwardIT_Efp_EEEDpOS7_
+   fun:_ZNSt5_BindIFSt7_Mem_fnIM9async_bufFvvEEPS1_EE6__callIvJEJLm0EEEET_OSt5tupleIJDpT0_EESt12_Index_tupleIJXspT1_EEE
+   fun:_ZNSt5_BindIFSt7_Mem_fnIM9async_bufFvvEEPS1_EEclIJEvEET0_DpOT_
+   fun:_ZNSt12_Bind_simpleIFSt5_BindIFSt7_Mem_fnIM9async_bufFvvEEPS2_EEvEE9_M_invokeIJEEEvSt12_Index_tupleIJXspT_EEE
+   fun:_ZNSt12_Bind_simpleIFSt5_BindIFSt7_Mem_fnIM9async_bufFvvEEPS2_EEvEEclEv
+   fun:_ZNSt6thread11_State_implISt12_Bind_simpleIFSt5_BindIFSt7_Mem_fnIM9async_bufFvvEEPS4_EEvEEE6_M_runEv
+   obj:/usr/lib64/libstdc++.so.6.0.22
+   fun:start_thread
+   fun:clone
+}
+{
+   async_buf::worker()[Memcheck:Cond]
+   Memcheck:Cond
+   fun:_ZN9async_buf6workerEv
+   fun:_ZSt13__invoke_implIvRKM9async_bufFvvERPS0_JEET_St21__invoke_memfun_derefOT0_OT1_DpOT2_
+   fun:_ZSt8__invokeIRKM9async_bufFvvEJRPS0_EENSt9result_ofIFOT_DpOT0_EE4typeES9_SC_
+   fun:_ZNKSt12_Mem_fn_baseIM9async_bufFvvELb1EEclIJRPS0_EEEDTcl8__invokedtdefpT6_M_pmfspcl7forwardIT_Efp_EEEDpOS7_
+   fun:_ZNSt5_BindIFSt7_Mem_fnIM9async_bufFvvEEPS1_EE6__callIvJEJLm0EEEET_OSt5tupleIJDpT0_EESt12_Index_tupleIJXspT1_EEE
+   fun:_ZNSt5_BindIFSt7_Mem_fnIM9async_bufFvvEEPS1_EEclIJEvEET0_DpOT_
+   fun:_ZNSt12_Bind_simpleIFSt5_BindIFSt7_Mem_fnIM9async_bufFvvEEPS2_EEvEE9_M_invokeIJEEEvSt12_Index_tupleIJXspT_EEE
+   fun:_ZNSt12_Bind_simpleIFSt5_BindIFSt7_Mem_fnIM9async_bufFvvEEPS2_EEvEEclEv
+   fun:_ZNSt6thread11_State_implISt12_Bind_simpleIFSt5_BindIFSt7_Mem_fnIM9async_bufFvvEEPS4_EEvEEE6_M_runEv
+   obj:/usr/lib64/libstdc++.so.6.0.22
+   fun:start_thread
+   fun:clone
+}
+{
+   operator new(unsigned long)[Memcheck:Leak]
+   Memcheck:Leak
+   fun:_Znwm
+   fun:_ZN9GekkoFyre9CurlMulti10opensocketEPv12curlsocktypeP13curl_sockaddr
+   obj:/usr/lib64/libcurl.so.4.4.0
+   obj:/usr/lib64/libcurl.so.4.4.0
+   obj:/usr/lib64/libcurl.so.4.4.0
+   obj:/usr/lib64/libcurl.so.4.4.0
+   obj:/usr/lib64/libcurl.so.4.4.0
+   obj:/usr/lib64/libcurl.so.4.4.0
+   fun:curl_multi_perform
+   fun:_ZN9GekkoFyre9CurlMulti10fileStreamEv
+   fun:_ZN9GekkoFyre9CurlMulti9recvNewDlERK7QStringS3_
+   fun:_ZN9GekkoFyre9CurlMulti18qt_static_metacallEP7QObjectN11QMetaObject4CallEiPPv
+   fun:_ZN7QObject5eventEP6QEvent
+   fun:_ZN19QApplicationPrivate13notify_helperEP7QObjectP6QEvent
+   fun:_ZN12QApplication6notifyEP7QObjectP6QEvent
+   fun:_ZN16QCoreApplication15notifyInternal2EP7QObjectP6QEvent
+   fun:_ZN23QCoreApplicationPrivate16sendPostedEventsEP7QObjectiP11QThreadData
+   obj:/usr/lib64/libQt5Core.so.5.7.0
+   fun:g_main_context_dispatch
+   obj:/usr/lib64/libglib-2.0.so.0.4800.2
+   fun:g_main_context_iteration
+   fun:_ZN20QEventDispatcherGlib13processEventsE6QFlagsIN10QEventLoop17ProcessEventsFlagEE
+   fun:_ZN10QEventLoop4execE6QFlagsINS_17ProcessEventsFlagEE
+}
+{
+   async_buf::worker()::{lambda()#1}::operator()() const[Memcheck:Cond]
+   Memcheck:Cond
+   fun:_ZZN9async_buf6workerEvENKUlvE_clEv
+   fun:_ZNSt18condition_variable4waitIZN9async_buf6workerEvEUlvE_EEvRSt11unique_lockISt5mutexET_
+   fun:_ZN9async_buf6workerEv
+   fun:_ZSt13__invoke_implIvRKM9async_bufFvvERPS0_JEET_St21__invoke_memfun_derefOT0_OT1_DpOT2_
+   fun:_ZSt8__invokeIRKM9async_bufFvvEJRPS0_EENSt9result_ofIFOT_DpOT0_EE4typeES9_SC_
+   fun:_ZNKSt12_Mem_fn_baseIM9async_bufFvvELb1EEclIJRPS0_EEEDTcl8__invokedtdefpT6_M_pmfspcl7forwardIT_Efp_EEEDpOS7_
+   fun:_ZNSt5_BindIFSt7_Mem_fnIM9async_bufFvvEEPS1_EE6__callIvJEJLm0EEEET_OSt5tupleIJDpT0_EESt12_Index_tupleIJXspT1_EEE
+   fun:_ZNSt5_BindIFSt7_Mem_fnIM9async_bufFvvEEPS1_EEclIJEvEET0_DpOT_
+   fun:_ZNSt12_Bind_simpleIFSt5_BindIFSt7_Mem_fnIM9async_bufFvvEEPS2_EEvEE9_M_invokeIJEEEvSt12_Index_tupleIJXspT_EEE
+   fun:_ZNSt12_Bind_simpleIFSt5_BindIFSt7_Mem_fnIM9async_bufFvvEEPS2_EEvEEclEv
+   fun:_ZNSt6thread11_State_implISt12_Bind_simpleIFSt5_BindIFSt7_Mem_fnIM9async_bufFvvEEPS4_EEvEEE6_M_runEv
+   obj:/usr/lib64/libstdc++.so.6.0.22
+   fun:start_thread
+   fun:clone
+}
+{
+   async_buf::worker()[Memcheck:Cond]
+   Memcheck:Cond
+   fun:_ZN9async_buf6workerEv
+   fun:_ZSt13__invoke_implIvRKM9async_bufFvvERPS0_JEET_St21__invoke_memfun_derefOT0_OT1_DpOT2_
+   fun:_ZSt8__invokeIRKM9async_bufFvvEJRPS0_EENSt9result_ofIFOT_DpOT0_EE4typeES9_SC_
+   fun:_ZNKSt12_Mem_fn_baseIM9async_bufFvvELb1EEclIJRPS0_EEEDTcl8__invokedtdefpT6_M_pmfspcl7forwardIT_Efp_EEEDpOS7_
+   fun:_ZNSt5_BindIFSt7_Mem_fnIM9async_bufFvvEEPS1_EE6__callIvJEJLm0EEEET_OSt5tupleIJDpT0_EESt12_Index_tupleIJXspT1_EEE
+   fun:_ZNSt5_BindIFSt7_Mem_fnIM9async_bufFvvEEPS1_EEclIJEvEET0_DpOT_
+   fun:_ZNSt12_Bind_simpleIFSt5_BindIFSt7_Mem_fnIM9async_bufFvvEEPS2_EEvEE9_M_invokeIJEEEvSt12_Index_tupleIJXspT_EEE
+   fun:_ZNSt12_Bind_simpleIFSt5_BindIFSt7_Mem_fnIM9async_bufFvvEEPS2_EEvEEclEv
+   fun:_ZNSt6thread11_State_implISt12_Bind_simpleIFSt5_BindIFSt7_Mem_fnIM9async_bufFvvEEPS4_EEvEEE6_M_runEv
+   obj:/usr/lib64/libstdc++.so.6.0.22
+   fun:start_thread
+   fun:clone
+}
+{
+   async_buf::worker()[Memcheck:Cond]
+   Memcheck:Cond
+   fun:_ZN9async_buf6workerEv
+   fun:_ZSt13__invoke_implIvRKM9async_bufFvvERPS0_JEET_St21__invoke_memfun_derefOT0_OT1_DpOT2_
+   fun:_ZSt8__invokeIRKM9async_bufFvvEJRPS0_EENSt9result_ofIFOT_DpOT0_EE4typeES9_SC_
+   fun:_ZNKSt12_Mem_fn_baseIM9async_bufFvvELb1EEclIJRPS0_EEEDTcl8__invokedtdefpT6_M_pmfspcl7forwardIT_Efp_EEEDpOS7_
+   fun:_ZNSt5_BindIFSt7_Mem_fnIM9async_bufFvvEEPS1_EE6__callIvJEJLm0EEEET_OSt5tupleIJDpT0_EESt12_Index_tupleIJXspT1_EEE
+   fun:_ZNSt5_BindIFSt7_Mem_fnIM9async_bufFvvEEPS1_EEclIJEvEET0_DpOT_
+   fun:_ZNSt12_Bind_simpleIFSt5_BindIFSt7_Mem_fnIM9async_bufFvvEEPS2_EEvEE9_M_invokeIJEEEvSt12_Index_tupleIJXspT_EEE
+   fun:_ZNSt12_Bind_simpleIFSt5_BindIFSt7_Mem_fnIM9async_bufFvvEEPS2_EEvEEclEv
+   fun:_ZNSt6thread11_State_implISt12_Bind_simpleIFSt5_BindIFSt7_Mem_fnIM9async_bufFvvEEPS4_EEvEEE6_M_runEv
+   obj:/usr/lib64/libstdc++.so.6.0.22
+   fun:start_thread
+   fun:clone
+}

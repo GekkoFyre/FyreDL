@@ -53,7 +53,6 @@
 #include <QString>
 #include <QtConcurrent/QtConcurrent>
 #include <QThread>
-#include <QMutex>
 
 namespace Ui {
 class MainWindow;
@@ -89,12 +88,12 @@ private:
 
     // http://stackoverflow.com/questions/10121560/stdthread-naming-your-thread
     QThread *curl_multi_thread;
-    QMutex curl_multi_mutex;
 
 signals:
     void updateDlStats();
     void sendStopDownload(const QString &fileLoc);
     void sendStartDownload(const QString &url, const QString &file_loc);
+    void finish_curl_multi_thread();
 
 private slots:
     void on_action_Open_a_File_triggered();

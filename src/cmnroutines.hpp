@@ -51,6 +51,7 @@
 #include <stdexcept>
 #include <QString>
 #include <QObject>
+#include <QMutex>
 
 namespace GekkoFyre {
 
@@ -83,6 +84,9 @@ public:
     bool delDownloadItem(const QString &effec_url, const std::string &xmlCfgFile = CFG_HISTORY_FILE);
     bool modifyDlState(const QString &effec_url, const DownloadStatus &status,
                        const std::string &xmlCfgFile = CFG_HISTORY_FILE);
+
+private:
+    QMutex mutex;
 };
 }
 

@@ -52,6 +52,7 @@ class SingletonEmit {
 
 public:
     static T* instance() {
+        // TODO: Fix the data-race that occurs here!
         if (!m_instance) {
             m_instance = new T;
         }

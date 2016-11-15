@@ -179,7 +179,9 @@ std::vector<GekkoFyre::GkCurl::CurlDlInfo> GekkoFyre::CmnRoutines::readDownloadI
         std::vector<GekkoFyre::GkCurl::CurlDlInfo> dl_info_list;
 
         pugi::xml_document doc;
+        mutex.lock();
         pugi::xml_parse_result result = doc.load_file(xmlCfgFile_loc.string().c_str(), pugi::parse_default|pugi::parse_declaration);
+        mutex.unlock();
             if (!result) {
                 throw std::invalid_argument(tr("Parse error: %1, character pos= %2")
                                             .arg(result.description(),
@@ -224,11 +226,10 @@ bool GekkoFyre::CmnRoutines::writeDownloadItem(GekkoFyre::GkCurl::CurlDlInfo &dl
 {
     fs::path xmlCfgFile_loc = findCfgFile(xmlCfgFile);
     sys::error_code ec;
-    if (dl_info.ext_info.status_ok == true) {
+    if (dl_info.ext_info.status_ok) {
         if (!xmlCfgFile_loc.string().empty()) {
-            switch (dl_info.dlStatus) {
-            case GekkoFyre::DownloadStatus::Unknown:
-            {
+            if (dl_info.dlStatus == GekkoFyre::DownloadStatus::Stopped || dl_info.dlStatus == GekkoFyre::DownloadStatus::Invalid ||
+                    dl_info.dlStatus == GekkoFyre::DownloadStatus::Unknown) {
                 pugi::xml_node root;
                 unsigned int cId = 0;
                 dl_info.dlStatus = GekkoFyre::DownloadStatus::Unknown;
@@ -265,8 +266,8 @@ bool GekkoFyre::CmnRoutines::writeDownloadItem(GekkoFyre::GkCurl::CurlDlInfo &dl
                 pugi::xml_parse_result result = doc.load_file(xmlCfgFile_loc.string().c_str(), pugi::parse_default|pugi::parse_declaration);
                 if (!result) {
                     throw std::invalid_argument(tr("Parse error: %1, character pos= %2")
-                                                .arg(result.description(),
-                                                     QString::number(result.offset)).toStdString());
+                                                        .arg(result.description(),
+                                                             QString::number(result.offset)).toStdString());
                 }
 
                 dl_info.cId = cId;
@@ -290,9 +291,8 @@ bool GekkoFyre::CmnRoutines::writeDownloadItem(GekkoFyre::GkCurl::CurlDlInfo &dl
                     throw std::runtime_error(tr("Error with saving XML config file!").toStdString());
                 }
                 return true;
-            }
-            default:
-                throw std::runtime_error(tr("You should not be seeing this!").toStdString());
+            } else {
+                throw std::invalid_argument(tr("You should not be seeing this!").toStdString());
             }
         } else {
             throw std::invalid_argument(tr("Internal error: no path has been given for the XML "
@@ -449,6 +449,8 @@ int GekkoFyre::CmnRoutines::convDlStat_toInt(const GekkoFyre::DownloadStatus &st
         return 4;
     case GekkoFyre::DownloadStatus::Unknown:
         return 5;
+    case GekkoFyre::DownloadStatus::Invalid:
+        return 6;
     default:
         return -1;
     }
@@ -476,6 +478,9 @@ GekkoFyre::DownloadStatus GekkoFyre::CmnRoutines::convDlStat_IntToEnum(const int
     case 5:
         ds_enum = GekkoFyre::DownloadStatus::Unknown;
         return ds_enum;
+    case 6:
+        ds_enum = GekkoFyre::DownloadStatus::Invalid;
+        return ds_enum;
     default:
         ds_enum = GekkoFyre::DownloadStatus::Unknown;
         return ds_enum;
@@ -497,6 +502,8 @@ QString GekkoFyre::CmnRoutines::convDlStat_toString(const GekkoFyre::DownloadSta
         return tr("Stopped");
     case GekkoFyre::DownloadStatus::Unknown:
         return tr("Unknown");
+    case GekkoFyre::DownloadStatus::Invalid:
+        return tr("Invalid");
     default:
         return tr("Unknown");
     }

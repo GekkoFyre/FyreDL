@@ -102,6 +102,11 @@ extern "C" {
 #define TAB_INDEX_GRAPH 3
 #define TAB_INDEX_LOG 4
 
+// Comma Separated Value related information
+#define CSV_NUM_COLS 2
+#define CSV_FIELD_URL "url"
+#define CSV_FIELD_DEST "destination"
+
 namespace GekkoFyre {
     enum DownloadStatus {
         Downloading,
@@ -109,7 +114,8 @@ namespace GekkoFyre {
         Failed,
         Paused,
         Stopped,
-        Unknown
+        Unknown,
+        Invalid
     };
 
     enum DownloadType {

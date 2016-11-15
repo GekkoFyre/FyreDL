@@ -47,6 +47,7 @@
 #include <future>
 #include <random>
 #include <ctime>
+#include <QMessageBox>
 
 namespace sys = boost::system;
 namespace fs = boost::filesystem;
@@ -57,7 +58,7 @@ std::map<curl_socket_t, boost::asio::ip::tcp::socket *> socket_map;
 
 std::time_t lastTime = 0;
 boost::ptr_unordered_map<std::string, GekkoFyre::GkCurl::CurlInit> GekkoFyre::CurlMulti::eh_vec;
-GekkoFyre::GkCurl::GlobalInfo *GekkoFyre::CurlMulti::gi;
+std::shared_ptr<GekkoFyre::GkCurl::GlobalInfo> GekkoFyre::CurlMulti::gi;
 QMutex GekkoFyre::CurlMulti::mutex;
 
 GekkoFyre::CurlMulti::CurlMulti()
@@ -69,7 +70,6 @@ GekkoFyre::CurlMulti::CurlMulti()
 GekkoFyre::CurlMulti::~CurlMulti()
 {
     // curl_global_cleanup(); // We're done with libcurl, globally, so clean it up!
-    delete gi;
 }
 
 /**
@@ -156,10 +156,14 @@ bool GekkoFyre::CurlMulti::fileStream()
                     status_msg.url = QString::fromStdString(curl_struct->conn_info->url);
                     curl_multi_remove_handle(gi->multi, curl_struct->conn_info->easy);
                     curl_easy_cleanup(curl_struct->conn_info->easy);
+                    // curl_multi_cleanup(gi->multi);
 
                     eh_vec.erase(ptr_uuid);
                     status_msg.dl_compl_succ = true;
+
+                    mutex.lock();
                     routine_singleton::instance()->sendDlFinished(status_msg);
+                    mutex.unlock();
                     return true;
                 }
             }
@@ -176,22 +180,22 @@ bool GekkoFyre::CurlMulti::fileStream()
 void GekkoFyre::CurlMulti::recvNewDl(const QString &url, const QString &fileLoc)
 {
     try {
-        if (gi == nullptr) {
+        if (gi.get() == nullptr) {
             // Global multi-handle does not exist, so create it
-            gi = new GekkoFyre::GkCurl::GlobalInfo;
+            gi.reset(new GekkoFyre::GkCurl::GlobalInfo);
             gi->multi = curl_multi_init(); // Initiate the libcurl session
             curl_multi_setopt(gi->multi, CURLMOPT_SOCKETFUNCTION, sock_cb);
-            curl_multi_setopt(gi->multi, CURLMOPT_SOCKETDATA, gi);
+            curl_multi_setopt(gi->multi, CURLMOPT_SOCKETDATA, gi.get());
             curl_multi_setopt(gi->multi, CURLMOPT_TIMERFUNCTION, multi_timer_cb);
-            curl_multi_setopt(gi->multi, CURLMOPT_TIMERDATA, gi);
+            curl_multi_setopt(gi->multi, CURLMOPT_TIMERDATA, gi.get());
         }
 
         std::string uuid;
         if (fileLoc.isEmpty()) { throw std::invalid_argument(tr("An invalid file location has been given!").toStdString()); }
-        uuid = new_conn(url, gi, false, false, fileLoc, true);
+        uuid = new_conn(url, gi.get(), false, false, fileLoc, true);
         fileStream(); // TODO: Fix race-condition here
     } catch (const std::exception &e) {
-        std::throw_with_nested(std::runtime_error(tr("Error whilst downloading!\n\n%1").arg(e.what()).toStdString()));
+        QMessageBox::warning(nullptr, tr("Error!"), QString("%1").arg(e.what()), QMessageBox::Ok);
     }
 }
 

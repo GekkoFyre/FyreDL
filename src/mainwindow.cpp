@@ -55,6 +55,7 @@
 #include <QList>
 #include <QSortFilterProxyModel>
 #include <QItemSelectionModel>
+#include <QMutex>
 
 #ifdef _WIN32
 #define _WIN32_WINNT 0x06000100
@@ -107,9 +108,9 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
     curl_multi_thread = new QThread;
     curl_multi->moveToThread(curl_multi_thread);
     QObject::connect(this, SIGNAL(sendStartDownload(QString,QString)), curl_multi, SLOT(recvNewDl(QString,QString)));
-    QObject::connect(curl_multi, SIGNAL(sendGlobFin()), curl_multi_thread, SLOT(quit()));
-    QObject::connect(curl_multi, SIGNAL(sendGlobFin()), curl_multi_thread, SLOT(deleteLater()));
-    QObject::connect(curl_multi, SIGNAL(sendGlobFin()), curl_multi, SLOT(deleteLater()));
+    QObject::connect(this, SIGNAL(finish_curl_multi_thread()), curl_multi_thread, SLOT(quit()));
+    QObject::connect(this, SIGNAL(finish_curl_multi_thread()), curl_multi_thread, SLOT(deleteLater()));
+    QObject::connect(curl_multi_thread, SIGNAL(finished()), curl_multi_thread, SLOT(deleteLater()));
     curl_multi_thread->start();
 
     dlModel = new downloadModel(this);
@@ -132,10 +133,11 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
 
 MainWindow::~MainWindow()
 {
+    emit finish_curl_multi_thread();
     delete routines;
     delete dl_stat;
     graph_init->clear();
-    delete graph_init;
+    // delete graph_init;
     delete ui;
 }
 
@@ -155,7 +157,6 @@ void MainWindow::addDownload()
     QObject::connect(add_url, SIGNAL(sendDetails(std::string,double,int,double,int,int,GekkoFyre::DownloadStatus,std::string,std::string)), this, SLOT(sendDetails(std::string,double,int,double,int,int,GekkoFyre::DownloadStatus,std::string,std::string)));
     add_url->setAttribute(Qt::WA_DeleteOnClose, true);
     add_url->open();
-    // delete add_url;
     return;
 }
 
@@ -186,12 +187,6 @@ void MainWindow::readFromHistoryFile()
                              dl_history.at(i).ext_info.content_length, 0, 0, 0, 0,
                              dl_history.at(i).dlStatus, dl_history.at(i).ext_info.effective_url,
                              dl_history.at(i).file_loc);
-
-                // Initialize the graphs
-                std::ostringstream oss;
-                oss << dl_history.at(i).file_loc << fs::path::preferred_separator
-                    << routines->extractFilename(QString::fromStdString(dl_history.at(i).ext_info.effective_url)).toStdString();
-                initCharts(oss.str()); // Please forgive me for converting above from std::string, to QString, back to std::string :<
             } else {
                 QMessageBox::information(this, tr("Problem!"), tr("The size of the download could not be "
                                                                   "determined. Please try again."),
@@ -251,6 +246,11 @@ void MainWindow::insertNewRow(const std::string &fileName, const double &fileSiz
     index = dlModel->index(0, MN_URL_COL, QModelIndex());
     dlModel->setData(index, QString::fromStdString(url), Qt::DisplayRole);
 
+    // Create the required graph/chart objects and initialize them
+    std::ostringstream oss;
+    oss << destination << fs::path::preferred_separator << routines->extractFilename(QString::fromStdString(url)).toStdString();
+    initCharts(oss.str());
+
     return;
 }
 
@@ -306,6 +306,17 @@ void MainWindow::removeSelRows()
  */
 void MainWindow::initCharts(const std::string &file_dest)
 {
+    if (!graph_init->empty()) {
+        for (size_t i = 0; i < graph_init->size(); ++i) {
+            // Check for pre-existing object and output a soft-error if so
+            if (graph_init->at(i).down_speed->file_dest == file_dest) {
+                std::cerr << tr("Existing graph-object! File in question: %1")
+                        .arg(QString::fromStdString(file_dest)).toStdString() << std::endl;
+                return;
+            }
+        }
+    }
+
     std::unique_ptr<GekkoFyre::GkGraph::DownSpeedGraph> down_speed_graph;
     GekkoFyre::GkGraph::GraphInit create_graph;
 
@@ -663,7 +674,7 @@ void MainWindow::sendDetails(const std::string &fileName, const double &fileSize
     QList<std::vector<QString>> list = dlModel->getList();
     std::vector<QString> fileNameVector;
     fileNameVector.push_back(QString::fromStdString(fileName));
-    if (!list.contains(fileNameVector) && !list.contains(std::vector<QString>())) {
+    if (!list.contains(fileNameVector) && !fileNameVector.empty()) {
         insertNewRow(fileName, fileSize, downloaded, progress, upSpeed, downSpeed, status, url, destination);
         return;
     } else {
@@ -680,10 +691,13 @@ void MainWindow::sendDetails(const std::string &fileName, const double &fileSize
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
  * @date   2016-10-23
  * @note   <http://stackoverflow.com/questions/9086372/how-to-compare-pointers>
+ *         <http://doc.qt.io/qt-5/qmutexlocker.html>
+ *         <http://stackoverflow.com/questions/19981161/using-qmutexlocker-to-protect-shared-variables-when-running-function-with-qtconc>
  * @param info is the struct related to the download info.
  */
 void MainWindow::recvXferStats(const GekkoFyre::GkCurl::CurlProgressPtr &info)
 {
+    QMutex curl_multi_mutex;
     curl_multi_mutex.lock();
     GekkoFyre::GkCurl::CurlProgressPtr prog_temp;
     prog_temp.stat = info.stat;
