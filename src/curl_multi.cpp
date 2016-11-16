@@ -70,6 +70,7 @@ GekkoFyre::CurlMulti::CurlMulti()
 GekkoFyre::CurlMulti::~CurlMulti()
 {
     // curl_global_cleanup(); // We're done with libcurl, globally, so clean it up!
+    gi.reset();
 }
 
 /**
@@ -178,6 +179,15 @@ bool GekkoFyre::CurlMulti::fileStream()
     return false;
 }
 
+/**
+ * @brief GekkoFyre::CurlMulti::recvNewDl receives and manages any new HTTP(S)/FTP(S) file downloads, and proceeds with the
+ * instruction of downloading these files.
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @note <http://en.cppreference.com/w/cpp/thread/call_once>
+ *       <http://en.cppreference.com/w/cpp/thread/once_flag>
+ * @param url
+ * @param fileLoc
+ */
 void GekkoFyre::CurlMulti::recvNewDl(const QString &url, const QString &fileLoc)
 {
     try {
@@ -524,8 +534,8 @@ int GekkoFyre::CurlMulti::close_socket(void *clientp, curl_socket_t item)
 /**
  * @brief GekkoFyre::CurlMulti::curl_write_file_callback can be used to download data into a local file
  * on the user's storage.
- * @author Daniel Stenberg <daniel@haxx.se>, et al.
- * @date   2015
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @date   2016-11
  * @note   <https://linustechtips.com/main/topic/663949-libcurl-curlopt_writefunction-callback-function-error/>
  *         <https://www.apriorit.com/dev-blog/344-libcurl-usage-downloading-protocols>
  *         <http://fwheel.net/aio.html>

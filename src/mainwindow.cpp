@@ -105,11 +105,12 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
     dl_stat = new std::vector<GekkoFyre::GkCurl::CurlProgressPtr>();
 
     // http://wiki.qt.io/QThreads_general_usage
+    // https://mayaposch.wordpress.com/2011/11/01/how-to-really-truly-use-qthreads-the-full-explanation/
     curl_multi_thread = new QThread;
     curl_multi->moveToThread(curl_multi_thread);
     QObject::connect(this, SIGNAL(sendStartDownload(QString,QString)), curl_multi, SLOT(recvNewDl(QString,QString)));
     QObject::connect(this, SIGNAL(finish_curl_multi_thread()), curl_multi_thread, SLOT(quit()));
-    QObject::connect(this, SIGNAL(finish_curl_multi_thread()), curl_multi_thread, SLOT(deleteLater()));
+    QObject::connect(this, SIGNAL(finish_curl_multi_thread()), curl_multi, SLOT(deleteLater()));
     QObject::connect(curl_multi_thread, SIGNAL(finished()), curl_multi_thread, SLOT(deleteLater()));
     curl_multi_thread->start();
 
@@ -181,7 +182,7 @@ void MainWindow::readFromHistoryFile()
 
     dlModel->removeRows(0, (int)dl_history.size(), QModelIndex());
     for (size_t i = 0; i < dl_history.size(); ++i) {
-        if (!dl_history.at(i).file_loc.empty() || dl_history.at(i).ext_info.status_ok == true) {
+        if (!dl_history.at(i).file_loc.empty() || dl_history.at(i).ext_info.status_ok) {
             if (dl_history.at(i).ext_info.content_length > 0) {
                 insertNewRow(dl_history.at(i).ext_info.effective_url,
                              dl_history.at(i).ext_info.content_length, 0, 0, 0, 0,
@@ -459,7 +460,6 @@ void MainWindow::on_printToolBtn_clicked()
 /**
  * @brief MainWindow::on_dlstartToolBtn_clicked
  * @note <https://solarianprogrammer.com/2012/10/17/cpp-11-async-tutorial/>
- *       <http://doc.qt.io/qt-5/examples-threadandconcurrent.html>
  *       <http://doc.qt.io/qt-5/qthreadpool.html>
  *       <http://doc.qt.io/qt-5/qthread.html>
  *       <http://en.cppreference.com/w/cpp/thread/packaged_task>

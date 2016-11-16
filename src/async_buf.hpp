@@ -60,7 +60,7 @@ struct async_buf : std::streambuf {
     std::queue<std::vector<char>> queue;
     std::vector<char> buffer;
     std::thread thread;
-    bool done;
+    bool done = false;
 
     void worker() {
         bool local_done(false);
