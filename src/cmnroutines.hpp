@@ -52,6 +52,11 @@
 #include <QString>
 #include <QObject>
 #include <QMutex>
+#include <QStorageInfo>
+
+extern "C" {
+#include <sys/stat.h>
+}
 
 namespace GekkoFyre {
 
@@ -78,6 +83,9 @@ public:
     GekkoFyre::DownloadStatus convDlStat_StringToEnum(const QString &status);
 
     std::string findCfgFile(const std::string &cfgFileName);
+    off64_t getFileSize(const std::string &file_name);
+    qint64 freeDiskSpace(const QStorageInfo &storage = QStorageInfo::root());
+
     std::vector<GekkoFyre::GkCurl::CurlDlInfo> readDownloadInfo(const std::string &xmlCfgFile = CFG_HISTORY_FILE);
     bool writeDownloadItem(GekkoFyre::GkCurl::CurlDlInfo &dl_info_list, const std::string &xmlCfgFile = CFG_HISTORY_FILE);
     pugi::xml_node createNewXmlFile(const std::string &xmlCfgFile = CFG_HISTORY_FILE);

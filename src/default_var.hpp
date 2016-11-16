@@ -178,9 +178,10 @@ namespace GekkoFyre {
         };
 
         struct DlStatusMsg {
-            bool dl_compl_succ; // Whether the download was completed successfully or aborted with an error
-            double content_len; // The content-length of the finished download
-            QString url;        // The URL of the download in question
+            bool dl_compl_succ;   // Whether the download was completed successfully or aborted with an error
+            double content_len;   // The content-length of the finished download
+            QString url;          // The URL of the download in question
+            std::string file_loc; // The full location of where the file is being saved to disk
         };
 
         struct CurlProgressPtr {

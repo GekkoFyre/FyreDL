@@ -154,6 +154,7 @@ bool GekkoFyre::CurlMulti::fileStream()
                     // The download has either completed successfully or been aborted! Either way, the handle
                     // is no longer needed.
                     status_msg.url = QString::fromStdString(curl_struct->conn_info->url);
+                    status_msg.file_loc = curl_struct->prog.file_dest;
                     curl_multi_remove_handle(gi->multi, curl_struct->conn_info->easy);
                     curl_easy_cleanup(curl_struct->conn_info->easy);
                     // curl_multi_cleanup(gi->multi);
@@ -192,8 +193,8 @@ void GekkoFyre::CurlMulti::recvNewDl(const QString &url, const QString &fileLoc)
 
         std::string uuid;
         if (fileLoc.isEmpty()) { throw std::invalid_argument(tr("An invalid file location has been given!").toStdString()); }
-        uuid = new_conn(url, gi.get(), false, false, fileLoc, true);
-        fileStream(); // TODO: Fix race-condition here
+        uuid = new_conn(url, fileLoc, gi.get());
+        fileStream();
     } catch (const std::exception &e) {
         QMessageBox::warning(nullptr, tr("Error!"), QString("%1").arg(e.what()), QMessageBox::Ok);
     }
@@ -521,25 +522,6 @@ int GekkoFyre::CurlMulti::close_socket(void *clientp, curl_socket_t item)
 }
 
 /**
- * @brief GekkoFyre::CurlMulti::curl_write_memory_callback can be used to download data into a chunk of
- * memory instead of storing it in a local file.
- * @date   2015
- * @note   <https://curl.haxx.se/libcurl/c/getinmemory.html>
- * @param ptr
- * @param size
- * @param nmemb
- * @param userp
- * @return
- */
-size_t GekkoFyre::CurlMulti::curl_write_memory_callback(void *ptr, size_t size, size_t nmemb, void *userp)
-{
-    GekkoFyre::GkCurl::MemoryStruct *mstr = static_cast<GekkoFyre::GkCurl::MemoryStruct *>(userp);
-    size_t realsize = (size * nmemb);
-    mstr->memory.append((char *)ptr, realsize);
-    return realsize;
-}
-
-/**
  * @brief GekkoFyre::CurlMulti::curl_write_file_callback can be used to download data into a local file
  * on the user's storage.
  * @author Daniel Stenberg <daniel@haxx.se>, et al.
@@ -577,7 +559,8 @@ size_t GekkoFyre::CurlMulti::curl_write_file_callback(char *buffer, size_t size,
  * @param url
  * @param ci
  */
-std::string GekkoFyre::CurlMulti::new_conn(const QString &url, GekkoFyre::GkCurl::GlobalInfo *global, bool grabHeaderOnly, bool writeToMemory, const QString &fileLoc, bool grabStats)
+std::string GekkoFyre::CurlMulti::new_conn(const QString &url, const QString &fileLoc,
+                                           GekkoFyre::GkCurl::GlobalInfo *global)
 {
     std::string uuid = createId();
     GekkoFyre::GkCurl::CurlInit *ci;
@@ -595,76 +578,54 @@ std::string GekkoFyre::CurlMulti::new_conn(const QString &url, GekkoFyre::GkCurl
         ci->uuid = uuid;
         curl_easy_setopt(ci->conn_info->easy, CURLOPT_URL, ci->conn_info->url.c_str());
 
-        if (grabHeaderOnly) {
-            curl_easy_setopt(ci->conn_info->easy, CURLOPT_HEADER, 1);
-            curl_easy_setopt(ci->conn_info->easy, CURLOPT_NOBODY, 1);
-        }
-
-        if (writeToMemory) {
-            ci->mem_chunk.size = 0; // No data at this point
-            ci->file_buf.file_loc = "";
-
-            curl_easy_setopt(ci->conn_info->easy, CURLOPT_NOPROGRESS, 1L);
-
-            // Send all data to this function, via the computer's RAM
-            // NOTE: On Windows, 'CURLOPT_WRITEFUNCTION' /must/ be set, otherwise a crash will occur!
-            curl_easy_setopt(ci->conn_info->easy, CURLOPT_WRITEFUNCTION, &curl_write_memory_callback);
-
-            // We pass our 'chunk' struct to the callback function
-            curl_easy_setopt(ci->conn_info->easy, CURLOPT_WRITEDATA, &ci->mem_chunk);
+        if (!fileLoc.isEmpty()) {
+            ci->file_buf.file_loc = fileLoc.toStdString();
         } else {
-            if (!fileLoc.isEmpty()) {
-                ci->file_buf.file_loc = fileLoc.toStdString();
-            } else {
-                throw std::invalid_argument(tr("An invalid file location has been given (empty parameter)!").toStdString());
-            }
-
-            // Initialize these variables, even if they're not used... as it generates spurious errors otherwise.
-            ci->mem_chunk.memory = "";
-            ci->mem_chunk.size = 0;
-
-            // http://stackoverflow.com/questions/18031357/why-the-constructor-of-stdostream-is-protected
-            async_buf *sbuf = new async_buf(ci->file_buf.file_loc);
-            std::ostream *out = new std::ostream(NULL);
-            out->rdbuf(sbuf);
-            ci->file_buf.astream = out;
-            ci->prog.status = DownloadStatus::Downloading;
-
-            // Send all data to this function, via file streaming
-            // NOTE: On Windows, 'CURLOPT_WRITEFUNCTION' /must/ be set, otherwise a crash will occur!
-            curl_easy_setopt(ci->conn_info->easy, CURLOPT_WRITEFUNCTION, &curl_write_file_callback);
-
-            // We pass our 'chunk' struct to the callback function
-            curl_easy_setopt(ci->conn_info->easy, CURLOPT_WRITEDATA, &ci->file_buf);
-
-            if (grabStats) {
-                #if LIBCURL_VERSION_NUM >= 0x072000
-                curl_easy_setopt(ci->conn_info->easy, CURLOPT_NOPROGRESS, 0L);
-
-                ci->prog.url = url.toStdString();
-                ci->prog.file_dest = fileLoc.toStdString();
-                ci->prog.timer_set = false;
-                ci->prog.curl = ci->conn_info->easy;
-
-                /* xferinfo was introduced in 7.32.0, no earlier libcurl versions will
-                   compile as they won't have the symbols around.
-                   If built with a newer libcurl, but running with an older libcurl:
-                   curl_easy_setopt() will fail in run-time trying to set the new
-                   callback, making the older callback get used.
-                   New libcurls will prefer the new callback and instead use that one even
-                   if both callbacks are set. */
-                curl_easy_setopt(ci->conn_info->easy, CURLOPT_XFERINFOFUNCTION, &GekkoFyre::CurlMulti::curl_xferinfo);
-                // Pass the struct pointer into the xferinfo function, but note that this is an
-                // alias to CURLOPT_PROGRESSDATA
-                curl_easy_setopt(ci->conn_info->easy, CURLOPT_XFERINFODATA, &ci->prog);
-
-                #else
-                #error "Libcurl needs to be of version 7.32.0 or later! Certain features are missing otherwise..."
-                #endif
-            } else {
-                curl_easy_setopt(ci->conn_info->easy, CURLOPT_NOPROGRESS, 1L);
-            }
+            throw std::invalid_argument(tr("An invalid file location has been given (empty parameter)!").toStdString());
         }
+
+        // Initialize these variables, even if they're not used... as it generates spurious errors otherwise.
+        ci->mem_chunk.memory = "";
+        ci->mem_chunk.size = 0;
+
+        // http://stackoverflow.com/questions/18031357/why-the-constructor-of-stdostream-is-protected
+        // TODO: Fix the memory leak hereinafter!
+        async_buf *sbuf = new async_buf(ci->file_buf.file_loc);
+        std::ostream *out = new std::ostream(NULL);
+        out->rdbuf(sbuf);
+        ci->file_buf.astream = out;
+        ci->prog.status = DownloadStatus::Downloading;
+
+        // Send all data to this function, via file streaming
+        // NOTE: On Windows, 'CURLOPT_WRITEFUNCTION' /must/ be set, otherwise a crash will occur!
+        curl_easy_setopt(ci->conn_info->easy, CURLOPT_WRITEFUNCTION, &curl_write_file_callback);
+
+        // We pass our 'chunk' struct to the callback function
+        curl_easy_setopt(ci->conn_info->easy, CURLOPT_WRITEDATA, &ci->file_buf);
+
+        #if LIBCURL_VERSION_NUM >= 0x072000
+        curl_easy_setopt(ci->conn_info->easy, CURLOPT_NOPROGRESS, 0L);
+
+        ci->prog.url = url.toStdString();
+        ci->prog.file_dest = fileLoc.toStdString();
+        ci->prog.timer_set = false;
+        ci->prog.curl = ci->conn_info->easy;
+
+        /* xferinfo was introduced in 7.32.0, no earlier libcurl versions will
+           compile as they won't have the symbols around.
+           If built with a newer libcurl, but running with an older libcurl:
+           curl_easy_setopt() will fail in run-time trying to set the new
+           callback, making the older callback get used.
+           New libcurls will prefer the new callback and instead use that one even
+           if both callbacks are set. */
+        curl_easy_setopt(ci->conn_info->easy, CURLOPT_XFERINFOFUNCTION, &GekkoFyre::CurlMulti::curl_xferinfo);
+        // Pass the struct pointer into the xferinfo function, but note that this is an
+        // alias to CURLOPT_PROGRESSDATA
+        curl_easy_setopt(ci->conn_info->easy, CURLOPT_XFERINFODATA, &ci->prog);
+
+        #else
+        #error "Libcurl needs to be of version 7.32.0 or later! Certain features are missing otherwise..."
+        #endif
 
         // A long parameter set to 1 tells the library to follow any Location: header that the server
         // sends as part of a HTTP header in a 3xx response. The Location: header can specify a relative

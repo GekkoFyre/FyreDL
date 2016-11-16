@@ -51,6 +51,7 @@
 #include <QApplication>
 #include <QtCore/QDateTime>
 #include <QMessageBox>
+#include <QMutexLocker>
 
 #ifdef _WIN32
 #define _WIN32_WINNT 0x06000100
@@ -160,6 +161,34 @@ std::string GekkoFyre::CmnRoutines::findCfgFile(const std::string &cfgFileName)
     }
 
     return oss.str();
+}
+
+/**
+ * @brief GekkoFyre::CmnRoutines::getFileSize finds the size of a file /without/ having to 'open' it. Portable
+ * under both Linux, Apple Macintosh and Microsoft Windows.
+ * @note <http://stackoverflow.com/questions/5840148/how-can-i-get-a-files-size-in-c>
+ * @param file_name The path of the file that you want to determine the size of.
+ * @return The size of the file in question.
+ */
+off64_t GekkoFyre::CmnRoutines::getFileSize(const std::string &file_name)
+{
+    struct stat64 stat_buf;
+    int rc = stat64(file_name.c_str(), &stat_buf);
+    return rc == 0 ? stat_buf.st_size : -1;
+}
+
+/**
+ * @brief GekkoFyre::CmnRoutines::freeDiskSpace() gives you the free disk-space available to the current user
+ * of the system at the given path.
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @note <http://doc.qt.io/qt-5/qstorageinfo.html>
+ *       <http://stackoverflow.com/questions/1732717/how-to-determine-how-much-free-space-on-a-drive-in-qt>
+ * @param path The path to determine the free disk space of.
+ * @return A 64-bit value determining free disk-space.
+ */
+qint64 GekkoFyre::CmnRoutines::freeDiskSpace(const QStorageInfo &storage)
+{
+    return storage.bytesAvailable();
 }
 
 /**
@@ -530,12 +559,17 @@ GekkoFyre::DownloadStatus GekkoFyre::CmnRoutines::convDlStat_StringToEnum(const 
 
 QString GekkoFyre::CmnRoutines::numberConverter(const double &value)
 {
+    QMutexLocker locker(&mutex);
+    locker.relock(); // Should lock automatically though
     if (value < 1024) {
-        return bytesToKilobytes(value);
+        QString conv = bytesToKilobytes(value);
+        return conv;
     } else if (value > 1024) {
-        return bytesToMegabytes(value);
+        QString conv = bytesToMegabytes(value);
+        return conv;
     } else {
-        return bytesToKilobytes(value);
+        QString conv = bytesToKilobytes(value);
+        return conv;
     }
 }
 
