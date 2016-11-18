@@ -77,7 +77,8 @@ public:
 
     void print_exception(const std::exception &e, int level = 0);
 
-    int convDlStat_toInt(const GekkoFyre::DownloadStatus &status);
+    short convDlStat_toInt(const GekkoFyre::DownloadStatus &status);
+    short convHashType_toInt(const GekkoFyre::HashType &hash_type);
     GekkoFyre::DownloadStatus convDlStat_IntToEnum(const int &s);
     QString convDlStat_toString(const GekkoFyre::DownloadStatus &status);
     GekkoFyre::DownloadStatus convDlStat_StringToEnum(const QString &status);

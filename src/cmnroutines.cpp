@@ -463,7 +463,7 @@ bool GekkoFyre::CmnRoutines::modifyDlState(const QString &effec_url,
     return false;
 }
 
-int GekkoFyre::CmnRoutines::convDlStat_toInt(const GekkoFyre::DownloadStatus &status)
+short GekkoFyre::CmnRoutines::convDlStat_toInt(const GekkoFyre::DownloadStatus &status)
 {
     switch (status) {
     case GekkoFyre::DownloadStatus::Downloading:
@@ -482,6 +482,32 @@ int GekkoFyre::CmnRoutines::convDlStat_toInt(const GekkoFyre::DownloadStatus &st
         return 6;
     default:
         return -1;
+    }
+}
+
+short GekkoFyre::CmnRoutines::convHashType_toInt(const GekkoFyre::HashType &hash_type)
+{
+    switch (hash_type) {
+        case GekkoFyre::HashType::CRC32:
+            return 1;
+        case GekkoFyre::HashType::MD5:
+            return 2;
+        case GekkoFyre::HashType::SHA1:
+            return 3;
+        case GekkoFyre::HashType::SHA256:
+            return 4;
+        case GekkoFyre::HashType::SHA512:
+            return 5;
+        case GekkoFyre::HashType::SHA3_256:
+            return 6;
+        case GekkoFyre::HashType::SHA3_512:
+            return 7;
+        case GekkoFyre::HashType::None:
+            return 0;
+        case GekkoFyre::HashType::CannotDetermine:
+            return -1;
+        default:
+            return -1;
     }
 }
 

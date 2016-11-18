@@ -134,8 +134,11 @@ namespace GekkoFyre {
         SHA1,
         SHA256,
         SHA512,
+        SHA3_256,
+        SHA3_512,
         MD5,
         CRC32,
+        CannotDetermine,
         None
     };
 
@@ -167,10 +170,10 @@ namespace GekkoFyre {
 
         // Information associated with a specific easy handle
         struct ConnInfo {
-            CURL *easy;              // libcurl easy-interface pointer
-            std::string url;         // The effective URL of the download in question
-            std::vector<char> error; // Any reportable errors go here
-            CURLMcode curl_res;      // The return code from the easy-interface
+            CURL *easy;                  // libcurl easy-interface pointer
+            std::string url;             // The effective URL of the download in question
+            char error[CURL_ERROR_SIZE]; // Any reportable errors go here
+            CURLMcode curl_res;          // The return code from the easy-interface
         };
 
         struct CurlInfo {

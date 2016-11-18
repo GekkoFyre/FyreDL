@@ -63,7 +63,7 @@ AddURL::AddURL(QWidget *parent) :
     routines = new GekkoFyre::CmnRoutines();
 
     ui->url_dest_lineEdit->setText(QDir::homePath());
-    ui->file_dest_lineEdit->setText(QDir::homePath());
+    ui->file_dest_lineEdit->setText("");
 }
 
 AddURL::~AddURL()
@@ -87,81 +87,94 @@ void AddURL::on_buttonBox_accepted()
     QString url_plaintext;
     QString hash_plaintext;
 
-    switch (ui->inputTabWidget->currentIndex()) {
-    case 0:
-        // We're only importing a single URL!
-        if (ui->url_dest_lineEdit->text().isEmpty()) {
+    if (ui->inputTabWidget->currentIndex() == 0) {
+        // #################################
+        // We're only importing a single URL
+        // #################################
+        QString file_dest = ui->url_dest_lineEdit->text();
+        url_plaintext = ui->url_plainTextEdit->toPlainText();
+        if (file_dest.isEmpty()) {
             QMessageBox::information(this, tr("Problem!"), tr("You must specify a destination directory."),
                                      QMessageBox::Ok);
             return AddURL::done(QDialog::Rejected);
-        } else if (ui->url_plainTextEdit->toPlainText().isEmpty()) {
+        } else if (url_plaintext.isEmpty()) {
             QMessageBox::information(this, tr("Problem!"), tr("You must specify a URL to grab."),
                                      QMessageBox::Ok);
             return AddURL::done(QDialog::Rejected);
         } else {
             try {
-                url_plaintext = ui->url_plainTextEdit->toPlainText();
-                hash_plaintext = ui->url_hash_lineEdit->text();
-                info = GekkoFyre::CurlEasy::verifyFileExists(url_plaintext);
+                // Check that the path exists and is a /directory/.
+                fs::path boost_file_dest(ui->url_dest_lineEdit->text().toStdString());
+                if (fs::exists(boost_file_dest) && fs::is_directory(boost_file_dest)) {
+                    hash_plaintext = ui->url_hash_lineEdit->text();
+                    info = GekkoFyre::CurlEasy::verifyFileExists(url_plaintext);
 
-                if (info.response_code == 200) {
-                    // The URL exists!
-                    // Now check it for more detailed information
-                    info_ext = GekkoFyre::CurlEasy::curlGrabInfo(url_plaintext);
+                    // Check that the file exists on the web-server, with a return code of '200'
+                    if (info.response_code == 200) {
+                        // The URL exists!
+                        // Now check it for more detailed information
+                        info_ext = GekkoFyre::CurlEasy::curlGrabInfo(url_plaintext);
 
-                    // Save this more detailed information
-                    dl_info.dlStatus = GekkoFyre::DownloadStatus::Stopped;
-                    dl_info.file_loc = ui->url_dest_lineEdit->text().toStdString();
-                    dl_info.ext_info.content_length = info_ext.content_length;
-                    dl_info.ext_info.effective_url = info_ext.effective_url;
-                    dl_info.ext_info.response_code = info_ext.response_code;
-                    dl_info.ext_info.status_ok = info_ext.status_ok;
-                    dl_info.cId = 0;
-                    dl_info.timestamp = 0;
+                        // Save this more detailed information
+                        dl_info.dlStatus = GekkoFyre::DownloadStatus::Stopped;
+                        dl_info.file_loc = ui->url_dest_lineEdit->text().toStdString();
+                        dl_info.ext_info.content_length = info_ext.content_length;
+                        dl_info.ext_info.effective_url = info_ext.effective_url;
+                        dl_info.ext_info.response_code = info_ext.response_code;
+                        dl_info.ext_info.status_ok = info_ext.status_ok;
+                        dl_info.cId = 0;
+                        dl_info.timestamp = 0;
 
-                    if (hash_plaintext.isEmpty()) {
-                        dl_info.hash_type = GekkoFyre::HashType::None;
-                        dl_info.hash_val = "";
+                        // Set default values for the hash(es) if none specified by the user
+                        if (hash_plaintext.isEmpty()) {
+                            dl_info.hash_type = GekkoFyre::HashType::None;
+                            dl_info.hash_val = "";
+                        } else {
+                            dl_info.hash_type = GekkoFyre::HashType::None;
+                            dl_info.hash_val = hash_plaintext.toStdString();
+                        }
+
+                        // Write the output to an XML file, with file-name 'CFG_HISTORY_FILE'
+                        routines->writeDownloadItem(dl_info);
+
+                        // Send any new details to the QTableView model/view routines, whereupon 'ui->downloadView' is
+                        // updated with the latest data.
+                        emit sendDetails(dl_info.ext_info.effective_url, dl_info.ext_info.content_length, 0, 0, 0,
+                                         0, dl_info.dlStatus, dl_info.ext_info.effective_url, dl_info.file_loc);
+                        return AddURL::done(QDialog::Accepted);
                     } else {
-                        dl_info.hash_type = GekkoFyre::HashType::None;
-                        dl_info.hash_val = hash_plaintext.toStdString();
+                        // We received something other than a '200' response code, so either the URL does not exist or
+                        // there was another problem that had been encountered.
+                        QMessageBox::information(this, tr("Error!"), QString("%1").arg(
+                                QString::fromStdString(info.effective_url)), QMessageBox::Ok);
+                        return AddURL::done(QDialog::Rejected);
                     }
-
-                    routines->writeDownloadItem(dl_info);
-
-                    emit sendDetails(dl_info.ext_info.effective_url, dl_info.ext_info.content_length, 0, 0, 0,
-                                     0, dl_info.dlStatus, dl_info.ext_info.effective_url, dl_info.file_loc);
-                    return AddURL::done(QDialog::Accepted);
-                } else {
-                    // The URL does not exist or there was another problem
-                    QMessageBox::information(this, tr("Error!"), QString("%1").arg(
-                                                 QString::fromStdString(info.effective_url)), QMessageBox::Ok);
-                    return AddURL::done(QDialog::Rejected);
                 }
             } catch (const std::exception &e) {
                 QMessageBox::warning(this, tr("Error!"), tr("%1").arg(e.what()), QMessageBox::Ok);
                 return;
             }
         }
-    case 1:
-    {
+    } else {
+        // ######################################
+        // We're importing a mass-amount of URLs!
+        // ######################################
         try {
-            // We're importing a mass-amount of URLs!
-            if (ui->file_import_lineEdit->text().isEmpty()) {
+            QString csv_file = ui->file_import_lineEdit->text();
+            if (csv_file.isEmpty()) {
                 QMessageBox::information(this, tr("Problem!"), tr("You must specify a target file to import!"),
                                          QMessageBox::Ok);
                 return AddURL::done(QDialog::Rejected);
             } else {
                 // Grab the path to the CSV file to import, if any
-                QString csv_file = ui->file_import_lineEdit->text();
                 fs::path csv_path(csv_file.toStdString());
 
-                // Check that the file exists
+                // Check that the CSV file exists
                 if (!fs::exists(csv_path)) {
                     throw std::invalid_argument(tr("The file you have chosen does not exist!\n\n%1").arg(csv_file).toStdString());
                 }
 
-                // Check that the file is not a directory
+                // Check that the CSV file is not a directory
                 if (fs::is_directory(csv_path)) {
                     throw std::invalid_argument(tr("You selected a directory, not a file!\n\n%1").arg(csv_file).toStdString());
                 }
@@ -174,7 +187,8 @@ void AddURL::on_buttonBox_accepted()
                                                         .arg(csv_file).toStdString());
                 }
 
-                if (!in.has_column(CSV_FIELD_DEST) && ui->file_dest_lineEdit->text().isEmpty()) {
+                QString csv_file_dest = ui->file_dest_lineEdit->text();
+                if (!in.has_column(CSV_FIELD_DEST) && csv_file_dest.isEmpty()) {
                     throw std::invalid_argument(tr("No destination provided either in dialog or CSV file!")
                                                         .toStdString());
                 }
@@ -186,7 +200,7 @@ void AddURL::on_buttonBox_accepted()
                 };
 
                 std::vector<CsvImport> csv_vec;
-                std::string url, dest, hash;
+                std::string url, dest, hash = { "" };
                 bool has_col_hash = false;
                 if (in.has_column(CSV_FIELD_HASH)) { has_col_hash = true; }
 
@@ -195,32 +209,49 @@ void AddURL::on_buttonBox_accepted()
                     CsvImport csv_import;
                     csv_import.url = url;
                     csv_import.dest = dest;
+
+                    // Set default values for the hash(es), only, if none specified by the user
                     if (has_col_hash) {
                         csv_import.hash = hash;
                     } else {
                         csv_import.hash = "";
                     }
 
+                    // Temporarily push the struct, CsvImport, onto the std::vector<CsvImport>()
                     csv_vec.push_back(csv_import);
                 }
 
-                // Process the now imported CSV data
+                // Process the now imported CSV data from std::vector<CsvImport>()
                 for (size_t i = 0; i < csv_vec.size(); ++i) {
+                    // Check that the file exists with a '200' return code from the web-server
                     info = GekkoFyre::CurlEasy::verifyFileExists(QString::fromStdString(csv_vec.at(i).url));
                     if (info.response_code == 200) {
                         // The URL exists!
                         // Now check it for more detailed information
                         info_ext = GekkoFyre::CurlEasy::curlGrabInfo(QString::fromStdString(csv_vec.at(i).url));
 
-                        // Save this more detailed information
                         dl_info.dlStatus = GekkoFyre::DownloadStatus::Stopped;
 
-                        if (!ui->file_dest_lineEdit->text().isEmpty()) {
-                            dl_info.file_loc = ui->file_dest_lineEdit->text().toStdString();
+                        // Make one final check and assign the appropriate values
+                        if (!csv_file_dest.isEmpty()) {
+                            dl_info.file_loc = csv_file_dest.toStdString();
                         } else if (in.has_column(CSV_FIELD_DEST)) {
                             dl_info.file_loc = csv_vec.at(i).dest;
+                        } else {
+                            throw std::invalid_argument(tr("No destination specified for: %1")
+                                                                .arg(QString::fromStdString(csv_vec.at(i).url))
+                                                                .toStdString());
                         }
 
+                        if (!csv_vec.at(i).hash.empty()) {
+                            dl_info.hash_type = GekkoFyre::HashType::None; // TODO: Fix this!
+                            dl_info.hash_val = csv_vec.at(i).hash;
+                        } else {
+                            dl_info.hash_type = GekkoFyre::HashType::None; // TODO: Fix this!
+                            dl_info.hash_val = "";
+                        }
+
+                        // Save this more detailed information
                         dl_info.ext_info.content_length = info_ext.content_length;
                         dl_info.ext_info.effective_url = info_ext.effective_url;
                         dl_info.ext_info.response_code = info_ext.response_code;
@@ -231,10 +262,15 @@ void AddURL::on_buttonBox_accepted()
                         // The URL does not exist! It's invalid.
                         dl_info.dlStatus = GekkoFyre::DownloadStatus::Invalid;
 
-                        if (!ui->file_dest_lineEdit->text().isEmpty()) {
-                            dl_info.file_loc = ui->file_dest_lineEdit->text().toStdString();
+                        if (!csv_file_dest.isEmpty()) {
+                            dl_info.file_loc = csv_file_dest.toStdString();
                         } else if (in.has_column(CSV_FIELD_DEST)) {
                             dl_info.file_loc = csv_vec.at(i).dest;
+                        }
+
+                        if (!csv_vec.at(i).hash.empty()) {
+                            dl_info.hash_type = GekkoFyre::HashType::None; // TODO: Fix this!
+                            dl_info.hash_val = csv_vec.at(i).hash;
                         }
 
                         dl_info.ext_info.content_length = 0;
@@ -245,11 +281,16 @@ void AddURL::on_buttonBox_accepted()
                         dl_info.timestamp = 0;
                     }
 
+                    // Write the data to an XML file, specifically 'CFG_HISTORY_FILE'
                     routines->writeDownloadItem(dl_info);
+
+                    // Send any new details to the QTableView model/view routines, whereupon 'ui->downloadView' is
+                    // updated with the latest data.
                     emit sendDetails(dl_info.ext_info.effective_url, dl_info.ext_info.content_length, 0, 0, 0,
                                      0, dl_info.dlStatus, dl_info.ext_info.effective_url, dl_info.file_loc);
                 }
 
+                // Clear the 'temporary' struct-holding std::vector<CsvImport>()
                 csv_vec.clear();
                 return AddURL::done(QDialog::Accepted);
             }
@@ -257,13 +298,6 @@ void AddURL::on_buttonBox_accepted()
             QMessageBox::warning(this, tr("Error!"), QString("%1").arg(e.what()), QMessageBox::Ok);
             return AddURL::done(QDialog::Rejected);
         }
-    }
-    default:
-        QMessageBox::warning(this, tr("Internal Error!"), tr("An error was encountered within the "
-                                                             "internals of the application! Please "
-                                                             "restart the program."),
-                             QMessageBox::Ok);
-        return AddURL::done(QDialog::Rejected);
     }
 }
 
