@@ -103,9 +103,10 @@ extern "C" {
 #define TAB_INDEX_LOG 4
 
 // Comma Separated Value related information
-#define CSV_NUM_COLS 2
+#define CSV_NUM_COLS 3
 #define CSV_FIELD_URL "url"
 #define CSV_FIELD_DEST "destination"
+#define CSV_FIELD_HASH "hash"
 
 namespace GekkoFyre {
     enum DownloadStatus {
@@ -129,6 +130,15 @@ namespace GekkoFyre {
         File
     };
 
+    enum HashType {
+        SHA1,
+        SHA256,
+        SHA512,
+        MD5,
+        CRC32,
+        None
+    };
+
     namespace GkCurl {
         // http://stackoverflow.com/questions/18031357/why-the-constructor-of-stdostream-is-protected
         struct FileStream {
@@ -136,9 +146,17 @@ namespace GekkoFyre {
             std::ostream *astream; // Async-I/O stream
         };
 
+        struct curl_multi_destructor {
+            void operator()(CURLM *multi) {
+                if (multi != nullptr) {
+                    curl_multi_cleanup(multi);
+                }
+            }
+        };
+
         // Global information, common to all connections
         struct GlobalInfo {
-            CURLM *multi;
+            std::shared_ptr<CURLM> multi;
             int still_running;
         };
 
@@ -200,6 +218,8 @@ namespace GekkoFyre {
             uint timestamp;                     // The date/time of the download/file having been inserted into the history file
             GekkoFyre::DownloadStatus dlStatus; // Status of the downloading file(s) in question
             CurlInfoExt ext_info;               // Extended info about the file(s) themselves
+            GekkoFyre::HashType hash_type;      // The actual type of hash used (e.g., CRC32/MD5/SHA1/SHA256/SHA512)
+            std::string hash_val;               // The value of the hash, if a type is specified in 'CurlDlInfo::hash_type'
         };
 
         struct CurlInit {
@@ -213,7 +233,7 @@ namespace GekkoFyre {
 
     namespace GkGraph {
         struct DownSpeedGraph {
-            std::shared_ptr<QtCharts::QSplineSeries> down_speed_series;
+            std::unique_ptr<QtCharts::QSplineSeries> down_speed_series;
             std::string file_dest;
         };
 

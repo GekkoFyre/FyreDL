@@ -857,6 +857,14 @@ void MainWindow::on_downloadView_customContextMenuRequested(const QPoint &pos)
     menu->popup(ui->downloadView->viewport()->mapToGlobal(pos));
 }
 
+/**
+ * @brief MainWindow::on_downloadView_activated gives the specific index of an item when selected/activated within
+ * the QTableView object, 'downloadView'.
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @date 2016-11-18
+ * @param index
+ * @see MainWindow::displayCharts(), MainWindow::delCharts()
+ */
 void MainWindow::on_downloadView_activated(const QModelIndex &index)
 {
     Q_UNUSED(index);

@@ -31,3 +31,5 @@ build/
 *.out
 *.app
 /NOTES.txt
+/MOCK_DATA.csv
+/addr_sanitizer.txt

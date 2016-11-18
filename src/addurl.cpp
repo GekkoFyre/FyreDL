@@ -77,6 +77,7 @@ AddURL::~AddURL()
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
  * @date 2016-11-15
  * @note <https://github.com/ben-strasser/fast-cpp-csv-parser>
+ *       <https://www.mockaroo.com/>
  */
 void AddURL::on_buttonBox_accepted()
 {
@@ -84,6 +85,7 @@ void AddURL::on_buttonBox_accepted()
     GekkoFyre::GkCurl::CurlInfoExt info_ext;
     GekkoFyre::GkCurl::CurlDlInfo dl_info;
     QString url_plaintext;
+    QString hash_plaintext;
 
     switch (ui->inputTabWidget->currentIndex()) {
     case 0:
@@ -99,6 +101,7 @@ void AddURL::on_buttonBox_accepted()
         } else {
             try {
                 url_plaintext = ui->url_plainTextEdit->toPlainText();
+                hash_plaintext = ui->url_hash_lineEdit->text();
                 info = GekkoFyre::CurlEasy::verifyFileExists(url_plaintext);
 
                 if (info.response_code == 200) {
@@ -115,6 +118,15 @@ void AddURL::on_buttonBox_accepted()
                     dl_info.ext_info.status_ok = info_ext.status_ok;
                     dl_info.cId = 0;
                     dl_info.timestamp = 0;
+
+                    if (hash_plaintext.isEmpty()) {
+                        dl_info.hash_type = GekkoFyre::HashType::None;
+                        dl_info.hash_val = "";
+                    } else {
+                        dl_info.hash_type = GekkoFyre::HashType::None;
+                        dl_info.hash_val = hash_plaintext.toStdString();
+                    }
+
                     routines->writeDownloadItem(dl_info);
 
                     emit sendDetails(dl_info.ext_info.effective_url, dl_info.ext_info.content_length, 0, 0, 0,
@@ -156,7 +168,7 @@ void AddURL::on_buttonBox_accepted()
 
                 // Process the CSV file
                 io::CSVReader<CSV_NUM_COLS> in(csv_file.toStdString());
-                in.read_header(io::ignore_no_column, CSV_FIELD_URL, CSV_FIELD_DEST);
+                in.read_header(io::ignore_missing_column, CSV_FIELD_URL, CSV_FIELD_DEST, CSV_FIELD_HASH); // If a column with a name is not in the file but is in the argument list, then read_row will not modify the corresponding variable.
                 if (!in.has_column(CSV_FIELD_URL)) {
                     throw std::invalid_argument(tr("Error reading CSV file! Is it formatted correctly?\n\n%1")
                                                         .arg(csv_file).toStdString());
@@ -170,21 +182,35 @@ void AddURL::on_buttonBox_accepted()
                 struct CsvImport {
                     std::string url;
                     std::string dest;
+                    std::string hash;
                 };
 
-                CsvImport csv_import;
-                std::unique_ptr<std::vector<CsvImport>> csv_vec(new std::vector<CsvImport>());
-                while (in.read_row(csv_import.url, csv_import.dest)) {
+                std::vector<CsvImport> csv_vec;
+                std::string url, dest, hash;
+                bool has_col_hash = false;
+                if (in.has_column(CSV_FIELD_HASH)) { has_col_hash = true; }
+
+                while (in.read_row(url, dest, hash)) {
                     // Handle the imported CSV data
-                    csv_vec->push_back(csv_import);
+                    CsvImport csv_import;
+                    csv_import.url = url;
+                    csv_import.dest = dest;
+                    if (has_col_hash) {
+                        csv_import.hash = hash;
+                    } else {
+                        csv_import.hash = "";
+                    }
+
+                    csv_vec.push_back(csv_import);
                 }
 
-                for (size_t i = 0; i < csv_vec->size(); ++i) {
-                    info = GekkoFyre::CurlEasy::verifyFileExists(QString::fromStdString(csv_vec->at(i).url));
+                // Process the now imported CSV data
+                for (size_t i = 0; i < csv_vec.size(); ++i) {
+                    info = GekkoFyre::CurlEasy::verifyFileExists(QString::fromStdString(csv_vec.at(i).url));
                     if (info.response_code == 200) {
                         // The URL exists!
                         // Now check it for more detailed information
-                        info_ext = GekkoFyre::CurlEasy::curlGrabInfo(QString::fromStdString(csv_vec->at(i).url));
+                        info_ext = GekkoFyre::CurlEasy::curlGrabInfo(QString::fromStdString(csv_vec.at(i).url));
 
                         // Save this more detailed information
                         dl_info.dlStatus = GekkoFyre::DownloadStatus::Stopped;
@@ -192,7 +218,7 @@ void AddURL::on_buttonBox_accepted()
                         if (!ui->file_dest_lineEdit->text().isEmpty()) {
                             dl_info.file_loc = ui->file_dest_lineEdit->text().toStdString();
                         } else if (in.has_column(CSV_FIELD_DEST)) {
-                            dl_info.file_loc = csv_vec->at(i).dest;
+                            dl_info.file_loc = csv_vec.at(i).dest;
                         }
 
                         dl_info.ext_info.content_length = info_ext.content_length;
@@ -208,11 +234,11 @@ void AddURL::on_buttonBox_accepted()
                         if (!ui->file_dest_lineEdit->text().isEmpty()) {
                             dl_info.file_loc = ui->file_dest_lineEdit->text().toStdString();
                         } else if (in.has_column(CSV_FIELD_DEST)) {
-                            dl_info.file_loc = csv_vec->at(i).dest;
+                            dl_info.file_loc = csv_vec.at(i).dest;
                         }
 
                         dl_info.ext_info.content_length = 0;
-                        dl_info.ext_info.effective_url = csv_vec->at(i).url;
+                        dl_info.ext_info.effective_url = csv_vec.at(i).url;
                         dl_info.ext_info.response_code = info.response_code;
                         dl_info.ext_info.status_ok = false;
                         dl_info.cId = 0;
@@ -224,7 +250,7 @@ void AddURL::on_buttonBox_accepted()
                                      0, dl_info.dlStatus, dl_info.ext_info.effective_url, dl_info.file_loc);
                 }
 
-                csv_vec->clear();
+                csv_vec.clear();
                 return AddURL::done(QDialog::Accepted);
             }
         } catch (const std::exception &e) {

@@ -58,7 +58,7 @@ std::map<curl_socket_t, boost::asio::ip::tcp::socket *> socket_map;
 
 std::time_t lastTime = 0;
 boost::ptr_unordered_map<std::string, GekkoFyre::GkCurl::CurlInit> GekkoFyre::CurlMulti::eh_vec;
-std::shared_ptr<GekkoFyre::GkCurl::GlobalInfo> GekkoFyre::CurlMulti::gi;
+GekkoFyre::GkCurl::GlobalInfo *GekkoFyre::CurlMulti::gi;
 QMutex GekkoFyre::CurlMulti::mutex;
 
 GekkoFyre::CurlMulti::CurlMulti()
@@ -70,7 +70,9 @@ GekkoFyre::CurlMulti::CurlMulti()
 GekkoFyre::CurlMulti::~CurlMulti()
 {
     // curl_global_cleanup(); // We're done with libcurl, globally, so clean it up!
-    gi.reset();
+    if (gi != nullptr) {
+        delete gi;
+    }
 }
 
 /**
@@ -91,8 +93,8 @@ bool GekkoFyre::CurlMulti::fileStream()
     int msgs_left = 0; // How many messages are left
     GekkoFyre::GkCurl::DlStatusMsg status_msg;
     try {
-        if (gi->multi != nullptr) {
-            multi_res = curl_multi_perform(gi->multi, &gi->still_running);
+        if (gi->multi.get() != nullptr) {
+            multi_res = curl_multi_perform(gi->multi.get(), &gi->still_running);
             if (multi_res != CURLM_OK) {
                 mcode_or_die(tr("Download file routine: ").toStdString().c_str(), multi_res);
             }
@@ -109,7 +111,7 @@ bool GekkoFyre::CurlMulti::fileStream()
                 CURLMcode mc; // curl_multi_wait() return code
                 int numfds; // Number of file descriptors
 
-                mc = curl_multi_wait(gi->multi, NULL, 0, CURL_MAX_WAIT_MSECS, &numfds);
+                mc = curl_multi_wait(gi->multi.get(), NULL, 0, CURL_MAX_WAIT_MSECS, &numfds);
                 if (mc != CURLM_OK) {
                     throw std::runtime_error(tr("curl_multi_wait() failed! Code: %1").arg(QString::number(mc)).toStdString());
                 }
@@ -127,10 +129,10 @@ bool GekkoFyre::CurlMulti::fileStream()
                     repeats = 0;
                 }
 
-                curl_multi_perform(gi->multi, &gi->still_running);
+                curl_multi_perform(gi->multi.get(), &gi->still_running);
             } while (gi->still_running);
 
-            while ((msg = curl_multi_info_read(gi->multi, &msgs_left))) {
+            while ((msg = curl_multi_info_read(gi->multi.get(), &msgs_left))) {
                 if (msg->msg == CURLMSG_DONE) {
                     std::string ptr_uuid;
                     GekkoFyre::GkCurl::CurlInit *curl_struct;
@@ -156,9 +158,9 @@ bool GekkoFyre::CurlMulti::fileStream()
                     // is no longer needed.
                     status_msg.url = QString::fromStdString(curl_struct->conn_info->url);
                     status_msg.file_loc = curl_struct->prog.file_dest;
-                    curl_multi_remove_handle(gi->multi, curl_struct->conn_info->easy);
+                    curl_multi_remove_handle(gi->multi.get(), curl_struct->conn_info->easy);
                     curl_easy_cleanup(curl_struct->conn_info->easy);
-                    // curl_multi_cleanup(gi->multi);
+                    // curl_multi_cleanup(gi->multi.get());
 
                     eh_vec.erase(ptr_uuid);
                     status_msg.dl_compl_succ = true;
@@ -191,19 +193,19 @@ bool GekkoFyre::CurlMulti::fileStream()
 void GekkoFyre::CurlMulti::recvNewDl(const QString &url, const QString &fileLoc)
 {
     try {
-        if (gi.get() == nullptr) {
+        if (gi == nullptr) {
             // Global multi-handle does not exist, so create it
-            gi.reset(new GekkoFyre::GkCurl::GlobalInfo);
-            gi->multi = curl_multi_init(); // Initiate the libcurl session
-            curl_multi_setopt(gi->multi, CURLMOPT_SOCKETFUNCTION, sock_cb);
-            curl_multi_setopt(gi->multi, CURLMOPT_SOCKETDATA, gi.get());
-            curl_multi_setopt(gi->multi, CURLMOPT_TIMERFUNCTION, multi_timer_cb);
-            curl_multi_setopt(gi->multi, CURLMOPT_TIMERDATA, gi.get());
+            gi = new GekkoFyre::GkCurl::GlobalInfo;
+            gi->multi.reset(curl_multi_init(), GekkoFyre::GkCurl::curl_multi_destructor()); // Initiate the libcurl session
+            curl_multi_setopt(gi->multi.get(), CURLMOPT_SOCKETFUNCTION, sock_cb);
+            curl_multi_setopt(gi->multi.get(), CURLMOPT_SOCKETDATA, gi);
+            curl_multi_setopt(gi->multi.get(), CURLMOPT_TIMERFUNCTION, multi_timer_cb);
+            curl_multi_setopt(gi->multi.get(), CURLMOPT_TIMERDATA, gi);
         }
 
         std::string uuid;
         if (fileLoc.isEmpty()) { throw std::invalid_argument(tr("An invalid file location has been given!").toStdString()); }
-        uuid = new_conn(url, fileLoc, gi.get());
+        uuid = new_conn(url, fileLoc, gi);
         fileStream();
     } catch (const std::exception &e) {
         QMessageBox::warning(nullptr, tr("Error!"), QString("%1").arg(e.what()), QMessageBox::Ok);
@@ -271,14 +273,14 @@ void GekkoFyre::CurlMulti::check_multi_info(GekkoFyre::GkCurl::GlobalInfo *g)
 
     std::cout << QString("REMAINING: %1\n").arg(QString::number(g->still_running)).toStdString();
 
-    while((msg = curl_multi_info_read(g->multi, &msgs_left))) {
+    while((msg = curl_multi_info_read(g->multi.get(), &msgs_left))) {
         if(msg->msg == CURLMSG_DONE) {
             easy = msg->easy_handle;
             res = msg->data.result;
             curl_easy_getinfo(easy, CURLINFO_PRIVATE, &conn);
             curl_easy_getinfo(easy, CURLINFO_EFFECTIVE_URL, &eff_url);
             std::cerr << QString("DONE: %1 => %2\n").arg(eff_url).arg(conn->error.data()).toStdString();
-            curl_multi_remove_handle(g->multi, easy);
+            curl_multi_remove_handle(g->multi.get(), easy);
             conn->url.clear();
             curl_easy_cleanup(easy);
             delete conn;
@@ -298,7 +300,7 @@ void GekkoFyre::CurlMulti::event_cb(GekkoFyre::GkCurl::GlobalInfo *g, boost::asi
     std::cout << QString("event_cb: action=%1\n").arg(QString::number(action)).toStdString();
 
     CURLMcode rc;
-    rc = curl_multi_socket_action(g->multi, tcp_socket->native_handle(), action, &g->still_running);
+    rc = curl_multi_socket_action(g->multi.get(), tcp_socket->native_handle(), action, &g->still_running);
 
     mcode_or_die("event_cb: curl_multi_socket_action", rc);
     check_multi_info(g);
@@ -319,7 +321,7 @@ void GekkoFyre::CurlMulti::timer_cb(const boost::system::error_code &error, Gekk
 {
     if (!error) {
         CURLMcode rc;
-        rc = curl_multi_socket_action(g->multi, CURL_SOCKET_TIMEOUT, 0, &g->still_running);
+        rc = curl_multi_socket_action(g->multi.get(), CURL_SOCKET_TIMEOUT, 0, &g->still_running);
 
         mcode_or_die("timer_cb: curl_multi_socket_action", rc);
         check_multi_info(g);
@@ -401,7 +403,7 @@ void GekkoFyre::CurlMulti::addsock(curl_socket_t s, CURL *easy, int action, Gekk
     int *fdp = (int *) calloc(sizeof(int), 1);
 
     setsock(fdp, s, easy, action, g);
-    curl_multi_assign(g->multi, s, fdp);
+    curl_multi_assign(g->multi.get(), s, fdp);
 }
 
 int GekkoFyre::CurlMulti::sock_cb(CURL *e, curl_socket_t s, int what, void *cbp, void *sockp)
@@ -668,7 +670,7 @@ std::string GekkoFyre::CurlMulti::new_conn(const QString &url, const QString &fi
         curl_easy_setopt(ci->conn_info->easy, CURLOPT_CLOSESOCKETFUNCTION, close_socket);
 
         std::cout << QString("Adding easy to multi (%1)\n").arg(url).toStdString();
-        ci->conn_info->curl_res = curl_multi_add_handle(global->multi, ci->conn_info->easy);
+        ci->conn_info->curl_res = curl_multi_add_handle(global->multi.get(), ci->conn_info->easy);
         mcode_or_die("new_conn: curl_multi_add_handle", ci->conn_info->curl_res);
     } catch (const std::exception &e) {
         std::throw_with_nested(std::runtime_error(tr("Error with internal libcurl function!\n\n%1").arg(e.what()).toStdString()));

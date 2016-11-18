@@ -90,7 +90,7 @@ private:
     // http://stackoverflow.com/questions/10333854/how-to-handle-a-map-with-pointers
     // https://theboostcpplibraries.com/boost.pointer_container
     static boost::ptr_unordered_map<std::string, GekkoFyre::GkCurl::CurlInit> eh_vec; // Easy handle mapped to a ID, for managing each connection
-    static std::shared_ptr<GekkoFyre::GkCurl::GlobalInfo> gi;
+    static GekkoFyre::GkCurl::GlobalInfo *gi;
     static QMutex mutex;
 
     static std::string createId();

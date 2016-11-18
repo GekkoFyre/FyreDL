@@ -1,2 +1,3 @@
 *.txt.user
 /.idea/
+/clang_addrsanitizer.supp
