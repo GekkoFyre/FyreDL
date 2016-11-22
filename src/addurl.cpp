@@ -230,7 +230,10 @@ void AddURL::on_buttonBox_accepted()
                     // Check that the file exists with a '200' return code from the web-server
                     info = GekkoFyre::CurlEasy::verifyFileExists(QString::fromStdString(csv_vec.at(i).url));
                     if (info.response_code == 200) {
+                        // ###############
                         // The URL exists!
+                        // ###############
+
                         // Now check it for more detailed information
                         info_ext = GekkoFyre::CurlEasy::curlGrabInfo(QString::fromStdString(csv_vec.at(i).url));
 
@@ -238,7 +241,10 @@ void AddURL::on_buttonBox_accepted()
 
                         // Make one final check and assign the appropriate values
                         if (!csv_file_dest.isEmpty()) {
-                            dl_info.file_loc = csv_file_dest.toStdString();
+                            std::ostringstream oss_path;
+                            oss_path << csv_file_dest.toStdString() << fs::path::preferred_separator
+                                     << routines->extractFilename(QString::fromStdString(info_ext.effective_url)).toStdString();
+                            dl_info.file_loc = oss_path.str();
                         } else if (in.has_column(CSV_FIELD_DEST)) {
                             dl_info.file_loc = csv_vec.at(i).dest;
                         } else {
@@ -263,16 +269,18 @@ void AddURL::on_buttonBox_accepted()
                         dl_info.cId = 0;
                         dl_info.timestamp = 0;
                     } else {
+                        // #####################################
                         // The URL does not exist! It's invalid.
+                        // #####################################
                         dl_info.dlStatus = GekkoFyre::DownloadStatus::Invalid;
 
                         if (!csv_file_dest.isEmpty()) {
-                            dl_info.file_loc = csv_file_dest.toStdString();
+                            std::ostringstream oss_path;
+                            oss_path << csv_file_dest.toStdString() << fs::path::preferred_separator
+                                     << routines->extractFilename(QString::fromStdString(info_ext.effective_url)).toStdString();
+                            dl_info.file_loc = oss_path.str();
                         } else if (in.has_column(CSV_FIELD_DEST)) {
-                            std::ostringstream file_comp_path;
-                            file_comp_path << csv_vec.at(i).dest << fs::path::preferred_separator
-                                           << routines->extractFilename(QString::fromStdString(info_ext.effective_url)).toStdString();
-                            dl_info.file_loc = file_comp_path.str();
+                            dl_info.file_loc = csv_vec.at(i).dest;
                         }
 
                         if (!csv_vec.at(i).hash.empty()) {
