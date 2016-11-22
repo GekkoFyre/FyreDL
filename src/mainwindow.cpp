@@ -248,9 +248,7 @@ void MainWindow::insertNewRow(const std::string &fileName, const double &fileSiz
     dlModel->setData(index, QString::fromStdString(url), Qt::DisplayRole);
 
     // Create the required graph/chart objects and initialize them
-    std::ostringstream oss;
-    oss << destination << fs::path::preferred_separator << routines->extractFilename(QString::fromStdString(url)).toStdString();
-    initCharts(oss.str());
+    initCharts(destination);
 
     return;
 }
@@ -279,10 +277,7 @@ void MainWindow::removeSelRows()
                 routines->delDownloadItem(url);
 
                 // Remove the associated graph(s) from memory
-                std::ostringstream oss;
-                oss << ui->downloadView->model()->data(ui->downloadView->model()->index(indexes.at(0).row(), MN_DESTINATION_COL)).toString().toStdString()
-                    << fs::path::preferred_separator << routines->extractFilename(url).toStdString();
-                delCharts(oss.str());
+                delCharts(ui->downloadView->model()->data(ui->downloadView->model()->index(indexes.at(0).row(), MN_DESTINATION_COL)).toString().toStdString());
 
                 // ...and then the GUI
                 dlModel->removeRows(indexes.at(0).row(), countRow, QModelIndex());
@@ -473,14 +468,12 @@ void MainWindow::on_dlstartToolBtn_clicked()
             try {
                 const QString url = ui->downloadView->model()->data(ui->downloadView->model()->index(indexes.at(0).row(), MN_URL_COL)).toString();
                 const QString dest = ui->downloadView->model()->data(ui->downloadView->model()->index(indexes.at(0).row(), MN_DESTINATION_COL)).toString();
-                std::ostringstream oss_dest;
-                oss_dest << dest.toStdString() << fs::path::preferred_separator << routines->extractFilename(url).toStdString();
-                fs::path dest_boost_path(oss_dest.str());
+                fs::path dest_boost_path(dest.toStdString());
 
                 if (fs::exists(dest_boost_path)) {
                     QMessageBox file_ask;
                     file_ask.setWindowTitle(tr("Pre-existing file!"));
-                    file_ask.setText(tr("The file, \"%1\", already exists. Do you want remove it before starting the download?").arg(QString::fromStdString(oss_dest.str())));
+                    file_ask.setText(tr("The file, \"%1\", already exists. Do you want remove it before starting the download?").arg(dest));
                     file_ask.setStandardButtons(QMessageBox::Yes | QMessageBox::No | QMessageBox::Cancel);
                     file_ask.setDefaultButton(QMessageBox::No);
                     file_ask.setModal(false);
@@ -511,7 +504,7 @@ void MainWindow::on_dlstartToolBtn_clicked()
                     GekkoFyre::GkCurl::CurlInfo verify = GekkoFyre::CurlEasy::verifyFileExists(url);
                     if (verify.response_code == 200) {
                         if (status != GekkoFyre::DownloadStatus::Downloading) {
-                            routines->modifyDlState(oss_dest.str(), GekkoFyre::DownloadStatus::Downloading);
+                            routines->modifyDlState(dest.toStdString(), GekkoFyre::DownloadStatus::Downloading);
                             dlModel->updateCol(index, routines->convDlStat_toString(GekkoFyre::DownloadStatus::Downloading), MN_STATUS_COL);
 
                             QObject::connect(GekkoFyre::routine_singleton::instance(), SIGNAL(sendXferStats(GekkoFyre::GkCurl::CurlProgressPtr)), this, SLOT(recvXferStats(GekkoFyre::GkCurl::CurlProgressPtr)));
@@ -521,7 +514,7 @@ void MainWindow::on_dlstartToolBtn_clicked()
                             qRegisterMetaType<GekkoFyre::GkCurl::CurlProgressPtr>("curlProgressPtr");
                             qRegisterMetaType<GekkoFyre::GkCurl::DlStatusMsg>("DlStatusMsg");
 
-                            emit sendStartDownload(url, QString::fromStdString(oss_dest.str()));
+                            emit sendStartDownload(url, dest);
                         }
                     }
                 }
@@ -542,13 +535,11 @@ void MainWindow::on_dlpauseToolBtn_clicked()
             try {
                 const QString url = ui->downloadView->model()->data(ui->downloadView->model()->index(indexes.at(0).row(), MN_URL_COL)).toString();
                 const QString dest = ui->downloadView->model()->data(ui->downloadView->model()->index(indexes.at(0).row(), MN_DESTINATION_COL)).toString();
-                std::ostringstream oss_dest;
-                oss_dest << dest.toStdString() << fs::path::preferred_separator << routines->extractFilename(url).toStdString();
 
                 QModelIndex index = dlModel->index(indexes.at(0).row(), MN_STATUS_COL, QModelIndex());
                 const GekkoFyre::DownloadStatus status = routines->convDlStat_StringToEnum(ui->downloadView->model()->data(index).toString());
                 if (status != GekkoFyre::DownloadStatus::Paused && status != GekkoFyre::DownloadStatus::Completed) {
-                    routines->modifyDlState(oss_dest.str(), GekkoFyre::DownloadStatus::Paused);
+                    routines->modifyDlState(dest.toStdString(), GekkoFyre::DownloadStatus::Paused);
                     dlModel->updateCol(index, routines->convDlStat_toString(GekkoFyre::DownloadStatus::Paused), MN_STATUS_COL);
                 }
             } catch (const std::exception &e) {
@@ -575,15 +566,13 @@ void MainWindow::on_dlstopToolBtn_clicked()
         try {
             const QString url = ui->downloadView->model()->data(ui->downloadView->model()->index(indexes.at(0).row(), MN_URL_COL)).toString();
             const QString dest = ui->downloadView->model()->data(ui->downloadView->model()->index(indexes.at(0).row(), MN_DESTINATION_COL)).toString();
-            std::ostringstream oss_dest;
-            oss_dest << dest.toStdString() << fs::path::preferred_separator << routines->extractFilename(url).toStdString();
 
             QModelIndex index = dlModel->index(indexes.at(0).row(), MN_STATUS_COL, QModelIndex());
             const GekkoFyre::DownloadStatus status = routines->convDlStat_StringToEnum(ui->downloadView->model()->data(index).toString());
             if (status != GekkoFyre::DownloadStatus::Stopped && status != GekkoFyre::DownloadStatus::Completed) {
                 QObject::connect(this, SIGNAL(sendStopDownload(QString)), curl_multi, SLOT(recvStopDl(QString)));
                 emit sendStopDownload(ui->downloadView->model()->data(ui->downloadView->model()->index(indexes.at(0).row(), MN_DESTINATION_COL)).toString());
-                routines->modifyDlState(oss_dest.str(), GekkoFyre::DownloadStatus::Stopped);
+                routines->modifyDlState(dest.toStdString(), GekkoFyre::DownloadStatus::Stopped);
                 dlModel->updateCol(index, routines->convDlStat_toString(GekkoFyre::DownloadStatus::Stopped), MN_STATUS_COL);
             }
         } catch (const std::exception &e) {
@@ -628,12 +617,8 @@ void MainWindow::on_clearhistoryToolBtn_clicked()
                 QModelIndex file_dest_index = dlModel->index(i, MN_DESTINATION_COL);
                 const QString url_string = ui->downloadView->model()->data(url_index).toString();
 
-                std::ostringstream oss;
-                oss << ui->downloadView->model()->data(file_dest_index).toString().toStdString()
-                    << fs::path::preferred_separator << routines->extractFilename(url_string).toStdString();
-
                 try {
-                    delCharts(oss.str());
+                    delCharts(ui->downloadView->model()->data(file_dest_index).toString().toStdString());
                     routines->delDownloadItem(url_string);
                 } catch (const std::exception &e) {
                     QMessageBox::warning(this, tr("Error!"), QString("%1").arg(e.what()), QMessageBox::Ok);
@@ -810,18 +795,15 @@ void MainWindow::recvDlFinished(const GekkoFyre::GkCurl::DlStatusMsg &status)
             QModelIndex find_index_dest = dlModel->index(i, MN_DESTINATION_COL);
             QString url = ui->downloadView->model()->data(find_index_url).toString();
             QString dest = ui->downloadView->model()->data(find_index_dest).toString();
-            std::ostringstream oss_dest;
-            oss_dest << dest.toStdString() << fs::path::preferred_separator << routines->extractFilename(url).toStdString();
 
             if (url == status.url) {
-                if (oss_dest.str() == status.file_loc) {
+                if (dest.toStdString() == status.file_loc) {
                     QModelIndex stat_index = dlModel->index(i, MN_STATUS_COL);
                     if (routines->convDlStat_StringToEnum(ui->downloadView->model()->data(stat_index).toString()) == GekkoFyre::DownloadStatus::Downloading) {
                         GekkoFyre::GkFile::FileHash file_hash;
                         std::vector<GekkoFyre::GkCurl::CurlDlInfo> dl_mini_info_vec = routines->readDownloadInfo(CFG_HISTORY_FILE, true);
                         for (size_t j = 0; j < dl_mini_info_vec.size(); ++j) {
-                            fs::path boost_path(status.file_loc);
-                            if (dl_mini_info_vec.at(j).file_loc == boost_path.parent_path() && dl_mini_info_vec.at(j).ext_info.effective_url == status.url.toStdString()) {
+                            if (dl_mini_info_vec.at(j).file_loc == status.file_loc && dl_mini_info_vec.at(j).ext_info.effective_url == status.url.toStdString()) {
                                 file_hash = routines->cryptoFileHash(
                                         QString::fromStdString(status.file_loc), dl_mini_info_vec.at(j).hash_type,
                                         QString::fromStdString(dl_mini_info_vec.at(j).hash_val_given));

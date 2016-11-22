@@ -230,10 +230,9 @@ GekkoFyre::GkFile::FileHash GekkoFyre::CmnRoutines::cryptoFileHash(const QString
                     hash_type != GekkoFyre::HashType::None) {
                 QCryptographicHash hash(convHashType_toAlgo(hash_type));
                 if (hash.addData(&f)) {
-                    result = hash.result().toHex();
-                    QString hex = QTextCodec::codecForMib(1015)->toUnicode(result);
-                    info.checksum = hex;
-                    if (hex == given_hash_val) {
+                    result = hash.result();
+                    info.checksum = result.toHex();
+                    if (info.checksum == given_hash_val) {
                         info.hash_verif = GekkoFyre::HashVerif::Verified;
                         return info;
                     } else {
@@ -259,17 +258,19 @@ GekkoFyre::GkFile::FileHash GekkoFyre::CmnRoutines::cryptoFileHash(const QString
                 for (size_t i = 0; i < vec_hash_type.size(); ++i) {
                     QCryptographicHash hash(convHashType_toAlgo(vec_hash_type.at(i)));
                     if (hash.addData(&f)) {
-                        result = hash.result().toHex();
-                        QString hex = QTextCodec::codecForMib(1015)->toUnicode(result);
-                        vec_hash_val.push_back(hex);
+                        result = hash.result();
+                        vec_hash_val.push_back(result.toHex());
                     }
                 }
 
                 for (size_t i = 0; i < vec_hash_val.size(); ++i) {
+                    info.checksum = vec_hash_val.at(i);
+                    info.hash_type = GekkoFyre::HashType::CannotDetermine;
                     if (vec_hash_val.at(i) == given_hash_val) {
                         info.hash_verif = GekkoFyre::HashVerif::Verified;
-                        info.checksum = vec_hash_val.at(i);
-                        info.hash_type = GekkoFyre::HashType::CannotDetermine;
+                        return info;
+                    } else {
+                        info.hash_verif = GekkoFyre::HashVerif::Corrupt;
                         return info;
                     }
                 }

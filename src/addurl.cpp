@@ -104,7 +104,8 @@ void AddURL::on_buttonBox_accepted()
         } else {
             try {
                 // Check that the path exists and is a /directory/.
-                fs::path boost_file_dest(ui->url_dest_lineEdit->text().toStdString());
+                std::string part_dest = ui->url_dest_lineEdit->text().toStdString();
+                fs::path boost_file_dest(part_dest);
                 if (fs::exists(boost_file_dest) && fs::is_directory(boost_file_dest)) {
                     hash_plaintext = ui->url_hash_lineEdit->text();
                     info = GekkoFyre::CurlEasy::verifyFileExists(url_plaintext);
@@ -114,10 +115,13 @@ void AddURL::on_buttonBox_accepted()
                         // The URL exists!
                         // Now check it for more detailed information
                         info_ext = GekkoFyre::CurlEasy::curlGrabInfo(url_plaintext);
+                        std::ostringstream file_comp_path;
+                        file_comp_path << part_dest << fs::path::preferred_separator
+                                       << routines->extractFilename(QString::fromStdString(info_ext.effective_url)).toStdString();
 
                         // Save this more detailed information
                         dl_info.dlStatus = GekkoFyre::DownloadStatus::Stopped;
-                        dl_info.file_loc = ui->url_dest_lineEdit->text().toStdString();
+                        dl_info.file_loc = file_comp_path.str();
                         dl_info.ext_info.content_length = info_ext.content_length;
                         dl_info.ext_info.effective_url = info_ext.effective_url;
                         dl_info.ext_info.response_code = info_ext.response_code;
@@ -130,7 +134,7 @@ void AddURL::on_buttonBox_accepted()
                             dl_info.hash_type = GekkoFyre::HashType::None;
                             dl_info.hash_val_given = "";
                         } else {
-                            dl_info.hash_type = GekkoFyre::HashType::None;
+                            dl_info.hash_type = GekkoFyre::HashType::CannotDetermine;
                             dl_info.hash_val_given = hash_plaintext.toStdString();
                         }
 
@@ -244,10 +248,10 @@ void AddURL::on_buttonBox_accepted()
                         }
 
                         if (!csv_vec.at(i).hash.empty()) {
-                            dl_info.hash_type = GekkoFyre::HashType::None; // TODO: Fix this!
+                            dl_info.hash_type = GekkoFyre::HashType::CannotDetermine;
                             dl_info.hash_val_given = csv_vec.at(i).hash;
                         } else {
-                            dl_info.hash_type = GekkoFyre::HashType::None; // TODO: Fix this!
+                            dl_info.hash_type = GekkoFyre::HashType::None;
                             dl_info.hash_val_given = "";
                         }
 
@@ -265,12 +269,18 @@ void AddURL::on_buttonBox_accepted()
                         if (!csv_file_dest.isEmpty()) {
                             dl_info.file_loc = csv_file_dest.toStdString();
                         } else if (in.has_column(CSV_FIELD_DEST)) {
-                            dl_info.file_loc = csv_vec.at(i).dest;
+                            std::ostringstream file_comp_path;
+                            file_comp_path << csv_vec.at(i).dest << fs::path::preferred_separator
+                                           << routines->extractFilename(QString::fromStdString(info_ext.effective_url)).toStdString();
+                            dl_info.file_loc = file_comp_path.str();
                         }
 
                         if (!csv_vec.at(i).hash.empty()) {
-                            dl_info.hash_type = GekkoFyre::HashType::None; // TODO: Fix this!
+                            dl_info.hash_type = GekkoFyre::HashType::CannotDetermine;
                             dl_info.hash_val_given = csv_vec.at(i).hash;
+                        } else {
+                            dl_info.hash_type = GekkoFyre::HashType::None;
+                            dl_info.hash_val_given = "";
                         }
 
                         dl_info.ext_info.content_length = 0;
