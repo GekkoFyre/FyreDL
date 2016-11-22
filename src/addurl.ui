@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>480</width>
-    <height>320</height>
+    <height>420</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -60,6 +60,9 @@
             <layout class="QHBoxLayout" name="url_dest_horizLayout">
              <item>
               <widget class="QLineEdit" name="url_dest_lineEdit">
+               <property name="toolTip">
+                <string>Where you would like the file saved.</string>
+               </property>
                <property name="maxLength">
                 <number>4096</number>
                </property>
@@ -76,6 +79,9 @@
            </item>
            <item row="1" column="1">
             <widget class="QPlainTextEdit" name="url_plainTextEdit">
+             <property name="toolTip">
+              <string>Enter a single URL into this textbox.</string>
+             </property>
              <property name="verticalScrollBarPolicy">
               <enum>Qt::ScrollBarAlwaysOn</enum>
              </property>
@@ -92,8 +98,22 @@
            </item>
            <item row="3" column="1">
             <widget class="QLineEdit" name="url_hash_lineEdit">
+             <property name="toolTip">
+              <string>Acceptable hashing types are CRC32, MD5, SHA1, SHA(3-)256, SHA(3-)512.</string>
+             </property>
              <property name="maxLength">
               <number>1024</number>
+             </property>
+            </widget>
+           </item>
+           <item row="4" column="1">
+            <widget class="QLabel" name="url_hash_label_desc">
+             <property name="text">
+              <string>CRC32, MD5, SHA1, SHA(3-)256, 
+and SHA(3-)512</string>
+             </property>
+             <property name="alignment">
+              <set>Qt::AlignCenter</set>
              </property>
             </widget>
            </item>
@@ -108,13 +128,6 @@
         <layout class="QVBoxLayout" name="verticalLayout_7">
          <item>
           <layout class="QFormLayout" name="file_form">
-           <item row="0" column="0">
-            <widget class="QLabel" name="file_dest_label">
-             <property name="text">
-              <string>Destination: </string>
-             </property>
-            </widget>
-           </item>
            <item row="1" column="0">
             <widget class="QLabel" name="file_import_label">
              <property name="text">
@@ -125,7 +138,11 @@
            <item row="0" column="1">
             <layout class="QHBoxLayout" name="file_dest_horizLayout">
              <item>
-              <widget class="QLineEdit" name="file_dest_lineEdit"/>
+              <widget class="QLineEdit" name="file_dest_lineEdit">
+               <property name="toolTip">
+                <string>Where you would like the file saved.</string>
+               </property>
+              </widget>
              </item>
              <item>
               <widget class="QToolButton" name="file_dest_toolButton">
@@ -139,7 +156,11 @@
            <item row="1" column="1">
             <layout class="QHBoxLayout" name="file_import_horizLayout">
              <item>
-              <widget class="QLineEdit" name="file_import_lineEdit"/>
+              <widget class="QLineEdit" name="file_import_lineEdit">
+               <property name="toolTip">
+                <string>The file you would like to import, whether it be a torrent or CSV of multiple URLs.</string>
+               </property>
+              </widget>
              </item>
              <item>
               <widget class="QToolButton" name="file_import_toolButton">
@@ -153,7 +174,14 @@
            <item row="2" column="1">
             <widget class="QLabel" name="file_import_desc_label">
              <property name="text">
-              <string>( e.g. download.torrent, download.nzb, urls.txt )</string>
+              <string>( e.g. download.torrent, download.nzb, urls.csv )</string>
+             </property>
+            </widget>
+           </item>
+           <item row="0" column="0">
+            <widget class="QLabel" name="file_dest_label">
+             <property name="text">
+              <string>Destination: </string>
              </property>
             </widget>
            </item>

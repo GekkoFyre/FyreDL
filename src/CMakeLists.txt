@@ -95,6 +95,9 @@ set(SOURCE_FILES
     singleton_emit.hpp
     singleton_proc.hpp)
 
+set(EXTERNAL_SOURCE_FILES
+    ./../utils/fast-cpp-csv-parser/csv.h)
+
 # http://www.executionunit.com/blog/2014/01/22/moving-from-qmake-to-cmake/
 qt5_wrap_ui(UI_HEADERS
             mainwindow.ui
@@ -111,7 +114,7 @@ elseif (${CMAKE_SYSTEM_NAME} MATCHES "Windows" OR "mingw" OR "cygwin")
     set_property(CACHE EXE_NAME PROPERTY STRINGS "fyredl.exe")
 endif()
 
-add_executable("${EXE_NAME}" ${SOURCE_FILES} ${UI_HEADERS} ${UI_RESOURCES})
+add_executable("${EXE_NAME}" ${SOURCE_FILES} ${EXTERNAL_SOURCE_FILES} ${UI_HEADERS} ${UI_RESOURCES})
 set_property(TARGET ${EXE_NAME} PROPERTY CXX_STANDARD 14)
 set_property(TARGET ${EXE_NAME} PROPERTY CXX_STANDARD_REQUIRED ON)
 
@@ -239,9 +242,6 @@ else()
     set(BIN_INSTALL_DIR "${CMAKE_INSTALL_PREFIX}/bin")
 ENDIF()
 
-#
-# Link the (static?) executable with the other, required external libraries
-#
 target_link_libraries(fyredl Qt5::Core Qt5::Widgets Qt5::Gui Qt5::Charts ${LIBS})
 
 IF(${CMAKE_SYSTEM_NAME} MATCHES "Windows" OR "cygwin" OR "mingw") # Check if we are on Microsoft Windows
@@ -252,15 +252,14 @@ IF(${CMAKE_SYSTEM_NAME} MATCHES "Windows" OR "cygwin" OR "mingw") # Check if we 
         message(STATUS "Creating a Microsoft Windows RELEASE build.")
     endif()
     if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC") # Check if we are using the Visual Studio compiler
-        set (CMAKE_GENERATOR "Visual Studio")
+        set(CMAKE_GENERATOR "Visual Studio")
         set_target_properties(fyredl PROPERTIES LINK_FLAGS "/SUBSYSTEM:CONSOLE")
         message(STATUS "Using the Microsoft Visual C++ compiler!")
-    elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
-        SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mwindows") # This is apparently not tested!
-        message(STATUS "Using the GCC compiler!")
+    elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU" OR "Clang")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mwindows -Wno-shorten-64-to-32 -Wno-sign-conversion") # This is apparently not tested!
+        message(STATUS "Using either the GCC or Clang compiler!")
     else()
         message(SEND_ERROR "You are using an unsupported Microsoft Windows compiler! (Not MSVC or GCC)")
-        # TODO: Add support for 'mingw'!
     endif()
 elseif(${CMAKE_SYSTEM_NAME} MATCHES "Linux") # Check if we are on Linux
     install(FILES ${TRANSLATION_QM} DESTINATION translations)
@@ -268,27 +267,44 @@ elseif(${CMAKE_SYSTEM_NAME} MATCHES "Linux") # Check if we are on Linux
         if("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
             # https://spin.atomicobject.com/2013/10/20/clang-compiler/
             # http://clang.llvm.org/docs/UsersManual.html#controlling-code-generation
-            SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Werror -Wconversion -Qunused-arguments -Wno-missing-braces -Wno-unused-parameter -g")
+            set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libstdc++ -Wall -Wextra -Werror -Wconversion -Qunused-arguments -Wno-missing-braces -Wno-unused-parameter -Wno-shorten-64-to-32 -Wno-sign-conversion -g")
             message(STATUS "DEBUG build using the Clang compiler!")
+
+            set(GK_ADDR_SANITIZE FALSE CACHE BOOL "See the Clang AddressSanitizer documentation for more details.")
+            if(GK_ADDR_SANITIZE)
+                set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O1 -fno-omit-frame-pointer -fno-optimize-sibling-calls -fsanitize=address")
+            endif(GK_ADDR_SANITIZE)
+
+            set(GK_MEM_SANITIZE FALSE CACHE BOOL "See the Clang MemorySanitizer documentation for more details.")
+            if(GK_MEM_SANITIZE)
+                set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O1 -fno-omit-frame-pointer -fno-optimize-sibling-calls -fsanitize=memory")
+            endif(GK_MEM_SANITIZE)
+
+            set(GK_THREAD_SANITIZE FALSE CACHE BOOL "See the Clang ThreadSanitizer documentation for more details.")
+            if(GK_THREAD_SANITIZE)
+                set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O1 -fsanitize=thread")
+            endif(GK_THREAD_SANITIZE)
         elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
             # http://stackoverflow.com/questions/3375697/useful-gcc-flags-for-c
-            SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wpointer-arith -Wcast-align -Wconversion -Wunreachable-code -g")
+            set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wpointer-arith -Wcast-align -Wconversion -Wunreachable-code -Wno-shorten-64-to-32 -Wno-sign-conversion -g")
             message(STATUS "DEBUG build using the GCC compiler!")
         elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel")
             message(STATUS "DEBUG build using the Intel compiler!")
+            # TODO: Setup this section for the Intel compiler toolset!
         else()
             message(SEND_ERROR "You are using an unsupported Linux compiler! (Not GCC, Clang or Intel!)")
         endif()
     elseif(CMAKE_BUILD_TYPE MATCHES "Release")
         if("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
-            SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-conversion -Qno-unused-arguments -Wno-missing-braces -Wno-unused-parameter")
+            set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-conversion -Qno-unused-arguments -Wno-missing-braces -Wno-unused-parameter -Wno-shorten-64-to-32 -Wno-sign-conversion")
             message(STATUS "DEBUG build using the Clang compiler!")
         elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
             # http://stackoverflow.com/questions/3375697/useful-gcc-flags-for-c
-            SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-pointer-arith -Wno-cast-align -Wno-conversion -Wno-unreachable-code")
+            set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-pointer-arith -Wno-cast-align -Wno-conversion -Wno-unreachable-code -Wno-shorten-64-to-32 -Wno-sign-conversion")
             message(STATUS "DEBUG build using the GCC compiler!")
         elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel")
             message(STATUS "DEBUG build using the Intel compiler!")
+            # TODO: Setup this section for the Intel compiler toolset!
         else()
             message(SEND_ERROR "You are using an unsupported Linux compiler! (Not GCC, Clang or Intel!)")
         endif()

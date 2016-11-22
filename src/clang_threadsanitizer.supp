@@ -3,7 +3,19 @@
 # http://clang.llvm.org/docs/ThreadSanitizer.html
 
 # Ignore the entire source file
-src:/home/phobos/Programming/FyreDL/src/main.cpp
+thread:/home/phobos/Programming/FyreDL/src/main.cpp
+mutex:/home/phobos/Programming/FyreDL/src/main.cpp
+signal:/home/phobos/Programming/FyreDL/src/main.cpp
+deadlock:/home/phobos/Programming/FyreDL/src/main.cpp
+race:/home/phobos/Programming/FyreDL/src/async_buf.hpp
+thread:/home/phobos/Programming/FyreDL/src/async_buf.hpp
+signal:/home/phobos/Programming/FyreDL/src/async_buf.hpp
+deadlock:/home/phobos/Programming/FyreDL/src/async_buf.hpp
+# race:/usr/include/qt5/QtCore/qstring.h
+race:/usr/include/c++/6.2.1/bits/stl_deque.h
+race:/usr/include/c++/6.2.1/bits/deque.tcc
+race:/usr/include/c++/6.2.1/bits/move.h
+mutex:/usr/include/c++/6.2.1/x86_64-redhat-linux/bits/gthr-default.h
 
 # Suppress various errors from external libraries
 called_from_lib:libQt5Core.so

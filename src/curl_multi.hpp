@@ -50,9 +50,9 @@
 #include <boost/asio.hpp>
 #include <boost/bind.hpp>
 #include <boost/ptr_container/ptr_unordered_map.hpp>
-#include <QObject>
 #include <string>
 #include <fstream>
+#include <QObject>
 #include <QString>
 #include <QDateTime>
 #include <QMutex>
@@ -85,7 +85,6 @@ public slots:
 signals:
     void sendXferStats(const GekkoFyre::GkCurl::CurlProgressPtr &dl_stat);
     void sendDlFinished(const GekkoFyre::GkCurl::DlStatusMsg &status);
-    void sendGlobFin();
 
 private:
     // http://stackoverflow.com/questions/10333854/how-to-handle-a-map-with-pointers
@@ -111,10 +110,8 @@ private:
     static int curl_xferinfo(void *p, curl_off_t dltotal, curl_off_t dlnow, curl_off_t ultotal, curl_off_t ulnow); // https://curl.haxx.se/libcurl/c/CURLOPT_PROGRESSFUNCTION.html
     static curl_socket_t opensocket(void *clientp, curlsocktype purpose, struct curl_sockaddr *address); // https://curl.haxx.se/libcurl/c/CURLOPT_OPENSOCKETFUNCTION.html
     static int close_socket(void *clientp, curl_socket_t item); // https://curl.haxx.se/libcurl/c/CURLOPT_CLOSESOCKETFUNCTION.html
-    static size_t curl_write_memory_callback(void *ptr, size_t size, size_t nmemb, void *userp);
     static size_t curl_write_file_callback(char *buffer, size_t size, size_t nmemb, void *userdata);
-    static std::string new_conn(const QString &url, GekkoFyre::GkCurl::GlobalInfo *global, bool grabHeaderOnly,
-                                bool writeToMemory, const QString &fileLoc, bool grabStats);
+    static std::string new_conn(const QString &url, const QString &fileLoc, GekkoFyre::GkCurl::GlobalInfo *global);
 
 };
     typedef SingletonEmit<CurlMulti> routine_singleton;

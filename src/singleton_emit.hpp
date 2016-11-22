@@ -38,6 +38,8 @@
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
  * @date 2016-10
  * @brief Handles the emitting of signals from a static object.
+ * @note <http://stackoverflow.com/questions/12248747/singleton-with-multithreads>
+ *       <https://cwe.mitre.org/data/definitions/543.html>
  */
 
 #ifndef SINGLEEMIT_HPP
@@ -52,6 +54,7 @@ class SingletonEmit {
 
 public:
     static T* instance() {
+        // TODO: Fix the data-race that occurs hereinafter!
         if (!m_instance) {
             m_instance = new T;
         }
