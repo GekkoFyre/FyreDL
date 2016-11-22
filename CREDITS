@@ -27,9 +27,13 @@ Doxygen by Dimitri van Heesch et al.
 	<http://www.stack.nl/~dimitri/doxygen/>
 		GNU General Public License (GPL, version 2)
 
-FindGettextTools.cmake by Jookia
-	<https://github.com/Jookia/GettextTools/>
-		Provided as-is
+Fast C++ CSV Parser by Ben Strasser
+	<https://github.com/ben-strasser/fast-cpp-csv-parser>
+		(Please see "./utils/fast-cpp-csv-parser/LICENSE" for more details)
+
+build-libcurl-windows by Mohd Rozi
+	<https://github.com/blackrosezy/build-libcurl-windows>
+		MIT License
 
 LibFindMacros.cmake by Lasse Kärkkäinen
 	<https://github.com/Tronic/cmake-modules/>
