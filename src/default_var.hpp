@@ -74,15 +74,37 @@ extern "C" {
 #error "Platform not supported!"
 #endif
 
-#define CFG_HISTORY_FILE "fyredl_history.xml"
-#define CURL_MAX_WAIT_MSECS 15000 // Measured in milliseconds
-#define WRITE_BUFFER_SIZE (1024 * 1024) // Measured in bytes
-#define FYREDL_USER_AGENT "FyreDL/0.0.1"
+#define FYREDL_PROG_VERS "0.0.1"          // The application version
+#define FYREDL_USER_AGENT "FyreDL/0.0.1"  // The user-agent displayed externally by FyreDL, along with the application version
+#define CFG_HISTORY_FILE "fyredl.xml"     // The configuration/history file-name used by FyreDL. Location is set within the application's GUI.
 
 //
-// DO NOT MODIFY BELOW THIS LINE!
-// ##############################
+// ###################################
+//   DO NOT MODIFY BELOW THIS LINE!
+// Unless you know what you are doing
+// ###################################
 //
+
+// Download and File I/O
+#define WRITE_BUFFER_SIZE (1024 * 1024) // Measured in bytes
+#define CURL_MAX_WAIT_MSECS (15 * 1000) // Measured in milliseconds
+
+// XML configuration
+#define XML_PARENT_NODE "fyredl-db"
+#define XML_CHILD_NODE_FILE "file"
+#define XML_CHILD_ITEM_FILE "item"
+#define XML_ITEM_ATTR_FILE_CID "content-id"                // The unique, content integer ID of the download in the XML history file
+#define XML_ITEM_ATTR_FILE_FLOC "file-loc"                 // Location of the file on user's storage disk
+#define XML_ITEM_ATTR_FILE_STAT "status"                   // The download status (i.e., downloading, completed, unknown, etc.)
+#define XML_ITEM_ATTR_FILE_INSERT_DATE "insert-date"       // Date upon which the download was added to the XML history file
+#define XML_ITEM_ATTR_FILE_STATMSG "status-msg"            // Status message returned by the libcurl library
+#define XML_ITEM_ATTR_FILE_EFFEC_URL "effec-url"           // Given, proper URL returned from the (source) web-server
+#define XML_ITEM_ATTR_FILE_RESP_CODE "resp-code"           // Given return-code returned from the (source) web-server
+#define XML_ITEM_ATTR_FILE_CONT_LNGTH "content-length"     // The size of the download returned from the (source) web-server
+#define XML_ITEM_ATTR_FILE_HASH_TYPE "hash-type"           // The type of hash employed (i.e, SHA1, SHA3-256/512, MD5, etc.)
+#define XML_ITEM_ATTR_FILE_HASH_VAL_GIVEN "hash-val-given" // The hash-value that was given by the user
+#define XML_ITEM_ATTR_FILE_HASH_VAL_RTRND "hash-val-rtrnd" // The hash-value that was calculated after the download (presumably) succeeded
+#define XML_ITEM_ATTR_FILE_HASH_SUCC_TYPE "hash-succ-type" // Whether the calculated hash of the download matched the given hash or not
 
 // These determine the columns used in QTableView
 #define MN_FILENAME_COL 0
@@ -137,10 +159,24 @@ namespace GekkoFyre {
         SHA3_256,
         SHA3_512,
         MD5,
-        CRC32,
         CannotDetermine,
-        None
+        None,
     };
+
+    enum HashVerif {
+        Analyzing,
+        Verified,
+        Corrupt,
+        NotApplicable
+    };
+
+    namespace GkFile {
+        struct FileHash {
+            GekkoFyre::HashType hash_type;
+            GekkoFyre::HashVerif hash_verif;
+            QString checksum;
+        };
+    }
 
     namespace GkCurl {
         // http://stackoverflow.com/questions/18031357/why-the-constructor-of-stdostream-is-protected
@@ -216,13 +252,15 @@ namespace GekkoFyre {
         };
 
         struct CurlDlInfo {
-            std::string file_loc;               // The location of the downloaded file being streamed towards
-            unsigned int cId;                   // Automatically incremented Content ID for each download/file
-            uint timestamp;                     // The date/time of the download/file having been inserted into the history file
-            GekkoFyre::DownloadStatus dlStatus; // Status of the downloading file(s) in question
-            CurlInfoExt ext_info;               // Extended info about the file(s) themselves
-            GekkoFyre::HashType hash_type;      // The actual type of hash used (e.g., CRC32/MD5/SHA1/SHA256/SHA512)
-            std::string hash_val;               // The value of the hash, if a type is specified in 'CurlDlInfo::hash_type'
+            std::string file_loc;                // The location of the downloaded file being streamed towards
+            unsigned int cId;                    // Automatically incremented Content ID for each download/file
+            uint timestamp;                      // The date/time of the download/file having been inserted into the history file
+            GekkoFyre::DownloadStatus dlStatus;  // Status of the downloading file(s) in question
+            CurlInfoExt ext_info;                // Extended info about the file(s) themselves
+            GekkoFyre::HashType hash_type;       // The actual type of hash used (e.g., CRC32/MD5/SHA1/SHA256/SHA512)
+            std::string hash_val_given;          // The value of the hash, if a type is specified in 'CurlDlInfo::hash_type', given by the user
+            std::string hash_val_rtrnd;          // Same as above, but calculated from the local file when, presumably, successfully downloaded
+            GekkoFyre::HashVerif hash_succ_type; // Whether the calculated hash matched the given hash or not
         };
 
         struct CurlInit {

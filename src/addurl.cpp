@@ -128,10 +128,10 @@ void AddURL::on_buttonBox_accepted()
                         // Set default values for the hash(es) if none specified by the user
                         if (hash_plaintext.isEmpty()) {
                             dl_info.hash_type = GekkoFyre::HashType::None;
-                            dl_info.hash_val = "";
+                            dl_info.hash_val_given = "";
                         } else {
                             dl_info.hash_type = GekkoFyre::HashType::None;
-                            dl_info.hash_val = hash_plaintext.toStdString();
+                            dl_info.hash_val_given = hash_plaintext.toStdString();
                         }
 
                         // Write the output to an XML file, with file-name 'CFG_HISTORY_FILE'
@@ -245,10 +245,10 @@ void AddURL::on_buttonBox_accepted()
 
                         if (!csv_vec.at(i).hash.empty()) {
                             dl_info.hash_type = GekkoFyre::HashType::None; // TODO: Fix this!
-                            dl_info.hash_val = csv_vec.at(i).hash;
+                            dl_info.hash_val_given = csv_vec.at(i).hash;
                         } else {
                             dl_info.hash_type = GekkoFyre::HashType::None; // TODO: Fix this!
-                            dl_info.hash_val = "";
+                            dl_info.hash_val_given = "";
                         }
 
                         // Save this more detailed information
@@ -270,7 +270,7 @@ void AddURL::on_buttonBox_accepted()
 
                         if (!csv_vec.at(i).hash.empty()) {
                             dl_info.hash_type = GekkoFyre::HashType::None; // TODO: Fix this!
-                            dl_info.hash_val = csv_vec.at(i).hash;
+                            dl_info.hash_val_given = csv_vec.at(i).hash;
                         }
 
                         dl_info.ext_info.content_length = 0;

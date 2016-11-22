@@ -47,11 +47,14 @@
 #include <iostream>
 #include <QUrl>
 #include <QDir>
+#include <QFile>
+#include <QByteArray>
 #include <QLocale>
 #include <QApplication>
 #include <QtCore/QDateTime>
 #include <QMessageBox>
 #include <QMutexLocker>
+#include <QTextCodec>
 
 #ifdef _WIN32
 #define _WIN32_WINNT 0x06000100
@@ -192,6 +195,95 @@ qint64 GekkoFyre::CmnRoutines::freeDiskSpace(const QStorageInfo &storage)
 }
 
 /**
+ * @brief GekkoFyre::CmnRoutines::cryptoFileHash() will find the given hash (or if unknown, search for it) of a file
+ * and return said hash in a hexadecimal format to be used in string-comparisons.
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @date 2016-11-19
+ * @note <http://doc.qt.io/qt-5/qcryptographichash.html>
+ *       <http://doc.qt.io/qt-5/qiodevice.html#OpenModeFlag-enum>
+ *       <http://en.cppreference.com/w/cpp/thread/call_once>
+ *       <http://en.cppreference.com/w/cpp/thread/once_flag>
+ * @param file_dest The destination of the file you wish to hash.
+ * @param hash_type The crypto type you wish to use, or if given GekkoFyre::HashType::Analyzing, attempt a search of the
+ * correct crypto used.
+ * @return The checksum, in hexadecimal format for portability reasons.
+ */
+GekkoFyre::GkFile::FileHash GekkoFyre::CmnRoutines::cryptoFileHash(const QString &file_dest, const GekkoFyre::HashType &hash_type,
+                                                                   const QString &given_hash_val)
+{
+    GekkoFyre::GkFile::FileHash info;
+    if (!given_hash_val.isEmpty()) {
+        QFile f(file_dest);
+        fs::path boost_file_path(file_dest.toStdString());
+        if (f.exists() && !fs::is_directory(boost_file_path)) {
+            if (!f.open(QIODevice::ReadOnly)) {
+                // The file is already opened by another application on the system! Throw exception...
+                throw std::runtime_error(tr("Unable to continue! The file, \"%1\", is already opened by another application.")
+                                                 .arg(file_dest).toStdString());
+            }
+
+            QByteArray result;
+            info.hash_type = hash_type;
+            if ((hash_type == GekkoFyre::HashType::MD5 || hash_type == GekkoFyre::HashType::SHA1 ||
+                hash_type == GekkoFyre::HashType::SHA256||  hash_type == GekkoFyre::HashType::SHA512 ||
+                hash_type == GekkoFyre::HashType::SHA3_256 ||  hash_type == GekkoFyre::HashType::SHA3_512) &&
+                    hash_type != GekkoFyre::HashType::None) {
+                QCryptographicHash hash(convHashType_toAlgo(hash_type));
+                if (hash.addData(&f)) {
+                    result = hash.result().toHex();
+                    QString hex = QTextCodec::codecForMib(1015)->toUnicode(result);
+                    info.checksum = hex;
+                    if (hex == given_hash_val) {
+                        info.hash_verif = GekkoFyre::HashVerif::Verified;
+                        return info;
+                    } else {
+                        info.hash_verif = GekkoFyre::HashVerif::Corrupt;
+                        return info;
+                    }
+                }
+            } else if (hash_type == GekkoFyre::HashType::None) {
+                info.hash_type = GekkoFyre::HashType::None;
+                info.hash_verif = GekkoFyre::HashVerif::NotApplicable;
+                info.checksum = "";
+                return info;
+            } else {
+                // We need to find the hash-type!
+                std::vector<QString> vec_hash_val;
+                std::vector<GekkoFyre::HashType> vec_hash_type;
+                vec_hash_type.push_back(GekkoFyre::HashType::MD5);
+                vec_hash_type.push_back(GekkoFyre::HashType::SHA1);
+                vec_hash_type.push_back(GekkoFyre::HashType::SHA256);
+                vec_hash_type.push_back(GekkoFyre::HashType::SHA512);
+                vec_hash_type.push_back(GekkoFyre::HashType::SHA3_256);
+                vec_hash_type.push_back(GekkoFyre::HashType::SHA3_512);
+                for (size_t i = 0; i < vec_hash_type.size(); ++i) {
+                    QCryptographicHash hash(convHashType_toAlgo(vec_hash_type.at(i)));
+                    if (hash.addData(&f)) {
+                        result = hash.result().toHex();
+                        QString hex = QTextCodec::codecForMib(1015)->toUnicode(result);
+                        vec_hash_val.push_back(hex);
+                    }
+                }
+
+                for (size_t i = 0; i < vec_hash_val.size(); ++i) {
+                    if (vec_hash_val.at(i) == given_hash_val) {
+                        info.hash_verif = GekkoFyre::HashVerif::Verified;
+                        info.checksum = vec_hash_val.at(i);
+                        info.hash_type = GekkoFyre::HashType::CannotDetermine;
+                        return info;
+                    }
+                }
+            }
+        }
+    }
+
+    info.hash_verif = GekkoFyre::HashVerif::NotApplicable;
+    info.hash_type = GekkoFyre::HashType::None;
+    info.checksum = "";
+    return info;
+}
+
+/**
  * @brief GekkoFyre::CmnRoutines::readDownloadInfo
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
  * @date   2016-10
@@ -200,7 +292,8 @@ qint64 GekkoFyre::CmnRoutines::freeDiskSpace(const QStorageInfo &storage)
  * @param xmlCfgFile
  * @return
  */
-std::vector<GekkoFyre::GkCurl::CurlDlInfo> GekkoFyre::CmnRoutines::readDownloadInfo(const std::string &xmlCfgFile)
+std::vector<GekkoFyre::GkCurl::CurlDlInfo> GekkoFyre::CmnRoutines::readDownloadInfo(const std::string &xmlCfgFile,
+                                                                                    const bool &hashesOnly)
 {
     fs::path xmlCfgFile_loc = findCfgFile(xmlCfgFile);
     sys::error_code ec;
@@ -212,24 +305,45 @@ std::vector<GekkoFyre::GkCurl::CurlDlInfo> GekkoFyre::CmnRoutines::readDownloadI
         pugi::xml_parse_result result = doc.load_file(xmlCfgFile_loc.string().c_str(), pugi::parse_default|pugi::parse_declaration);
         mutex.unlock();
             if (!result) {
-                throw std::invalid_argument(tr("Parse error: %1, character pos= %2")
+                throw std::invalid_argument(tr("XML parse error: %1, character pos= %2")
                                             .arg(result.description(),
                                                  QString::number(result.offset)).toStdString());
             }
 
-        pugi::xml_node items = doc.child("download-db");
-        for (const auto& file: items.children("file")) {
-            for (const auto& item: file.children("item")) {
+        pugi::xml_node items = doc.child(XML_PARENT_NODE);
+        for (const auto& file: items.children(XML_CHILD_NODE_FILE)) {
+            for (const auto& item: file.children(XML_CHILD_ITEM_FILE)) {
                 GekkoFyre::GkCurl::CurlDlInfo i;
-                i.cId = item.attribute("content-id").as_uint();
-                i.file_loc = item.attribute("file-loc").value();
-                i.dlStatus = convDlStat_IntToEnum(item.attribute("status").as_int());
-                i.timestamp = item.attribute("insert-date").as_uint();
-                // i.ext_info.status_ok = tool.attribute("status-ok").as_bool();
-                i.ext_info.status_msg = item.attribute("status-msg").value();
-                i.ext_info.effective_url = item.attribute("effec-url").value();
-                i.ext_info.response_code = item.attribute("resp-code").as_llong();
-                i.ext_info.content_length = item.attribute("content-length").as_double();
+                if (hashesOnly) {
+                    // Only a minimum of information is required
+                    i.cId = item.attribute(XML_ITEM_ATTR_FILE_CID).as_uint();
+                    i.file_loc = item.attribute(XML_ITEM_ATTR_FILE_FLOC).value();
+                    i.dlStatus = GekkoFyre::DownloadStatus::Unknown;
+                    i.timestamp = 0;
+                    i.ext_info.status_msg = "";
+                    i.ext_info.effective_url = item.attribute(XML_ITEM_ATTR_FILE_EFFEC_URL).value();
+                    i.ext_info.response_code = -1;
+                    i.ext_info.content_length = -1.0;
+                    i.hash_type = convHashType_IntToEnum(item.attribute(XML_ITEM_ATTR_FILE_HASH_TYPE).as_int());
+                    i.hash_val_given = item.attribute(XML_ITEM_ATTR_FILE_HASH_VAL_GIVEN).value();
+                    i.hash_val_rtrnd = item.attribute(XML_ITEM_ATTR_FILE_HASH_VAL_RTRND).value();
+                    i.hash_succ_type = convHashVerif_IntToEnum(item.attribute(XML_ITEM_ATTR_FILE_HASH_SUCC_TYPE).as_int());
+                } else {
+                    // We require /all/ the information that the XML history file can provide
+                    i.cId = item.attribute(XML_ITEM_ATTR_FILE_CID).as_uint();
+                    i.file_loc = item.attribute(XML_ITEM_ATTR_FILE_FLOC).value();
+                    i.dlStatus = convDlStat_IntToEnum(item.attribute(XML_ITEM_ATTR_FILE_STAT).as_int());
+                    i.timestamp = item.attribute(XML_ITEM_ATTR_FILE_INSERT_DATE).as_uint();
+                    i.ext_info.status_msg = item.attribute(XML_ITEM_ATTR_FILE_STATMSG).value();
+                    i.ext_info.effective_url = item.attribute(XML_ITEM_ATTR_FILE_EFFEC_URL).value();
+                    i.ext_info.response_code = item.attribute(XML_ITEM_ATTR_FILE_RESP_CODE).as_llong();
+                    i.ext_info.content_length = item.attribute(XML_ITEM_ATTR_FILE_CONT_LNGTH).as_double();
+                    i.hash_type = convHashType_IntToEnum(item.attribute(XML_ITEM_ATTR_FILE_HASH_TYPE).as_int());
+                    i.hash_val_given = item.attribute(XML_ITEM_ATTR_FILE_HASH_VAL_GIVEN).value();
+                    i.hash_val_rtrnd = item.attribute(XML_ITEM_ATTR_FILE_HASH_VAL_RTRND).value();
+                    i.hash_succ_type = convHashVerif_IntToEnum(item.attribute(XML_ITEM_ATTR_FILE_HASH_SUCC_TYPE).as_int());
+                }
+
                 dl_info_list.push_back(i);
             }
         }
@@ -294,7 +408,7 @@ bool GekkoFyre::CmnRoutines::writeDownloadItem(GekkoFyre::GkCurl::CurlDlInfo &dl
                 // Remark: to fully read declaration entries you have to specify, "pugi::parse_declaration"
                 pugi::xml_parse_result result = doc.load_file(xmlCfgFile_loc.string().c_str(), pugi::parse_default|pugi::parse_declaration);
                 if (!result) {
-                    throw std::invalid_argument(tr("Parse error: %1, character pos= %2")
+                    throw std::invalid_argument(tr("XML parse error: %1, character pos= %2")
                                                         .arg(result.description(),
                                                              QString::number(result.offset)).toStdString());
                 }
@@ -304,19 +418,23 @@ bool GekkoFyre::CmnRoutines::writeDownloadItem(GekkoFyre::GkCurl::CurlDlInfo &dl
                 // A valid XML document must have a single root node
                 root = doc.document_element();
 
-                pugi::xml_node nodeParent = root.append_child("file");
-                pugi::xml_node nodeChild = nodeParent.append_child("item");
-                nodeChild.append_attribute("content-id") = dl_info.cId;
-                nodeChild.append_attribute("file-loc") = dl_info.file_loc.c_str();
-                nodeChild.append_attribute("status") = convDlStat_toInt(dl_info.dlStatus);
-                nodeChild.append_attribute("insert-date") = dl_info.timestamp;
-                nodeChild.append_attribute("status-msg") = dl_info.ext_info.status_msg.c_str();
-                nodeChild.append_attribute("effec-url") = dl_info.ext_info.effective_url.c_str();
-                nodeChild.append_attribute("resp-code") = dl_info.ext_info.response_code;
-                nodeChild.append_attribute("content-length") = dl_info.ext_info.content_length;
+                pugi::xml_node nodeParent = root.append_child(XML_CHILD_NODE_FILE);
+                pugi::xml_node nodeChild = nodeParent.append_child(XML_CHILD_ITEM_FILE);
+                nodeChild.append_attribute(XML_ITEM_ATTR_FILE_CID) = dl_info.cId;
+                nodeChild.append_attribute(XML_ITEM_ATTR_FILE_FLOC) = dl_info.file_loc.c_str();
+                nodeChild.append_attribute(XML_ITEM_ATTR_FILE_STAT) = convDlStat_toInt(dl_info.dlStatus);
+                nodeChild.append_attribute(XML_ITEM_ATTR_FILE_INSERT_DATE) = dl_info.timestamp;
+                nodeChild.append_attribute(XML_ITEM_ATTR_FILE_STATMSG) = dl_info.ext_info.status_msg.c_str();
+                nodeChild.append_attribute(XML_ITEM_ATTR_FILE_EFFEC_URL) = dl_info.ext_info.effective_url.c_str();
+                nodeChild.append_attribute(XML_ITEM_ATTR_FILE_RESP_CODE) = dl_info.ext_info.response_code;
+                nodeChild.append_attribute(XML_ITEM_ATTR_FILE_CONT_LNGTH) = dl_info.ext_info.content_length;
+                nodeChild.append_attribute(XML_ITEM_ATTR_FILE_HASH_TYPE) = convHashType_toInt(dl_info.hash_type);
+                nodeChild.append_attribute(XML_ITEM_ATTR_FILE_HASH_VAL_GIVEN) = dl_info.hash_val_given.c_str();
+                nodeChild.append_attribute(XML_ITEM_ATTR_FILE_HASH_VAL_RTRND) = dl_info.hash_val_rtrnd.c_str();
+                nodeChild.append_attribute(XML_ITEM_ATTR_FILE_HASH_SUCC_TYPE) = convHashVerif_toInt(dl_info.hash_succ_type);
 
                 bool saveSucceed = doc.save_file(xmlCfgFile_loc.string().c_str(), PUGIXML_TEXT("    "));
-                if (saveSucceed == false) {
+                if (!saveSucceed) {
                     throw std::runtime_error(tr("Error with saving XML config file!").toStdString());
                 }
                 return true;
@@ -340,17 +458,17 @@ pugi::xml_node GekkoFyre::CmnRoutines::createNewXmlFile(const std::string &xmlCf
     // Generate XML declaration
     auto declarNode = doc.append_child(pugi::node_declaration);
     declarNode.append_attribute("version") = "1.0";
-    declarNode.append_attribute("encoding") = "ISO-8859-1";;
+    declarNode.append_attribute("encoding") = "UTF-8";;
     declarNode.append_attribute("standalone") = "yes";
 
     // A valid XML doc must contain a single root node of any name
-    pugi::xml_node root = doc.append_child("download-db");
+    pugi::xml_node root = doc.append_child(XML_PARENT_NODE);
 
     // Save XML tree to file.
     // Remark: second optional param is indent string to be used;
     // default indentation is tab character.
    bool saveSucceed = doc.save_file(xmlCfgFile_loc.string().c_str(), PUGIXML_TEXT("    "));
-   if (saveSucceed == false) {
+   if (!saveSucceed) {
        throw std::runtime_error(tr("Error with saving XML config file!").toStdString());
    }
 
@@ -382,22 +500,22 @@ bool GekkoFyre::CmnRoutines::delDownloadItem(const QString &effec_url, const std
         pugi::xml_parse_result result = doc.load_file(xmlCfgFile_loc.string().c_str(),
                                                       pugi::parse_default|pugi::parse_declaration);
         if (!result) {
-            throw std::invalid_argument(tr("Parse error: %1, character pos= %2")
+            throw std::invalid_argument(tr("XML parse error: %1, character pos= %2")
                                         .arg(result.description(),
                                              QString::number(result.offset)).toStdString());
         }
 
-        pugi::xml_node items = doc.child("download-db");
-        for (const auto& file: items.children("file")) {
-            for (const auto& item: file.children("item")) {
-                if (file.find_child_by_attribute("effec-url", effec_url.toStdString().c_str())) {
+        pugi::xml_node items = doc.child(XML_PARENT_NODE);
+        for (const auto& file: items.children(XML_CHILD_NODE_FILE)) {
+            for (const auto& item: file.children(XML_CHILD_ITEM_FILE)) {
+                if (file.find_child_by_attribute(XML_ITEM_ATTR_FILE_EFFEC_URL, effec_url.toStdString().c_str())) {
                     item.parent().remove_child(item);
                 }
             }
         }
 
         bool saveSucceed = doc.save_file(xmlCfgFile_loc.string().c_str(), PUGIXML_TEXT("    "));
-        if (saveSucceed == false) {
+        if (!saveSucceed) {
             throw std::runtime_error(tr("Error with saving XML config file!").toStdString());
         }
 
@@ -413,13 +531,17 @@ bool GekkoFyre::CmnRoutines::delDownloadItem(const QString &effec_url, const std
 /**
  * @brief GekkoFyre::CmnRoutines::modifyDlState allows the modification of the download state, whether it
  * be 'paused', 'actively downloading', 'unknown', or something else.
- * @param effec_url  The URL of the download you wish to change.
- * @param status     The download state you wish to change towards.
- * @param xmlCfgFile The XML history file in question.
+ * @param file_loc relates to the location of the download on the user's local storage.
+ * @param status is the download state you wish to change towards.
+ * @param hash_checksum is the calculated checksum of the file in question.
+ * @param ret_succ_type regards whether the checksum comparison with the original, given checksum was a success or not.
+ * @param xmlCfgFile is the XML history file in question.
  * @return Whether the operation was a success or not.
  */
-bool GekkoFyre::CmnRoutines::modifyDlState(const QString &effec_url,
+bool GekkoFyre::CmnRoutines::modifyDlState(const std::string &file_loc,
                                            const GekkoFyre::DownloadStatus &status,
+                                           const std::string &hash_checksum,
+                                           const GekkoFyre::HashVerif &ret_succ_type,
                                            const std::string &xmlCfgFile)
 {
     fs::path xmlCfgFile_loc = findCfgFile(xmlCfgFile);
@@ -435,22 +557,26 @@ bool GekkoFyre::CmnRoutines::modifyDlState(const QString &effec_url,
         pugi::xml_parse_result result = doc.load_file(xmlCfgFile_loc.string().c_str(),
                                                       pugi::parse_default|pugi::parse_declaration);
         if (!result) {
-            throw std::invalid_argument(tr("Parse error: %1, character pos= %2")
+            throw std::invalid_argument(tr("XML parse error: %1, character pos= %2")
                                         .arg(result.description(),
                                              QString::number(result.offset)).toStdString());
         }
 
-        pugi::xml_node items = doc.child("download-db");
-        for (const auto& file: items.children("file")) {
-            for (const auto& item: file.children("item")) {
-                if (file.find_child_by_attribute("effec-url", effec_url.toStdString().c_str())) {
-                    item.attribute("status").set_value(convDlStat_toInt(status));
+        pugi::xml_node items = doc.child(XML_PARENT_NODE);
+        for (const auto& file: items.children(XML_CHILD_NODE_FILE)) {
+            for (const auto& item: file.children(XML_CHILD_ITEM_FILE)) {
+                if (file.find_child_by_attribute(XML_ITEM_ATTR_FILE_FLOC, file_loc.c_str())) {
+                    item.attribute(XML_ITEM_ATTR_FILE_STAT).set_value(convDlStat_toInt(status));
+                    if (!hash_checksum.empty()) {
+                        item.attribute(XML_ITEM_ATTR_FILE_HASH_VAL_RTRND).set_value(hash_checksum.c_str());
+                        item.attribute(XML_ITEM_ATTR_FILE_HASH_SUCC_TYPE).set_value(convHashVerif_toInt(ret_succ_type));
+                    }
                 }
             }
         }
 
         bool saveSucceed = doc.save_file(xmlCfgFile_loc.string().c_str(), PUGIXML_TEXT("    "));
-        if (saveSucceed == false) {
+        if (!saveSucceed) {
             throw std::runtime_error(tr("Error with saving XML config file!").toStdString());
         }
 
@@ -463,7 +589,7 @@ bool GekkoFyre::CmnRoutines::modifyDlState(const QString &effec_url,
     return false;
 }
 
-short GekkoFyre::CmnRoutines::convDlStat_toInt(const GekkoFyre::DownloadStatus &status)
+int GekkoFyre::CmnRoutines::convDlStat_toInt(const GekkoFyre::DownloadStatus &status)
 {
     switch (status) {
     case GekkoFyre::DownloadStatus::Downloading:
@@ -485,29 +611,103 @@ short GekkoFyre::CmnRoutines::convDlStat_toInt(const GekkoFyre::DownloadStatus &
     }
 }
 
-short GekkoFyre::CmnRoutines::convHashType_toInt(const GekkoFyre::HashType &hash_type)
+int GekkoFyre::CmnRoutines::convHashType_toInt(const GekkoFyre::HashType &hash_type)
 {
     switch (hash_type) {
-        case GekkoFyre::HashType::CRC32:
-            return 1;
         case GekkoFyre::HashType::MD5:
-            return 2;
+            return 1;
         case GekkoFyre::HashType::SHA1:
-            return 3;
+            return 2;
         case GekkoFyre::HashType::SHA256:
-            return 4;
+            return 3;
         case GekkoFyre::HashType::SHA512:
-            return 5;
+            return 4;
         case GekkoFyre::HashType::SHA3_256:
-            return 6;
+            return 5;
         case GekkoFyre::HashType::SHA3_512:
-            return 7;
+            return 6;
         case GekkoFyre::HashType::None:
             return 0;
         case GekkoFyre::HashType::CannotDetermine:
             return -1;
         default:
             return -1;
+    }
+}
+
+int GekkoFyre::CmnRoutines::convHashVerif_toInt(const GekkoFyre::HashVerif &hash_verif)
+{
+    switch (hash_verif) {
+        case GekkoFyre::HashVerif::Analyzing:
+            return 1;
+        case GekkoFyre::HashVerif::NotApplicable:
+            return 0;
+        case GekkoFyre::HashVerif::Verified:
+            return 2;
+        case GekkoFyre::HashVerif::Corrupt:
+            return -1;
+        default:
+            return 0;
+    }
+}
+
+GekkoFyre::HashType GekkoFyre::CmnRoutines::convHashType_IntToEnum(const int &t)
+{
+    switch (t) {
+        case 1:
+            return GekkoFyre::HashType::MD5;
+        case 2:
+            return GekkoFyre::HashType::SHA1;
+        case 3:
+            return GekkoFyre::HashType::SHA256;
+        case 4:
+            return GekkoFyre::HashType::SHA512;
+        case 5:
+            return GekkoFyre::HashType::SHA3_256;
+        case 6:
+            return GekkoFyre::HashType::SHA3_512;
+        case 0:
+            return GekkoFyre::HashType::None;
+        case -1:
+            return GekkoFyre::HashType::CannotDetermine;
+        default:
+            return GekkoFyre::HashType::CannotDetermine;
+    }
+}
+
+GekkoFyre::HashVerif GekkoFyre::CmnRoutines::convHashVerif_IntToEnum(const int &v)
+{
+    switch (v) {
+        case 1:
+            return GekkoFyre::HashVerif::Analyzing;
+        case 0:
+            return GekkoFyre::HashVerif::NotApplicable;
+        case 2:
+            return GekkoFyre::HashVerif::Verified;
+        case -1:
+            return GekkoFyre::HashVerif::Corrupt;
+        default:
+            return GekkoFyre::HashVerif::NotApplicable;
+    }
+}
+
+QCryptographicHash::Algorithm GekkoFyre::CmnRoutines::convHashType_toAlgo(const GekkoFyre::HashType &hash_type)
+{
+    switch (hash_type) {
+        case GekkoFyre::HashType::MD5:
+            return QCryptographicHash::Algorithm::Md5;
+        case GekkoFyre::HashType::SHA1:
+            return QCryptographicHash::Algorithm::Sha1;
+        case GekkoFyre::HashType::SHA256:
+            return QCryptographicHash::Algorithm::Sha256;
+        case GekkoFyre::HashType::SHA512:
+            return QCryptographicHash::Algorithm::Sha512;
+        case GekkoFyre::HashType::SHA3_256:
+            return QCryptographicHash::Algorithm::Sha3_256;
+        case GekkoFyre::HashType::SHA3_512:
+            return QCryptographicHash::Algorithm::Sha3_512;
+        default:
+            return QCryptographicHash::Algorithm::Md4; // This hash is /never/ used, so it's a good default!
     }
 }
 

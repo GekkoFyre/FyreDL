@@ -511,7 +511,7 @@ void MainWindow::on_dlstartToolBtn_clicked()
                     GekkoFyre::GkCurl::CurlInfo verify = GekkoFyre::CurlEasy::verifyFileExists(url);
                     if (verify.response_code == 200) {
                         if (status != GekkoFyre::DownloadStatus::Downloading) {
-                            routines->modifyDlState(url, GekkoFyre::DownloadStatus::Downloading);
+                            routines->modifyDlState(oss_dest.str(), GekkoFyre::DownloadStatus::Downloading);
                             dlModel->updateCol(index, routines->convDlStat_toString(GekkoFyre::DownloadStatus::Downloading), MN_STATUS_COL);
 
                             QObject::connect(GekkoFyre::routine_singleton::instance(), SIGNAL(sendXferStats(GekkoFyre::GkCurl::CurlProgressPtr)), this, SLOT(recvXferStats(GekkoFyre::GkCurl::CurlProgressPtr)));
@@ -541,10 +541,14 @@ void MainWindow::on_dlpauseToolBtn_clicked()
         if (indexes.at(0).isValid()) {
             try {
                 const QString url = ui->downloadView->model()->data(ui->downloadView->model()->index(indexes.at(0).row(), MN_URL_COL)).toString();
+                const QString dest = ui->downloadView->model()->data(ui->downloadView->model()->index(indexes.at(0).row(), MN_DESTINATION_COL)).toString();
+                std::ostringstream oss_dest;
+                oss_dest << dest.toStdString() << fs::path::preferred_separator << routines->extractFilename(url).toStdString();
+
                 QModelIndex index = dlModel->index(indexes.at(0).row(), MN_STATUS_COL, QModelIndex());
                 const GekkoFyre::DownloadStatus status = routines->convDlStat_StringToEnum(ui->downloadView->model()->data(index).toString());
                 if (status != GekkoFyre::DownloadStatus::Paused && status != GekkoFyre::DownloadStatus::Completed) {
-                    routines->modifyDlState(url, GekkoFyre::DownloadStatus::Paused);
+                    routines->modifyDlState(oss_dest.str(), GekkoFyre::DownloadStatus::Paused);
                     dlModel->updateCol(index, routines->convDlStat_toString(GekkoFyre::DownloadStatus::Paused), MN_STATUS_COL);
                 }
             } catch (const std::exception &e) {
@@ -570,12 +574,16 @@ void MainWindow::on_dlstopToolBtn_clicked()
     if (!flagDif) {
         try {
             const QString url = ui->downloadView->model()->data(ui->downloadView->model()->index(indexes.at(0).row(), MN_URL_COL)).toString();
+            const QString dest = ui->downloadView->model()->data(ui->downloadView->model()->index(indexes.at(0).row(), MN_DESTINATION_COL)).toString();
+            std::ostringstream oss_dest;
+            oss_dest << dest.toStdString() << fs::path::preferred_separator << routines->extractFilename(url).toStdString();
+
             QModelIndex index = dlModel->index(indexes.at(0).row(), MN_STATUS_COL, QModelIndex());
             const GekkoFyre::DownloadStatus status = routines->convDlStat_StringToEnum(ui->downloadView->model()->data(index).toString());
             if (status != GekkoFyre::DownloadStatus::Stopped && status != GekkoFyre::DownloadStatus::Completed) {
                 QObject::connect(this, SIGNAL(sendStopDownload(QString)), curl_multi, SLOT(recvStopDl(QString)));
                 emit sendStopDownload(ui->downloadView->model()->data(ui->downloadView->model()->index(indexes.at(0).row(), MN_DESTINATION_COL)).toString());
-                routines->modifyDlState(url, GekkoFyre::DownloadStatus::Stopped);
+                routines->modifyDlState(oss_dest.str(), GekkoFyre::DownloadStatus::Stopped);
                 dlModel->updateCol(index, routines->convDlStat_toString(GekkoFyre::DownloadStatus::Stopped), MN_STATUS_COL);
             }
         } catch (const std::exception &e) {
@@ -809,7 +817,20 @@ void MainWindow::recvDlFinished(const GekkoFyre::GkCurl::DlStatusMsg &status)
                 if (oss_dest.str() == status.file_loc) {
                     QModelIndex stat_index = dlModel->index(i, MN_STATUS_COL);
                     if (routines->convDlStat_StringToEnum(ui->downloadView->model()->data(stat_index).toString()) == GekkoFyre::DownloadStatus::Downloading) {
-                        routines->modifyDlState(status.url, GekkoFyre::DownloadStatus::Completed);
+                        GekkoFyre::GkFile::FileHash file_hash;
+                        std::vector<GekkoFyre::GkCurl::CurlDlInfo> dl_mini_info_vec = routines->readDownloadInfo(CFG_HISTORY_FILE, true);
+                        for (size_t j = 0; j < dl_mini_info_vec.size(); ++j) {
+                            fs::path boost_path(status.file_loc);
+                            if (dl_mini_info_vec.at(j).file_loc == boost_path.parent_path() && dl_mini_info_vec.at(j).ext_info.effective_url == status.url.toStdString()) {
+                                file_hash = routines->cryptoFileHash(
+                                        QString::fromStdString(status.file_loc), dl_mini_info_vec.at(j).hash_type,
+                                        QString::fromStdString(dl_mini_info_vec.at(j).hash_val_given));
+                                break;
+                            }
+                        }
+
+                        routines->modifyDlState(status.file_loc, GekkoFyre::DownloadStatus::Completed, file_hash.checksum.toStdString(),
+                                                file_hash.hash_verif);
                         dlModel->updateCol(stat_index, routines->convDlStat_toString(GekkoFyre::DownloadStatus::Completed), MN_STATUS_COL);
 
                         // Update the 'downloaded amount' because the statistics routines are not always accurate, due to only
