@@ -269,9 +269,11 @@ GekkoFyre::GkFile::FileHash GekkoFyre::CmnRoutines::cryptoFileHash(const QString
                     if (vec_hash_val.at(i) == given_hash_val) {
                         info.hash_verif = GekkoFyre::HashVerif::Verified;
                         return info;
-                    } else {
+                    } else if ((i == vec_hash_val.size()) && (vec_hash_val.at(i) != given_hash_val)) {
                         info.hash_verif = GekkoFyre::HashVerif::Corrupt;
                         return info;
+                    } else {
+                        continue;
                     }
                 }
             }
