@@ -83,8 +83,8 @@ private:
     GekkoFyre::CmnRoutines *routines;
     GekkoFyre::CurlMulti *curl_multi;
     GekkoFyre::DownloadStatus status;
-    std::vector<GekkoFyre::GkCurl::CurlProgressPtr> *dl_stat;
-    std::vector<GekkoFyre::GkGraph::GraphInit> *graph_init;
+    std::vector<GekkoFyre::GkCurl::CurlProgressPtr> dl_stat;
+    std::vector<GekkoFyre::GkGraph::GraphInit> graph_init;
 
     // http://stackoverflow.com/questions/10121560/stdthread-naming-your-thread
     QThread *curl_multi_thread;

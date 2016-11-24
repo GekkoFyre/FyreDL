@@ -102,7 +102,6 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
 
     routines = new GekkoFyre::CmnRoutines();
     curl_multi = new GekkoFyre::CurlMulti();
-    dl_stat = new std::vector<GekkoFyre::GkCurl::CurlProgressPtr>();
 
     // http://wiki.qt.io/QThreads_general_usage
     // https://mayaposch.wordpress.com/2011/11/01/how-to-really-truly-use-qthreads-the-full-explanation/
@@ -123,8 +122,6 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
     QObject::connect(ui->downloadView, SIGNAL(customContextMenuRequested(QPoint)), this, SLOT(on_downloadView_customContextMenuRequested(QPoint)));
     QObject::connect(this, SIGNAL(updateDlStats()), this, SLOT(manageDlStats()));
 
-    graph_init = new std::vector<GekkoFyre::GkGraph::GraphInit>();
-
     try {
         readFromHistoryFile();
     } catch (const std::exception &e) {
@@ -137,9 +134,8 @@ MainWindow::~MainWindow()
     delete ui;
     emit finish_curl_multi_thread();
     delete routines;
-    delete dl_stat;
-    graph_init->clear();
-    delete graph_init;
+    dl_stat.clear();
+    graph_init.clear();
 }
 
 /**
@@ -302,10 +298,10 @@ void MainWindow::removeSelRows()
  */
 void MainWindow::initCharts(const std::string &file_dest)
 {
-    if (!graph_init->empty()) {
-        for (size_t i = 0; i < graph_init->size(); ++i) {
+    if (!graph_init.empty()) {
+        for (size_t i = 0; i < graph_init.size(); ++i) {
             // Check for pre-existing object and output a soft-error if so
-            if (graph_init->at(i).down_speed->file_dest == file_dest) {
+            if (graph_init.at(i).down_speed->file_dest == file_dest) {
                 std::cerr << tr("Existing graph-object! File in question: %1")
                         .arg(QString::fromStdString(file_dest)).toStdString() << std::endl;
                 return;
@@ -329,7 +325,7 @@ void MainWindow::initCharts(const std::string &file_dest)
     // TODO: Fix this memory leak!
     create_graph.down_speed = down_speed_graph.release();
 
-    graph_init->push_back(create_graph);
+    graph_init.push_back(create_graph);
     return;
 }
 
@@ -345,16 +341,16 @@ void MainWindow::initCharts(const std::string &file_dest)
  */
 void MainWindow::displayCharts(const std::string &file_dest)
 {
-    for (size_t i = 0; i < graph_init->size(); ++i) {
+    for (size_t i = 0; i < graph_init.size(); ++i) {
         if (ui->tabStatusWidget->currentIndex() == TAB_INDEX_GRAPH) {
-            if (graph_init->at(i).down_speed->down_speed_series == nullptr) {
+            if (graph_init.at(i).down_speed->down_speed_series == nullptr) {
                 throw std::invalid_argument(tr("Download-speed graph pointer is NULL! Index: %1").arg(QString::number(i)).toStdString());
             }
 
-            if (graph_init->at(i).down_speed->file_dest == file_dest) {
+            if (graph_init.at(i).down_speed->file_dest == file_dest) {
                 // Create the needed 'series'
                 std::unique_ptr<QtCharts::QSplineSeries> down_speed_series;
-                down_speed_series.reset(graph_init->at(i).down_speed->down_speed_series.get());
+                down_speed_series.reset(graph_init.at(i).down_speed->down_speed_series.get());
 
                 down_speed_series->setName(tr("Download speed spline %1").arg(i));
 
@@ -389,12 +385,12 @@ void MainWindow::displayCharts(const std::string &file_dest)
  */
 void MainWindow::delCharts(const std::string &file_dest)
 {
-    if (!graph_init->empty()) {
-        for (size_t i = 0; i < graph_init->size(); ++i) {
-            if (!graph_init->at(i).down_speed->file_dest.empty() &&
-                    graph_init->at(i).down_speed->down_speed_series.get() != nullptr) {
-                if (graph_init->at(i).down_speed->file_dest == file_dest) {
-                    graph_init->erase(graph_init->begin() + (long)i);
+    if (!graph_init.empty()) {
+        for (size_t i = 0; i < graph_init.size(); ++i) {
+            if (!graph_init.at(i).down_speed->file_dest.empty() &&
+                    graph_init.at(i).down_speed->down_speed_series.get() != nullptr) {
+                if (graph_init.at(i).down_speed->file_dest == file_dest) {
+                    graph_init.erase(graph_init.begin() + (long)i);
                     return;
                 }
             }
@@ -703,8 +699,8 @@ void MainWindow::recvXferStats(const GekkoFyre::GkCurl::CurlProgressPtr &info)
     prog_temp.file_dest = info.file_dest;
 
     bool alreadyExists = false;
-    for (size_t i = 0; i < dl_stat->size(); ++i) {
-        if (dl_stat->at(i).file_dest == prog_temp.file_dest) {
+    for (size_t i = 0; i < dl_stat.size(); ++i) {
+        if (dl_stat.at(i).file_dest == prog_temp.file_dest) {
             alreadyExists = true;
             break;
         }
@@ -713,14 +709,14 @@ void MainWindow::recvXferStats(const GekkoFyre::GkCurl::CurlProgressPtr &info)
     if (!alreadyExists) {
         // If it doesn't exist, push the whole of 'prog_temp' onto the private, class-global 'dl_stat' and
         // thusly updateDlStats().
-        dl_stat->push_back(prog_temp);
+        dl_stat.push_back(prog_temp);
         emit updateDlStats();
         return;
     } else {
         // If it does exist, then only update certain elements instead and thusly updateDlStats() also.
-        for (size_t i = 0; i < dl_stat->size(); ++i) {
-            if (dl_stat->at(i).file_dest == prog_temp.file_dest) {
-                dl_stat->at(i).stat = prog_temp.stat;
+        for (size_t i = 0; i < dl_stat.size(); ++i) {
+            if (dl_stat.at(i).file_dest == prog_temp.file_dest) {
+                dl_stat.at(i).stat = prog_temp.stat;
                 emit updateDlStats();
                 return;
             }
@@ -740,10 +736,10 @@ void MainWindow::manageDlStats()
     // TODO: Have FyreDL immediately stop this routine, MainWindow::manageDlStats(), after a download is completed.
     for (int i = 0; i < dlModel->getList().size(); ++i) {
         QModelIndex find_index = dlModel->index(i, MN_URL_COL);
-        for (size_t j = 0; j < dl_stat->size(); ++j) {
-            if (ui->downloadView->model()->data(find_index).toString().toStdString() == dl_stat->at(j).url) {
+        for (size_t j = 0; j < dl_stat.size(); ++j) {
+            if (ui->downloadView->model()->data(find_index).toString().toStdString() == dl_stat.at(j).url) {
                 try {
-                    GekkoFyre::GkCurl::CurlDlStats dl_stat_element = dl_stat->at(j).stat.back();
+                    GekkoFyre::GkCurl::CurlDlStats dl_stat_element = dl_stat.at(j).stat.back();
                     std::ostringstream oss_dlnow;
                     oss_dlnow << routines->numberConverter(dl_stat_element.dlnow).toStdString() << tr("/sec").toStdString();
 
@@ -751,18 +747,18 @@ void MainWindow::manageDlStats()
                     dlModel->updateCol(dlModel->index(i, MN_DOWNLOADED_COL), routines->numberConverter(dl_stat_element.dltotal), MN_DOWNLOADED_COL);
 
                     // Update the 'download speed' spline-graph, via the file location
-                    if (!graph_init->empty()) {
-                        for (size_t k = 0; k < graph_init->size(); ++k) {
+                    if (!graph_init.empty()) {
+                        for (size_t k = 0; k < graph_init.size(); ++k) {
 
                             // Verify that the constants we are going to use are not empty/nullptr
-                            if (!graph_init->at(k).down_speed->file_dest.empty() &&
-                                    !dl_stat->at(j).file_dest.empty() && graph_init->at(k).down_speed->down_speed_series != nullptr) {
+                            if (!graph_init.at(k).down_speed->file_dest.empty() &&
+                                    !dl_stat.at(j).file_dest.empty() && graph_init.at(k).down_speed->down_speed_series != nullptr) {
 
                                 // Make sure we are using the right 'graph_init' element!
-                                if (graph_init->at(k).down_speed->file_dest == dl_stat->at(j).file_dest) {
+                                if (graph_init.at(k).down_speed->file_dest == dl_stat.at(j).file_dest) {
                                     // TODO: Fix the SIGSEGV bug relating to the code immediately below! NOTE: It only occurs some of the time.
                                     // Append our statistics to the 'graph_init' struct and thus, the graph in question
-                                    graph_init->at(k).down_speed->down_speed_series->append(dl_stat_element.dlnow,
+                                    graph_init.at(k).down_speed->down_speed_series->append(dl_stat_element.dlnow,
                                                                                             dl_stat_element.cur_time);
                                 }
                             } else {
