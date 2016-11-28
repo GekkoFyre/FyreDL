@@ -115,6 +115,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
 
     dlModel = new downloadModel();
     ui->downloadView->setModel(dlModel);
+    ui->downloadView->setSelectionBehavior(QAbstractItemView::SelectRows);
     ui->downloadView->setSelectionMode(QAbstractItemView::SingleSelection);
     ui->downloadView->horizontalHeader()->setStretchLastSection(true); // http://stackoverflow.com/questions/16931569/qstandarditemmodel-inside-qtableview
     ui->downloadView->setContextMenuPolicy(Qt::CustomContextMenu);
@@ -127,6 +128,11 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
     } catch (const std::exception &e) {
         QMessageBox::warning(this, tr("Error!"), QString("%1").arg(e.what()), QMessageBox::Ok);
     }
+
+    // Manage the up/down keyboard-presses that happen in the QTableView, 'downloadView'
+    ui->downloadView->installEventFilter(dlModel);
+    QObject::connect(dlModel, SIGNAL(keyUpGkEvent()), this, SLOT(keyUpDlModelSlot()));
+    QObject::connect(dlModel, SIGNAL(keyDownGkEvent()), this, SLOT(keyDownDlModelSlot()));
 }
 
 MainWindow::~MainWindow()
@@ -243,6 +249,9 @@ void MainWindow::insertNewRow(const std::string &fileName, const double &fileSiz
     index = dlModel->index(0, MN_URL_COL, QModelIndex());
     dlModel->setData(index, QString::fromStdString(url), Qt::DisplayRole);
 
+    // Refresh the GUI
+    ui->downloadView->update();
+
     // Create the required graph/chart objects and initialize them
     initCharts(destination);
 
@@ -261,7 +270,7 @@ void MainWindow::removeSelRows()
 {
     // Be sure not to delete items from within slots connected to signals that have the item (or its
     // index) as their parameter.
-    QModelIndexList indexes = ui->downloadView->selectionModel()->selectedIndexes();
+    QModelIndexList indexes = ui->downloadView->selectionModel()->selectedRows();
     int countRow = indexes.count();
 
     if (indexes.size() > 0) {
@@ -277,6 +286,9 @@ void MainWindow::removeSelRows()
 
                 // ...and then the GUI
                 dlModel->removeRows(indexes.at(0).row(), countRow, QModelIndex());
+
+                // Now refresh the GUI
+                ui->downloadView->update();
 
                 return;
             } catch (const std::exception &e) {
@@ -309,21 +321,21 @@ void MainWindow::initCharts(const std::string &file_dest)
         }
     }
 
-    std::unique_ptr<GekkoFyre::GkGraph::DownSpeedGraph> down_speed_graph;
+    GekkoFyre::GkGraph::DownSpeedGraph *down_speed_graph;
     GekkoFyre::GkGraph::GraphInit create_graph;
 
     // Initialize 'down_speed_graph' struct
-    down_speed_graph.reset(new GekkoFyre::GkGraph::DownSpeedGraph);
+    down_speed_graph = new GekkoFyre::GkGraph::DownSpeedGraph;
 
     // Intialize the 'down_speed_series' QSplineSeries
-    down_speed_graph->down_speed_series.reset(new QtCharts::QSplineSeries());
+    down_speed_graph->down_speed_series = new QtCharts::QSplineSeries(this);
 
     // Set the file location of the download, and thus matching graph
     down_speed_graph->file_dest = file_dest;
 
     // Add the sub-struct to our main struct
     // TODO: Fix this memory leak!
-    create_graph.down_speed = down_speed_graph.release();
+    create_graph.down_speed = down_speed_graph;
 
     graph_init.push_back(create_graph);
     return;
@@ -337,6 +349,7 @@ void MainWindow::initCharts(const std::string &file_dest)
  * @note <http://doc.qt.io/qt-5/qtcharts-index.html>
  *       <http://doc.qt.io/qt-5/qtcharts-splinechart-example.html>
  *       <http://en.cppreference.com/w/cpp/chrono/c/time>
+ *       <http://doc.qt.io/qt-5/qtcharts-zoomlinechart-chartview-cpp.html>
  * @param file_dest The file destination of the download in question, relating to the chart being displayed
  */
 void MainWindow::displayCharts(const std::string &file_dest)
@@ -349,23 +362,33 @@ void MainWindow::displayCharts(const std::string &file_dest)
 
             if (graph_init.at(i).down_speed->file_dest == file_dest) {
                 // Create the needed 'series'
-                std::unique_ptr<QtCharts::QSplineSeries> down_speed_series;
-                down_speed_series.reset(graph_init.at(i).down_speed->down_speed_series.get());
+                QtCharts::QSplineSeries *down_speed_series = new QtCharts::QSplineSeries(graph_init.at(i).down_speed->down_speed_series);
 
                 down_speed_series->setName(tr("Download speed spline %1").arg(i));
+                QFile qfile_path(QString::fromStdString(file_dest));
 
                 // Create the needed QChart and set its initial properties
-                std::unique_ptr<QtCharts::QChart> chart(new QtCharts::QChart());
+                QtCharts::QChart *chart = new QtCharts::QChart();
                 chart->legend()->show();
-                chart->addSeries(down_speed_series.get());
-                chart->setTitle(tr("Download Speed"));
+                chart->addSeries(down_speed_series);
+                chart->setTitle(tr("Download Speed for %1").arg(qfile_path.fileName()));
                 chart->createDefaultAxes();
                 chart->axisY()->setTitleText(tr("Download speed (KB/sec)")); // The title of the y-axis
                 chart->axisX()->setTitleText(tr("Time passed (seconds)")); // The title of the x-axis
 
                 // Create the QChartView, which displays the graph, and set some initial properties
-                std::unique_ptr<QtCharts::QChartView> chartView(new QtCharts::QChartView(chart.get()));
+                QtCharts::QChartView *chartView = new QtCharts::QChartView(chart);
                 chartView->setRenderHint(QPainter::Antialiasing);
+
+                if (!ui->graphVerticalLayout->isEmpty()) { // Check to see if the layout contains any widgets
+                    routines->clearLayout(ui->graphVerticalLayout);
+                }
+
+                ui->graphVerticalLayout->insertWidget(0, chartView);
+                chartView->setAlignment(Qt::AlignCenter);
+                chartView->setRubberBand(QtCharts::QChartView::RectangleRubberBand);
+                chartView->show();
+                ui->graphVerticalLayout->update();
                 return;
             }
         }
@@ -388,7 +411,7 @@ void MainWindow::delCharts(const std::string &file_dest)
     if (!graph_init.empty()) {
         for (size_t i = 0; i < graph_init.size(); ++i) {
             if (!graph_init.at(i).down_speed->file_dest.empty() &&
-                    graph_init.at(i).down_speed->down_speed_series.get() != nullptr) {
+                    graph_init.at(i).down_speed->down_speed_series != nullptr) {
                 if (graph_init.at(i).down_speed->file_dest == file_dest) {
                     graph_init.erase(graph_init.begin() + (long)i);
                     return;
@@ -398,6 +421,18 @@ void MainWindow::delCharts(const std::string &file_dest)
     }
 
     throw std::invalid_argument(tr("'delCharts()' failed!").toStdString());
+}
+
+void MainWindow::updateChart()
+{
+    QModelIndexList indexes = ui->downloadView->selectionModel()->selectedRows();
+
+    if (indexes.size() > 0) {
+        if (indexes.at(0).isValid()) {
+            const QString dest = ui->downloadView->model()->data(ui->downloadView->model()->index(indexes.at(0).row(), MN_DESTINATION_COL)).toString();
+            displayCharts(dest.toStdString());
+        }
+    }
 }
 
 void MainWindow::on_action_Open_a_File_triggered()
@@ -457,7 +492,7 @@ void MainWindow::on_printToolBtn_clicked()
  */
 void MainWindow::on_dlstartToolBtn_clicked()
 {
-    QModelIndexList indexes = ui->downloadView->selectionModel()->selectedIndexes();
+    QModelIndexList indexes = ui->downloadView->selectionModel()->selectedRows();
 
     if (indexes.size() > 0) {
         if (indexes.at(0).isValid()) {
@@ -524,7 +559,7 @@ void MainWindow::on_dlstartToolBtn_clicked()
 
 void MainWindow::on_dlpauseToolBtn_clicked()
 {
-    QModelIndexList indexes = ui->downloadView->selectionModel()->selectedIndexes();
+    QModelIndexList indexes = ui->downloadView->selectionModel()->selectedRows();
 
     if (indexes.size() > 0) {
         if (indexes.at(0).isValid()) {
@@ -548,7 +583,7 @@ void MainWindow::on_dlpauseToolBtn_clicked()
 
 void MainWindow::on_dlstopToolBtn_clicked()
 {
-    QModelIndexList indexes = ui->downloadView->selectionModel()->selectedIndexes();
+    QModelIndexList indexes = ui->downloadView->selectionModel()->selectedRows();
     int countRow = indexes.count();
 
     bool flagDif = false;
@@ -570,6 +605,7 @@ void MainWindow::on_dlstopToolBtn_clicked()
                 emit sendStopDownload(ui->downloadView->model()->data(ui->downloadView->model()->index(indexes.at(0).row(), MN_DESTINATION_COL)).toString());
                 routines->modifyDlState(dest.toStdString(), GekkoFyre::DownloadStatus::Stopped);
                 dlModel->updateCol(index, routines->convDlStat_toString(GekkoFyre::DownloadStatus::Stopped), MN_STATUS_COL);
+                ui->downloadView->update();
             }
         } catch (const std::exception &e) {
             QMessageBox::warning(this, tr("Error!"), QString("%1").arg(e.what()), QMessageBox::Ok);
@@ -581,6 +617,7 @@ void MainWindow::on_dlstopToolBtn_clicked()
 void MainWindow::on_removeToolBtn_clicked()
 {
     removeSelRows();
+    ui->downloadView->update();
 }
 
 /**
@@ -616,6 +653,7 @@ void MainWindow::on_clearhistoryToolBtn_clicked()
                 try {
                     delCharts(ui->downloadView->model()->data(file_dest_index).toString().toStdString());
                     routines->delDownloadItem(url_string);
+                    ui->downloadView->update();
                 } catch (const std::exception &e) {
                     QMessageBox::warning(this, tr("Error!"), QString("%1").arg(e.what()), QMessageBox::Ok);
                     return;
@@ -625,6 +663,7 @@ void MainWindow::on_clearhistoryToolBtn_clicked()
 
         for (int i = indexes.count(); i > 0; --i) {
             dlModel->removeRow(indexes.at(i - 1).row(), QModelIndex());
+            ui->downloadView->update();
         }
 
         return;
@@ -655,8 +694,49 @@ void MainWindow::on_settingsToolBtn_clicked()
  */
 void MainWindow::on_tabStatusWidget_currentChanged(int index)
 {
+    updateChart();
+}
+
+/**
+ * @brief MainWindow::on_downloadView_customContextMenuRequested
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @date   2016-10-15
+ * @note   <https://forum.qt.io/topic/31233/how-to-create-a-custom-context-menu-for-qtableview/3>
+ * @param pos
+ */
+void MainWindow::on_downloadView_customContextMenuRequested(const QPoint &pos)
+{
+    ui->downloadView->indexAt(pos);
+
+    QMenu *menu = new QMenu(this);
+    menu->addAction(new QAction(tr("Edit"), this));
+    menu->addAction(new QAction(tr("Delete"), this));
+
+    menu->popup(ui->downloadView->viewport()->mapToGlobal(pos));
+}
+
+void MainWindow::on_downloadView_clicked(const QModelIndex &index)
+{
     Q_UNUSED(index);
-    return;
+    updateChart();
+}
+
+void MainWindow::keyUpDlModelSlot()
+{
+    QModelIndexList indexes = ui->downloadView->selectionModel()->selectedRows();
+    int row = indexes.at(0).row();
+    --row;
+    ui->downloadView->selectRow(row);
+    updateChart();
+}
+
+void MainWindow::keyDownDlModelSlot()
+{
+    QModelIndexList indexes = ui->downloadView->selectionModel()->selectedRows();
+    int row = indexes.at(0).row();
+    ++row;
+    ui->downloadView->selectRow(row);
+    updateChart();
 }
 
 void MainWindow::sendDetails(const std::string &fileName, const double &fileSize, const int &downloaded,
@@ -735,9 +815,9 @@ void MainWindow::manageDlStats()
 {
     // TODO: Have FyreDL immediately stop this routine, MainWindow::manageDlStats(), after a download is completed.
     for (int i = 0; i < dlModel->getList().size(); ++i) {
-        QModelIndex find_index = dlModel->index(i, MN_URL_COL);
+        QModelIndex find_index = dlModel->index(i, MN_DESTINATION_COL);
         for (size_t j = 0; j < dl_stat.size(); ++j) {
-            if (ui->downloadView->model()->data(find_index).toString().toStdString() == dl_stat.at(j).url) {
+            if (ui->downloadView->model()->data(find_index).toString().toStdString() == dl_stat.at(j).file_dest && !dl_stat.at(j).dl_complete) {
                 try {
                     GekkoFyre::GkCurl::CurlDlStats dl_stat_element = dl_stat.at(j).stat.back();
                     std::ostringstream oss_dlnow;
@@ -807,6 +887,13 @@ void MainWindow::recvDlFinished(const GekkoFyre::GkCurl::DlStatusMsg &status)
                             }
                         }
 
+                        for (size_t j = 0; j < dl_stat.size(); ++j) {
+                            if (status.file_loc == dl_stat.at(j).file_dest) {
+                                dl_stat.at(j).dl_complete = true;
+                                break;
+                            }
+                        }
+
                         routines->modifyDlState(status.file_loc, GekkoFyre::DownloadStatus::Completed, file_hash.checksum.toStdString(),
                                                 file_hash.hash_verif);
                         dlModel->updateCol(stat_index, routines->convDlStat_toString(GekkoFyre::DownloadStatus::Completed), MN_STATUS_COL);
@@ -836,35 +923,4 @@ void MainWindow::recvDlFinished(const GekkoFyre::GkCurl::DlStatusMsg &status)
     }
 
     return;
-}
-
-/**
- * @brief MainWindow::on_downloadView_customContextMenuRequested
- * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
- * @date   2016-10-15
- * @note   <https://forum.qt.io/topic/31233/how-to-create-a-custom-context-menu-for-qtableview/3>
- * @param pos
- */
-void MainWindow::on_downloadView_customContextMenuRequested(const QPoint &pos)
-{
-    ui->downloadView->indexAt(pos);
-
-    QMenu *menu = new QMenu(this);
-    menu->addAction(new QAction(tr("Edit"), this));
-    menu->addAction(new QAction(tr("Delete"), this));
-
-    menu->popup(ui->downloadView->viewport()->mapToGlobal(pos));
-}
-
-/**
- * @brief MainWindow::on_downloadView_activated gives the specific index of an item when selected/activated within
- * the QTableView object, 'downloadView'.
- * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
- * @date 2016-11-18
- * @param index
- * @see MainWindow::displayCharts(), MainWindow::delCharts()
- */
-void MainWindow::on_downloadView_activated(const QModelIndex &index)
-{
-    Q_UNUSED(index);
 }

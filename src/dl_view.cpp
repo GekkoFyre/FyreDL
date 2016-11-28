@@ -284,6 +284,33 @@ bool downloadModel::updateCol(const QModelIndex &index, const QVariant &value, c
 }
 
 /**
+ * @note <http://www.qtcentre.org/threads/9715-QTableView-key-pressed>
+ *       <http://www.qtcentre.org/threads/19660-problem-with-keypress-event-and-QTableView>
+ * @param watched
+ * @param event
+ * @return
+ */
+bool downloadModel::eventFilter(QObject *watched, QEvent *event)
+{
+    Q_UNUSED(watched);
+    if (event->type() == QEvent::KeyPress) {
+        QKeyEvent *ke = static_cast<QKeyEvent *>(event);
+        switch (ke->key()) {
+            case Qt::Key_Up:
+                emit keyUpGkEvent();
+                break;
+            case Qt::Key_Down:
+                emit keyDownGkEvent();
+                break;
+            default:
+                break;
+        }
+    }
+
+    return true;
+}
+
+/**
  * @brief downloadModel::getList
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
  * @return

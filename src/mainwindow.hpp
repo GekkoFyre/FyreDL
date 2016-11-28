@@ -78,6 +78,7 @@ private:
     void initCharts(const std::string &file_dest);
     void displayCharts(const std::string &file_dest);
     void delCharts(const std::string &file_dest);
+    void updateChart();
 
     downloadModel *dlModel;
     GekkoFyre::CmnRoutines *routines;
@@ -112,7 +113,9 @@ private slots:
     void on_settingsToolBtn_clicked();
     void on_tabStatusWidget_currentChanged(int index);
     void on_downloadView_customContextMenuRequested(const QPoint &pos);
-    void on_downloadView_activated(const QModelIndex &index);
+    void on_downloadView_clicked(const QModelIndex &index);
+    void keyUpDlModelSlot();
+    void keyDownDlModelSlot();
     void sendDetails(const std::string &fileName, const double &fileSize, const int &downloaded,
                      const double &progress, const int &upSpeed, const int &downSpeed,
                      const GekkoFyre::DownloadStatus &status, const std::string &url,

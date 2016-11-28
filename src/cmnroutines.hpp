@@ -54,6 +54,7 @@
 #include <QMutex>
 #include <QStorageInfo>
 #include <QCryptographicHash>
+#include <QLayout>
 
 extern "C" {
 #include <sys/stat.h>
@@ -93,6 +94,8 @@ public:
     qint64 freeDiskSpace(const QStorageInfo &storage = QStorageInfo::root());
     GekkoFyre::GkFile::FileHash cryptoFileHash(const QString &file_dest, const GekkoFyre::HashType &hash_type,
                                                const QString &given_hash_val);
+
+    void clearLayout(QLayout *layout);
 
     std::vector<GekkoFyre::GkCurl::CurlDlInfo> readDownloadInfo(const std::string &xmlCfgFile = CFG_HISTORY_FILE, const bool &hashesOnly = false);
     bool writeDownloadItem(GekkoFyre::GkCurl::CurlDlInfo &dl_info_list, const std::string &xmlCfgFile = CFG_HISTORY_FILE);

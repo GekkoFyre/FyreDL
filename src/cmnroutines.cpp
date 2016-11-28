@@ -287,6 +287,29 @@ GekkoFyre::GkFile::FileHash GekkoFyre::CmnRoutines::cryptoFileHash(const QString
 }
 
 /**
+ * @brief GekkoFyre::CmnRoutines::clearLayout will clear any QLayout, such as a QVBoxLayout, of any widgets.
+ * @note <http://stackoverflow.com/questions/4857188/clearing-a-layout-in-qt>
+ *       <http://stackoverflow.com/questions/4272196/qt-remove-all-widgets-from-layout>
+ * @param layout
+ */
+void GekkoFyre::CmnRoutines::clearLayout(QLayout *layout)
+{
+    QLayoutItem *item;
+    while ((item = layout->takeAt(0))) {
+        if (item->layout()) {
+            clearLayout(item->layout());
+            delete item->layout();
+        }
+
+        if (item->widget()) {
+            delete item->widget();
+        }
+
+        delete item;
+    }
+}
+
+/**
  * @brief GekkoFyre::CmnRoutines::readDownloadInfo
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
  * @date   2016-10
