@@ -50,6 +50,7 @@
 #include <QList>
 #include <QString>
 #include <QAbstractTableModel>
+#include <QAbstractItemView>
 #include <QVariant>
 #include <vector>
 
@@ -70,13 +71,8 @@ public:
     bool insertRows(int position, int rows, const QModelIndex &index = QModelIndex()) Q_DECL_OVERRIDE;
     bool removeRows(int position, int rows, const QModelIndex &index = QModelIndex()) Q_DECL_OVERRIDE;
     bool updateCol(const QModelIndex &index, const QVariant &value, const int &col);
-    bool eventFilter(QObject *watched, QEvent *event) Q_DECL_OVERRIDE;
 
     QList<std::vector<QString>> getList();
-
-signals:
-    void keyUpGkEvent();
-    void keyDownGkEvent();
 
 private:
     // http://stackoverflow.com/questions/23870396/qt-list-clear-does-it-destroy-the-objects

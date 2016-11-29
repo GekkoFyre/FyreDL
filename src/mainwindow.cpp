@@ -56,6 +56,7 @@
 #include <QSortFilterProxyModel>
 #include <QItemSelectionModel>
 #include <QMutex>
+#include <QShortcut>
 
 #ifdef _WIN32
 #define _WIN32_WINNT 0x06000100
@@ -129,10 +130,12 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
         QMessageBox::warning(this, tr("Error!"), QString("%1").arg(e.what()), QMessageBox::Ok);
     }
 
-    // Manage the up/down keyboard-presses that happen in the QTableView, 'downloadView'
-    ui->downloadView->installEventFilter(dlModel);
-    QObject::connect(dlModel, SIGNAL(keyUpGkEvent()), this, SLOT(keyUpDlModelSlot()));
-    QObject::connect(dlModel, SIGNAL(keyDownGkEvent()), this, SLOT(keyDownDlModelSlot()));
+    QShortcut *upKeyOverride = new QShortcut(QKeySequence(Qt::Key_Up), ui->downloadView);
+    QShortcut *downKeyOverride = new QShortcut(QKeySequence(Qt::Key_Down), ui->downloadView);
+    QObject::connect(upKeyOverride, SIGNAL(activated()), this, SLOT(keyUpDlModelSlot()));
+    QObject::connect(downKeyOverride, SIGNAL(activated()), this, SLOT(keyDownDlModelSlot()));
+
+    curr_shown_graphs = "";
 }
 
 MainWindow::~MainWindow()
@@ -215,6 +218,20 @@ void MainWindow::modifyHistoryFile()
     QList<std::vector<QString>> list = dlModel->getList();
 }
 
+/**
+ * @brief MainWindow::insertNewRow controls the insertion of data into the QTableView object, 'downloadView'.
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @date 2016-09
+ * @param fileName The name of the file to be inserted.
+ * @param fileSize The size of the file.
+ * @param downloaded How much data has already been downloaded.
+ * @param progress The current progress towards download completion.
+ * @param upSpeed Upload speed, i.e. for torrents.
+ * @param downSpeed How fast the file is downloading at.
+ * @param status Current download status, whether it be Paused, Stopped, Downloading, etc.
+ * @param url The effective URL of the download in question.
+ * @param destination The location of the download on the user's local storage.
+ */
 void MainWindow::insertNewRow(const std::string &fileName, const double &fileSize, const int &downloaded,
                               const double &progress, const int &upSpeed, const int &downSpeed,
                               const GekkoFyre::DownloadStatus &status, const std::string &url,
@@ -249,11 +266,8 @@ void MainWindow::insertNewRow(const std::string &fileName, const double &fileSiz
     index = dlModel->index(0, MN_URL_COL, QModelIndex());
     dlModel->setData(index, QString::fromStdString(url), Qt::DisplayRole);
 
-    // Refresh the GUI
-    ui->downloadView->update();
-
-    // Create the required graph/chart objects and initialize them
-    initCharts(destination);
+    // Initialize the graphs
+    initCharts(QString::fromStdString(destination));
 
     return;
 }
@@ -287,9 +301,6 @@ void MainWindow::removeSelRows()
                 // ...and then the GUI
                 dlModel->removeRows(indexes.at(0).row(), countRow, QModelIndex());
 
-                // Now refresh the GUI
-                ui->downloadView->update();
-
                 return;
             } catch (const std::exception &e) {
                 QMessageBox::warning(this, tr("Error!"), QString("%1").arg(e.what()), QMessageBox::Ok);
@@ -301,43 +312,18 @@ void MainWindow::removeSelRows()
     return;
 }
 
-/**
- * @brief MainWindow::initCharts initializes the appropriate graph structs, so that the charts can be displayed
- * to the user.
- * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
- * @date 2016-11-13
- * @param file_dest The file relating to the download in question, and thus the right graph in question.
- */
-void MainWindow::initCharts(const std::string &file_dest)
+void MainWindow::initCharts(const QString &file_dest)
 {
-    if (!graph_init.empty()) {
-        for (size_t i = 0; i < graph_init.size(); ++i) {
-            // Check for pre-existing object and output a soft-error if so
-            if (graph_init.at(i).down_speed->file_dest == file_dest) {
-                std::cerr << tr("Existing graph-object! File in question: %1")
-                        .arg(QString::fromStdString(file_dest)).toStdString() << std::endl;
-                return;
-            }
-        }
+    if (!file_dest.isEmpty()) {
+        GekkoFyre::GkGraph::GraphInit graph;
+        graph.down_speed.down_speed_vals.push_back(std::make_pair(0.0, 0.0));
+        graph.down_speed.down_speed_init = false;
+        graph.file_dest = file_dest;
+        graph_init.push_back(graph);
+    } else {
+        throw std::invalid_argument(tr("'file_dest' is empty!").toStdString());
     }
 
-    GekkoFyre::GkGraph::DownSpeedGraph *down_speed_graph;
-    GekkoFyre::GkGraph::GraphInit create_graph;
-
-    // Initialize 'down_speed_graph' struct
-    down_speed_graph = new GekkoFyre::GkGraph::DownSpeedGraph;
-
-    // Intialize the 'down_speed_series' QSplineSeries
-    down_speed_graph->down_speed_series = new QtCharts::QSplineSeries(this);
-
-    // Set the file location of the download, and thus matching graph
-    down_speed_graph->file_dest = file_dest;
-
-    // Add the sub-struct to our main struct
-    // TODO: Fix this memory leak!
-    create_graph.down_speed = down_speed_graph;
-
-    graph_init.push_back(create_graph);
     return;
 }
 
@@ -346,50 +332,74 @@ void MainWindow::initCharts(const std::string &file_dest)
  * 'ui->tabStatusWidget', at index 'TAB_INDEX_GRAPH'.
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
  * @date 2016-11-13
- * @note <http://doc.qt.io/qt-5/qtcharts-index.html>
+ * @note <http://doc.qt.io/qt-5/qtcharts-modeldata-example.html>
+ *       <http://doc.qt.io/qt-5/qtcharts-index.html>
  *       <http://doc.qt.io/qt-5/qtcharts-splinechart-example.html>
- *       <http://en.cppreference.com/w/cpp/chrono/c/time>
  *       <http://doc.qt.io/qt-5/qtcharts-zoomlinechart-chartview-cpp.html>
  * @param file_dest The file destination of the download in question, relating to the chart being displayed
  */
-void MainWindow::displayCharts(const std::string &file_dest)
+void MainWindow::displayCharts(const QString &file_dest)
 {
     for (size_t i = 0; i < graph_init.size(); ++i) {
         if (ui->tabStatusWidget->currentIndex() == TAB_INDEX_GRAPH) {
-            if (graph_init.at(i).down_speed->down_speed_series == nullptr) {
-                throw std::invalid_argument(tr("Download-speed graph pointer is NULL! Index: %1").arg(QString::number(i)).toStdString());
+            if (!graph_init.at(i).down_speed.down_speed_init) {
+                // Create the needed 'series'
+                graph_init.at(i).down_speed.down_speed_series = new QtCharts::QLineSeries(this);
+                graph_init.at(i).down_speed.down_speed_init = true;
             }
 
-            if (graph_init.at(i).down_speed->file_dest == file_dest) {
-                // Create the needed 'series'
-                QtCharts::QSplineSeries *down_speed_series = new QtCharts::QSplineSeries(graph_init.at(i).down_speed->down_speed_series);
+            if (graph_init.at(i).file_dest == file_dest) {
+                if (curr_shown_graphs != file_dest) {
+                    // NOTE: Only clear and/or then show the QChartView once, if 'file_dest' has not changed despite this
+                    // function being called.
+                    QString prev_shown_graphs = curr_shown_graphs;
+                    curr_shown_graphs = file_dest;
 
-                down_speed_series->setName(tr("Download speed spline %1").arg(i));
-                QFile qfile_path(QString::fromStdString(file_dest));
+                    graph_init.at(i).down_speed.down_speed_series->setName(tr("Download speed spline %1").arg(i));
+                    QFile qfile_path(file_dest);
 
-                // Create the needed QChart and set its initial properties
-                QtCharts::QChart *chart = new QtCharts::QChart();
-                chart->legend()->show();
-                chart->addSeries(down_speed_series);
-                chart->setTitle(tr("Download Speed for %1").arg(qfile_path.fileName()));
-                chart->createDefaultAxes();
-                chart->axisY()->setTitleText(tr("Download speed (KB/sec)")); // The title of the y-axis
-                chart->axisX()->setTitleText(tr("Time passed (seconds)")); // The title of the x-axis
+                    for (size_t j = 0; j < graph_init.at(i).down_speed.down_speed_vals.size(); ++j) {
+                        graph_init.at(i).down_speed.down_speed_series->append(graph_init.at(i).down_speed.down_speed_vals.at(j).second,
+                                                                              graph_init.at(i).down_speed.down_speed_vals.at(j).first);
+                    }
 
-                // Create the QChartView, which displays the graph, and set some initial properties
-                QtCharts::QChartView *chartView = new QtCharts::QChartView(chart);
-                chartView->setRenderHint(QPainter::Antialiasing);
+                    // Create the needed QChart and set its initial properties
+                    QtCharts::QChart *chart = new QtCharts::QChart();
+                    chart->addSeries(graph_init.at(i).down_speed.down_speed_series);
+                    chart->setTitle(QString("%1").arg(qfile_path.fileName()));
+                    chart->createDefaultAxes();
+                    chart->axisY()->setTitleText(tr("Download speed (KB/sec)")); // The title of the y-axis
+                    chart->axisX()->setTitleText(tr("Time passed (seconds)")); // The title of the x-axis
+                    chart->legend()->hide();
 
-                if (!ui->graphVerticalLayout->isEmpty()) { // Check to see if the layout contains any widgets
-                    routines->clearLayout(ui->graphVerticalLayout);
+                    // Create the QChartView, which displays the graph, and set some initial properties
+                    QtCharts::QChartView *chartView = new QtCharts::QChartView(chart);
+                    chartView->setRenderHint(QPainter::Antialiasing);
+
+                    if (!ui->graphVerticalLayout->isEmpty()) { // Check to see if the layout contains any widgets
+                        routines->clearLayout(ui->graphVerticalLayout);
+                    }
+
+                    for (size_t j = 0; j < graph_init.size(); ++j) {
+                        if (graph_init.at(j).file_dest == prev_shown_graphs) {
+                            graph_init.at(j).down_speed.down_speed_init = false;
+                            break;
+                        }
+                    }
+
+                    ui->graphVerticalLayout->insertWidget(0, chartView);
+                    chartView->setAlignment(Qt::AlignCenter);
+                    chartView->show();
+                    ui->graphVerticalLayout->update();
+                    return;
+                } else {
+                    for (size_t j = 0; j < graph_init.at(i).down_speed.down_speed_vals.size(); ++j) {
+                        graph_init.at(i).down_speed.down_speed_series->append(graph_init.at(i).down_speed.down_speed_vals.at(j).second,
+                                                                              graph_init.at(i).down_speed.down_speed_vals.at(j).first);
+                    }
+
+                    return;
                 }
-
-                ui->graphVerticalLayout->insertWidget(0, chartView);
-                chartView->setAlignment(Qt::AlignCenter);
-                chartView->setRubberBand(QtCharts::QChartView::RectangleRubberBand);
-                chartView->show();
-                ui->graphVerticalLayout->update();
-                return;
             }
         }
     }
@@ -408,11 +418,12 @@ void MainWindow::displayCharts(const std::string &file_dest)
  */
 void MainWindow::delCharts(const std::string &file_dest)
 {
+    /*
     if (!graph_init.empty()) {
         for (size_t i = 0; i < graph_init.size(); ++i) {
-            if (!graph_init.at(i).down_speed->file_dest.empty() &&
+            if (!graph_init.at(i).file_dest.empty() &&
                     graph_init.at(i).down_speed->down_speed_series != nullptr) {
-                if (graph_init.at(i).down_speed->file_dest == file_dest) {
+                if (graph_init.at(i).file_dest == file_dest) {
                     graph_init.erase(graph_init.begin() + (long)i);
                     return;
                 }
@@ -421,18 +432,23 @@ void MainWindow::delCharts(const std::string &file_dest)
     }
 
     throw std::invalid_argument(tr("'delCharts()' failed!").toStdString());
+     */
 }
 
 void MainWindow::updateChart()
 {
-    QModelIndexList indexes = ui->downloadView->selectionModel()->selectedRows();
+    if (ENBL_GUI_CHARTS) {
+        QModelIndexList indexes = ui->downloadView->selectionModel()->selectedRows();
 
-    if (indexes.size() > 0) {
-        if (indexes.at(0).isValid()) {
-            const QString dest = ui->downloadView->model()->data(ui->downloadView->model()->index(indexes.at(0).row(), MN_DESTINATION_COL)).toString();
-            displayCharts(dest.toStdString());
+        if (indexes.size() > 0) {
+            if (indexes.at(0).isValid()) {
+                const QString dest = ui->downloadView->model()->data(ui->downloadView->model()->index(indexes.at(0).row(), MN_DESTINATION_COL)).toString();
+                displayCharts(dest);
+            }
         }
     }
+
+    return;
 }
 
 void MainWindow::on_action_Open_a_File_triggered()
@@ -605,7 +621,6 @@ void MainWindow::on_dlstopToolBtn_clicked()
                 emit sendStopDownload(ui->downloadView->model()->data(ui->downloadView->model()->index(indexes.at(0).row(), MN_DESTINATION_COL)).toString());
                 routines->modifyDlState(dest.toStdString(), GekkoFyre::DownloadStatus::Stopped);
                 dlModel->updateCol(index, routines->convDlStat_toString(GekkoFyre::DownloadStatus::Stopped), MN_STATUS_COL);
-                ui->downloadView->update();
             }
         } catch (const std::exception &e) {
             QMessageBox::warning(this, tr("Error!"), QString("%1").arg(e.what()), QMessageBox::Ok);
@@ -617,7 +632,6 @@ void MainWindow::on_dlstopToolBtn_clicked()
 void MainWindow::on_removeToolBtn_clicked()
 {
     removeSelRows();
-    ui->downloadView->update();
 }
 
 /**
@@ -653,7 +667,6 @@ void MainWindow::on_clearhistoryToolBtn_clicked()
                 try {
                     delCharts(ui->downloadView->model()->data(file_dest_index).toString().toStdString());
                     routines->delDownloadItem(url_string);
-                    ui->downloadView->update();
                 } catch (const std::exception &e) {
                     QMessageBox::warning(this, tr("Error!"), QString("%1").arg(e.what()), QMessageBox::Ok);
                     return;
@@ -663,7 +676,6 @@ void MainWindow::on_clearhistoryToolBtn_clicked()
 
         for (int i = indexes.count(); i > 0; --i) {
             dlModel->removeRow(indexes.at(i - 1).row(), QModelIndex());
-            ui->downloadView->update();
         }
 
         return;
@@ -687,17 +699,6 @@ void MainWindow::on_settingsToolBtn_clicked()
 }
 
 /**
- * @brief MainWindow::on_tabStatusWidget_currentChanged detects when the QTabWidget, 'tabStatusWidget', changes indexes.
- * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
- * @date 2016-11-13
- * @param index The newly changed index.
- */
-void MainWindow::on_tabStatusWidget_currentChanged(int index)
-{
-    updateChart();
-}
-
-/**
  * @brief MainWindow::on_downloadView_customContextMenuRequested
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
  * @date   2016-10-15
@@ -715,18 +716,13 @@ void MainWindow::on_downloadView_customContextMenuRequested(const QPoint &pos)
     menu->popup(ui->downloadView->viewport()->mapToGlobal(pos));
 }
 
-void MainWindow::on_downloadView_clicked(const QModelIndex &index)
-{
-    Q_UNUSED(index);
-    updateChart();
-}
-
 void MainWindow::keyUpDlModelSlot()
 {
     QModelIndexList indexes = ui->downloadView->selectionModel()->selectedRows();
     int row = indexes.at(0).row();
     --row;
     ui->downloadView->selectRow(row);
+
     updateChart();
 }
 
@@ -736,6 +732,7 @@ void MainWindow::keyDownDlModelSlot()
     int row = indexes.at(0).row();
     ++row;
     ui->downloadView->selectRow(row);
+
     updateChart();
 }
 
@@ -817,6 +814,11 @@ void MainWindow::manageDlStats()
     for (int i = 0; i < dlModel->getList().size(); ++i) {
         QModelIndex find_index = dlModel->index(i, MN_DESTINATION_COL);
         for (size_t j = 0; j < dl_stat.size(); ++j) {
+            if (!dl_stat.at(j).timer_set) {
+                std::time(&dl_stat.at(j).timer_begin);
+                dl_stat.at(j).timer_set = true;
+            }
+
             if (ui->downloadView->model()->data(find_index).toString().toStdString() == dl_stat.at(j).file_dest && !dl_stat.at(j).dl_complete) {
                 try {
                     GekkoFyre::GkCurl::CurlDlStats dl_stat_element = dl_stat.at(j).stat.back();
@@ -831,15 +833,19 @@ void MainWindow::manageDlStats()
                         for (size_t k = 0; k < graph_init.size(); ++k) {
 
                             // Verify that the constants we are going to use are not empty/nullptr
-                            if (!graph_init.at(k).down_speed->file_dest.empty() &&
-                                    !dl_stat.at(j).file_dest.empty() && graph_init.at(k).down_speed->down_speed_series != nullptr) {
+                            if (!graph_init.at(k).file_dest.isEmpty() &&
+                                    !dl_stat.at(j).file_dest.empty()) {
 
                                 // Make sure we are using the right 'graph_init' element!
-                                if (graph_init.at(k).down_speed->file_dest == dl_stat.at(j).file_dest) {
+                                if (graph_init.at(k).file_dest.toStdString() == dl_stat.at(j).file_dest) {
                                     // TODO: Fix the SIGSEGV bug relating to the code immediately below! NOTE: It only occurs some of the time.
                                     // Append our statistics to the 'graph_init' struct and thus, the graph in question
-                                    graph_init.at(k).down_speed->down_speed_series->append(dl_stat_element.dlnow,
-                                                                                            dl_stat_element.cur_time);
+                                    std::time_t cur_time;
+                                    std::time(&cur_time);
+                                    double passed_time = std::difftime(cur_time, dl_stat.at(j).timer_begin);
+                                    graph_init.at(k).down_speed.down_speed_vals.push_back(std::make_pair(dl_stat_element.dlnow,
+                                                                                                         passed_time));
+                                    updateChart();
                                 }
                             } else {
                                 throw std::invalid_argument(tr("Invalid file destination and/or graphing pointer(s) have been given!").toStdString());

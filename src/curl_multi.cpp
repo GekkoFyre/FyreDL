@@ -469,14 +469,6 @@ int GekkoFyre::CurlMulti::curl_xferinfo(void *p, curl_off_t dltotal, curl_off_t 
     dl_stat.dltotal = dlnow;
     dl_stat.upnow = upspeed;
     dl_stat.uptotal = ulnow;
-
-    std::time_t cur_time = std::time(nullptr);
-    if (!prog->timer_set) {
-        prog->timer_begin = cur_time;
-        prog->timer_set = true;
-    }
-
-    dl_stat.cur_time = cur_time;
     prog->stat.push_back(dl_stat);
 
     mutex.lock();

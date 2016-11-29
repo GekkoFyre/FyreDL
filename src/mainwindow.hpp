@@ -75,8 +75,9 @@ private:
                       const GekkoFyre::DownloadStatus &status, const std::string &url,
                       const std::string &destination);
     void removeSelRows();
-    void initCharts(const std::string &file_dest);
-    void displayCharts(const std::string &file_dest);
+
+    void initCharts(const QString &file_dest);
+    void displayCharts(const QString &file_dest);
     void delCharts(const std::string &file_dest);
     void updateChart();
 
@@ -86,6 +87,7 @@ private:
     GekkoFyre::DownloadStatus status;
     std::vector<GekkoFyre::GkCurl::CurlProgressPtr> dl_stat;
     std::vector<GekkoFyre::GkGraph::GraphInit> graph_init;
+    QString curr_shown_graphs;
 
     // http://stackoverflow.com/questions/10121560/stdthread-naming-your-thread
     QThread *curl_multi_thread;
@@ -111,9 +113,7 @@ private slots:
     void on_removeToolBtn_clicked();
     void on_clearhistoryToolBtn_clicked();
     void on_settingsToolBtn_clicked();
-    void on_tabStatusWidget_currentChanged(int index);
     void on_downloadView_customContextMenuRequested(const QPoint &pos);
-    void on_downloadView_clicked(const QModelIndex &index);
     void keyUpDlModelSlot();
     void keyDownDlModelSlot();
     void sendDetails(const std::string &fileName, const double &fileSize, const int &downloaded,

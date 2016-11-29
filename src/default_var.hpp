@@ -51,7 +51,7 @@
 #include <ctime>
 #include <QString>
 #include <QtCharts>
-#include <QSplineSeries>
+#include <QLineSeries>
 
 extern "C" {
 #include <curl/curl.h>
@@ -74,9 +74,10 @@ extern "C" {
 #error "Platform not supported!"
 #endif
 
-#define FYREDL_PROG_VERS "0.0.1"          // The application version
-#define FYREDL_USER_AGENT "FyreDL/0.0.1"  // The user-agent displayed externally by FyreDL, along with the application version
-#define CFG_HISTORY_FILE "fyredl.xml"     // The configuration/history file-name used by FyreDL. Location is set within the application's GUI.
+#define FYREDL_PROG_VERS "0.0.1"         // The application version
+#define FYREDL_USER_AGENT "FyreDL/0.0.1" // The user-agent displayed externally by FyreDL, along with the application version.
+#define CFG_HISTORY_FILE "fyredl.xml"    // The configuration/history file-name used by FyreDL. Location is set within the application's GUI.
+#define ENBL_GUI_CHARTS false             // Whether to enable charts/graphs within the GUI, to chart the progress of downloads.
 
 //
 // ###################################
@@ -275,12 +276,15 @@ namespace GekkoFyre {
 
     namespace GkGraph {
         struct DownSpeedGraph {
-            QtCharts::QSplineSeries *down_speed_series;
-            std::string file_dest;
+            QtCharts::QLineSeries *down_speed_series;
+            bool down_speed_init;
+            std::vector<std::pair<double, double>> down_speed_vals;
         };
 
         struct GraphInit {
-            DownSpeedGraph *down_speed;
+            DownSpeedGraph down_speed;
+            QString file_dest;
+            bool currShown;
         };
     }
 }
