@@ -52,6 +52,7 @@
 #include <boost/ptr_container/ptr_unordered_map.hpp>
 #include <string>
 #include <fstream>
+#include <unordered_map>
 #include <QObject>
 #include <QString>
 #include <QDateTime>
@@ -79,7 +80,7 @@ public slots:
      * 3.0) When transfers are done, delete the easy-handle
      */
 
-    void recvNewDl(const QString &url, const QString &fileLoc);
+    void recvNewDl(const QString &url, const QString &fileLoc, const bool &resumeDl);
     void recvStopDl(const QString &fileLoc);
 
 signals:
@@ -90,8 +91,10 @@ private:
     // http://stackoverflow.com/questions/10333854/how-to-handle-a-map-with-pointers
     // https://theboostcpplibraries.com/boost.pointer_container
     static boost::ptr_unordered_map<std::string, GekkoFyre::GkCurl::CurlInit> eh_vec; // Easy handle mapped to a ID, for managing each connection
+    static std::unordered_map<std::string, GekkoFyre::GkCurl::ActiveDownloads> transfer_monitoring;
     static GekkoFyre::GkCurl::GlobalInfo *gi;
     static QMutex mutex;
+    static short active_downloads;
 
     static std::string createId();
 
@@ -111,7 +114,8 @@ private:
     static curl_socket_t opensocket(void *clientp, curlsocktype purpose, struct curl_sockaddr *address); // https://curl.haxx.se/libcurl/c/CURLOPT_OPENSOCKETFUNCTION.html
     static int close_socket(void *clientp, curl_socket_t item); // https://curl.haxx.se/libcurl/c/CURLOPT_CLOSESOCKETFUNCTION.html
     static size_t curl_write_file_callback(char *buffer, size_t size, size_t nmemb, void *userdata);
-    static std::string new_conn(const QString &url, const QString &fileLoc, GekkoFyre::GkCurl::GlobalInfo *global);
+    static std::string new_conn(const QString &url, const QString &fileLoc, GekkoFyre::GkCurl::GlobalInfo *global,
+                                const curl_off_t &file_offset = 0L);
 
 };
     typedef SingletonEmit<CurlMulti> routine_singleton;

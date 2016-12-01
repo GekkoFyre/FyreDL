@@ -51,7 +51,7 @@
 #include <ctime>
 #include <QString>
 #include <QtCharts>
-#include <QSplineSeries>
+#include <QLineSeries>
 
 extern "C" {
 #include <curl/curl.h>
@@ -75,8 +75,13 @@ extern "C" {
 #endif
 
 #define FYREDL_PROG_VERS "0.0.1"          // The application version
-#define FYREDL_USER_AGENT "FyreDL/0.0.1"  // The user-agent displayed externally by FyreDL, along with the application version
+#define FYREDL_USER_AGENT "FyreDL/0.0.1"  // The user-agent displayed externally by FyreDL, along with the application version.
 #define CFG_HISTORY_FILE "fyredl.xml"     // The configuration/history file-name used by FyreDL. Location is set within the application's GUI.
+#define ENBL_GUI_CHARTS false             // Whether to enable charts/graphs within the GUI, to chart the progress of downloads.
+#define FYREDL_LIBCURL_VERBOSE 1L         // Set to '1L' if you want libcurl to tell you what it's up to!
+#define FYREDL_CONN_TIMEOUT 60L           // The duration, in seconds, until a timeout occurs when attempting to make a connection.
+#define FYREDL_CONN_LOW_SPEED_CUTOUT 512L // The average transfer speed in bytes per second to be considered below before connection cut-off.
+#define FYREDL_CONN_LOW_SPEED_TIME 10L    // The number of seconds that the transfer speed should be below 'FYREDL_CONN_LOW_SPEED_CUTOUT' before connection cut-off.
 
 //
 // ###################################
@@ -86,7 +91,7 @@ extern "C" {
 //
 
 // Download and File I/O
-#define WRITE_BUFFER_SIZE (1024 * 1024) // Measured in bytes
+#define WRITE_BUFFER_SIZE (CURL_MAX_WRITE_SIZE * 8) // Measured in bytes, see <https://curl.haxx.se/libcurl/c/CURLOPT_BUFFERSIZE.html>
 #define CURL_MAX_WAIT_MSECS (15 * 1000) // Measured in milliseconds
 
 // XML configuration
@@ -181,22 +186,21 @@ namespace GekkoFyre {
     namespace GkCurl {
         // http://stackoverflow.com/questions/18031357/why-the-constructor-of-stdostream-is-protected
         struct FileStream {
-            std::string file_loc;  // Name to store file as if download /and/ disk writing is successful
-            std::ostream *astream; // Async-I/O stream
-        };
-
-        struct curl_multi_destructor {
-            void operator()(CURLM *multi) {
-                if (multi != nullptr) {
-                    curl_multi_cleanup(multi);
-                }
-            }
+            std::string file_loc;   // Name to store file as if download /and/ disk writing is successful
+            std::ofstream *astream; // I/O stream
         };
 
         // Global information, common to all connections
         struct GlobalInfo {
-            std::shared_ptr<CURLM> multi;
+            CURLM *multi;
             int still_running;
+        };
+
+        // Monitors which downloads are actively transferring data. A hack to get things working correctly with regard
+        // to being able to halt/pause downloads in libcurl.
+        struct ActiveDownloads {
+            QString file_dest; // The file destination of the download on local storage
+            bool isActive;     // Whether the download is actively transferring data to local storage or not
         };
 
         struct MemoryStruct {
@@ -243,12 +247,12 @@ namespace GekkoFyre {
 
         struct CurlProgressPtr {
             CURL *curl;                    // Easy interface pointer
-            DownloadStatus status;         // Used to stop/pause a download mid-transfer
             std::vector<CurlDlStats> stat; // Download statistics struct
             std::string url;               // The URL in question
             std::string file_dest;         // The destination of where the download is being saved to disk
             std::time_t timer_begin;       // The time since epoch at which the timer begun (for charting facilities)
             bool timer_set;                // Whether the timer, 'timer_begin' has been set for this object or not
+            bool dl_complete;              // Whether the download has completed or not. Used for correctly displaying the statistics in the GUI.
         };
 
         struct CurlDlInfo {
@@ -274,12 +278,15 @@ namespace GekkoFyre {
 
     namespace GkGraph {
         struct DownSpeedGraph {
-            std::unique_ptr<QtCharts::QSplineSeries> down_speed_series;
-            std::string file_dest;
+            QtCharts::QLineSeries *down_speed_series;
+            bool down_speed_init;
+            std::vector<std::pair<double, double>> down_speed_vals;
         };
 
         struct GraphInit {
-            DownSpeedGraph *down_speed;
+            DownSpeedGraph down_speed;
+            QString file_dest;
+            bool currShown;
         };
     }
 }

@@ -75,9 +75,10 @@ endif(Qt5Widgets_FOUND)
 set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/Modules/")
 
 set(SOURCE_FILES
+    about.hpp
+    about.cpp
     addurl.hpp
     addurl.cpp
-    async_buf.hpp
     cmnroutines.hpp
     cmnroutines.cpp
     curl_easy.hpp
@@ -100,6 +101,7 @@ set(EXTERNAL_SOURCE_FILES
 
 # http://www.executionunit.com/blog/2014/01/22/moving-from-qmake-to-cmake/
 qt5_wrap_ui(UI_HEADERS
+            about.ui
             mainwindow.ui
             addurl.ui
             settings.ui)

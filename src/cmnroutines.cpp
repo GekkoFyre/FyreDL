@@ -171,13 +171,19 @@ std::string GekkoFyre::CmnRoutines::findCfgFile(const std::string &cfgFileName)
  * under both Linux, Apple Macintosh and Microsoft Windows.
  * @note <http://stackoverflow.com/questions/5840148/how-can-i-get-a-files-size-in-c>
  * @param file_name The path of the file that you want to determine the size of.
- * @return The size of the file in question.
+ * @return The size of the file in question, in bytes.
  */
-off64_t GekkoFyre::CmnRoutines::getFileSize(const std::string &file_name)
+long GekkoFyre::CmnRoutines::getFileSize(const std::string &file_name)
 {
+    #ifdef _WIN32
+    // TODO: Fill out this section for Win32!
+    #elif __linux__
     struct stat64 stat_buf;
     int rc = stat64(file_name.c_str(), &stat_buf);
     return rc == 0 ? stat_buf.st_size : -1;
+    #else
+    #error "Platform not supported!"
+    #endif
 }
 
 /**
@@ -269,11 +275,13 @@ GekkoFyre::GkFile::FileHash GekkoFyre::CmnRoutines::cryptoFileHash(const QString
                     if (vec_hash_val.at(i) == given_hash_val) {
                         info.hash_verif = GekkoFyre::HashVerif::Verified;
                         return info;
-                    } else {
-                        info.hash_verif = GekkoFyre::HashVerif::Corrupt;
-                        return info;
                     }
                 }
+
+                info.hash_verif = GekkoFyre::HashVerif::NotApplicable;
+                info.hash_type = GekkoFyre::HashType::CannotDetermine;
+                info.checksum = "";
+                return info;
             }
         }
     }
@@ -282,6 +290,29 @@ GekkoFyre::GkFile::FileHash GekkoFyre::CmnRoutines::cryptoFileHash(const QString
     info.hash_type = GekkoFyre::HashType::None;
     info.checksum = "";
     return info;
+}
+
+/**
+ * @brief GekkoFyre::CmnRoutines::clearLayout will clear any QLayout, such as a QVBoxLayout, of any widgets.
+ * @note <http://stackoverflow.com/questions/4857188/clearing-a-layout-in-qt>
+ *       <http://stackoverflow.com/questions/4272196/qt-remove-all-widgets-from-layout>
+ * @param layout
+ */
+void GekkoFyre::CmnRoutines::clearLayout(QLayout *layout)
+{
+    QLayoutItem *item;
+    while ((item = layout->takeAt(0))) {
+        if (item->layout()) {
+            clearLayout(item->layout());
+            delete item->layout();
+        }
+
+        if (item->widget()) {
+            delete item->widget();
+        }
+
+        delete item;
+    }
 }
 
 /**
@@ -531,7 +562,7 @@ bool GekkoFyre::CmnRoutines::delDownloadItem(const QString &effec_url, const std
 
 /**
  * @brief GekkoFyre::CmnRoutines::modifyDlState allows the modification of the download state, whether it
- * be 'paused', 'actively downloading', 'unknown', or something else.
+ * be 'paused', 'actively downloading', 'unknown', or something else, it will update the given XML history file.
  * @param file_loc relates to the location of the download on the user's local storage.
  * @param status is the download state you wish to change towards.
  * @param hash_checksum is the calculated checksum of the file in question.

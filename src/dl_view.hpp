@@ -50,6 +50,7 @@
 #include <QList>
 #include <QString>
 #include <QAbstractTableModel>
+#include <QAbstractItemView>
 #include <QVariant>
 #include <vector>
 

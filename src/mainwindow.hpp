@@ -75,16 +75,23 @@ private:
                       const GekkoFyre::DownloadStatus &status, const std::string &url,
                       const std::string &destination);
     void removeSelRows();
-    void initCharts(const std::string &file_dest);
-    void displayCharts(const std::string &file_dest);
+    void resetDlStateStartup();
+
+    void initCharts(const QString &file_dest);
+    void displayCharts(const QString &file_dest);
     void delCharts(const std::string &file_dest);
+    void updateChart();
+
+    bool askDeleteFile(const QString &file_dest);
+    void startDownload(const QString &file_dest, const bool &resumeDl = true);
 
     downloadModel *dlModel;
     GekkoFyre::CmnRoutines *routines;
     GekkoFyre::CurlMulti *curl_multi;
     GekkoFyre::DownloadStatus status;
-    std::vector<GekkoFyre::GkCurl::CurlProgressPtr> *dl_stat;
-    std::vector<GekkoFyre::GkGraph::GraphInit> *graph_init;
+    std::vector<GekkoFyre::GkCurl::CurlProgressPtr> dl_stat;
+    std::vector<GekkoFyre::GkGraph::GraphInit> graph_init;
+    QString curr_shown_graphs;
 
     // http://stackoverflow.com/questions/10121560/stdthread-naming-your-thread
     QThread *curl_multi_thread;
@@ -92,7 +99,7 @@ private:
 signals:
     void updateDlStats();
     void sendStopDownload(const QString &fileLoc);
-    void sendStartDownload(const QString &url, const QString &file_loc);
+    void sendStartDownload(const QString &url, const QString &file_loc, const bool &resumeDl);
     void finish_curl_multi_thread();
 
 private slots:
@@ -110,9 +117,9 @@ private slots:
     void on_removeToolBtn_clicked();
     void on_clearhistoryToolBtn_clicked();
     void on_settingsToolBtn_clicked();
-    void on_tabStatusWidget_currentChanged(int index);
     void on_downloadView_customContextMenuRequested(const QPoint &pos);
-    void on_downloadView_activated(const QModelIndex &index);
+    void keyUpDlModelSlot();
+    void keyDownDlModelSlot();
     void sendDetails(const std::string &fileName, const double &fileSize, const int &downloaded,
                      const double &progress, const int &upSpeed, const int &downSpeed,
                      const GekkoFyre::DownloadStatus &status, const std::string &url,

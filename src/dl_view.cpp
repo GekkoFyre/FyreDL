@@ -241,7 +241,8 @@ bool downloadModel::insertRows(int position, int rows, const QModelIndex &index)
 
 /**
  * @brief downloadModel::removeRows
- * @author         Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @date 2016-10
  * @param position
  * @param rows
  * @param index
@@ -260,6 +261,15 @@ bool downloadModel::removeRows(int position, int rows, const QModelIndex &index)
     return true;
 }
 
+/**
+ * @brief downloadModel::updateCol updates the column, within a row, to visually reflect the new data given by 'value'.
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @date 2016-11
+ * @param index The QModelIndex to be updated, specifically, the row and column.
+ * @param value The new data to be reflected by the update.
+ * @param col Used for verification purposes. Kind of redundant.
+ * @return Whether the operation was a success or not.
+ */
 bool downloadModel::updateCol(const QModelIndex &index, const QVariant &value, const int &col)
 {
     if (index.isValid()) {
