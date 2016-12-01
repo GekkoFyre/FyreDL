@@ -90,7 +90,7 @@ public:
     GekkoFyre::DownloadStatus convDlStat_StringToEnum(const QString &status);
 
     std::string findCfgFile(const std::string &cfgFileName);
-    off64_t getFileSize(const std::string &file_name);
+    static long getFileSize(const std::string &file_name);
     qint64 freeDiskSpace(const QStorageInfo &storage = QStorageInfo::root());
     GekkoFyre::GkFile::FileHash cryptoFileHash(const QString &file_dest, const GekkoFyre::HashType &hash_type,
                                                const QString &given_hash_val);

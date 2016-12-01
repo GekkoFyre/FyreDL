@@ -173,11 +173,17 @@ std::string GekkoFyre::CmnRoutines::findCfgFile(const std::string &cfgFileName)
  * @param file_name The path of the file that you want to determine the size of.
  * @return The size of the file in question.
  */
-off64_t GekkoFyre::CmnRoutines::getFileSize(const std::string &file_name)
+long GekkoFyre::CmnRoutines::getFileSize(const std::string &file_name)
 {
+    #ifdef _WIN32
+    // TODO: Fill out this section for Win32!
+    #elif __linux__
     struct stat64 stat_buf;
     int rc = stat64(file_name.c_str(), &stat_buf);
     return rc == 0 ? stat_buf.st_size : -1;
+    #else
+    #error "Platform not supported!"
+    #endif
 }
 
 /**
@@ -556,7 +562,7 @@ bool GekkoFyre::CmnRoutines::delDownloadItem(const QString &effec_url, const std
 
 /**
  * @brief GekkoFyre::CmnRoutines::modifyDlState allows the modification of the download state, whether it
- * be 'paused', 'actively downloading', 'unknown', or something else.
+ * be 'paused', 'actively downloading', 'unknown', or something else, it will update the given XML history file.
  * @param file_loc relates to the location of the download on the user's local storage.
  * @param status is the download state you wish to change towards.
  * @param hash_checksum is the calculated checksum of the file in question.

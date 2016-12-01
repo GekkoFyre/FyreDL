@@ -79,7 +79,7 @@ public slots:
      * 3.0) When transfers are done, delete the easy-handle
      */
 
-    void recvNewDl(const QString &url, const QString &fileLoc);
+    void recvNewDl(const QString &url, const QString &fileLoc, const bool &resumeDl);
     void recvStopDl(const QString &fileLoc);
 
 signals:
@@ -111,7 +111,8 @@ private:
     static curl_socket_t opensocket(void *clientp, curlsocktype purpose, struct curl_sockaddr *address); // https://curl.haxx.se/libcurl/c/CURLOPT_OPENSOCKETFUNCTION.html
     static int close_socket(void *clientp, curl_socket_t item); // https://curl.haxx.se/libcurl/c/CURLOPT_CLOSESOCKETFUNCTION.html
     static size_t curl_write_file_callback(char *buffer, size_t size, size_t nmemb, void *userdata);
-    static std::string new_conn(const QString &url, const QString &fileLoc, GekkoFyre::GkCurl::GlobalInfo *global);
+    static std::string new_conn(const QString &url, const QString &fileLoc, GekkoFyre::GkCurl::GlobalInfo *global,
+                                const curl_off_t &file_offset = 0L);
 
 };
     typedef SingletonEmit<CurlMulti> routine_singleton;

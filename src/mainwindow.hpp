@@ -75,11 +75,15 @@ private:
                       const GekkoFyre::DownloadStatus &status, const std::string &url,
                       const std::string &destination);
     void removeSelRows();
+    void resetDlStateStartup();
 
     void initCharts(const QString &file_dest);
     void displayCharts(const QString &file_dest);
     void delCharts(const std::string &file_dest);
     void updateChart();
+
+    bool askDeleteFile(const QString &file_dest);
+    void startDownload(const QString &file_dest, const bool &resumeDl = true);
 
     downloadModel *dlModel;
     GekkoFyre::CmnRoutines *routines;
@@ -95,7 +99,7 @@ private:
 signals:
     void updateDlStats();
     void sendStopDownload(const QString &fileLoc);
-    void sendStartDownload(const QString &url, const QString &file_loc);
+    void sendStartDownload(const QString &url, const QString &file_loc, const bool &resumeDl);
     void finish_curl_multi_thread();
 
 private slots:

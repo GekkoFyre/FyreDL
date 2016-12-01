@@ -77,7 +77,6 @@ set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/Modules/")
 set(SOURCE_FILES
     addurl.hpp
     addurl.cpp
-    async_buf.hpp
     cmnroutines.hpp
     cmnroutines.cpp
     curl_easy.hpp
