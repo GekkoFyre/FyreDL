@@ -45,6 +45,7 @@
 #include "settings.hpp"
 #include "singleton_proc.hpp"
 #include "curl_easy.hpp"
+#include "about.hpp"
 #include <boost/filesystem.hpp>
 #include <boost/exception/all.hpp>
 #include <qmetatype.h>
@@ -588,8 +589,9 @@ void MainWindow::on_actionE_xit_triggered()
 
 void MainWindow::on_action_About_triggered()
 {
-    QMessageBox::information(this, tr("Problem!"), tr("This function is not yet implemented."),
-                             QMessageBox::Ok);
+    About *about_dialog = new About(this);
+    about_dialog->setAttribute(Qt::WA_DeleteOnClose, true);
+    about_dialog->open();
     return;
 }
 

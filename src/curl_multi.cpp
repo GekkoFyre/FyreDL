@@ -501,6 +501,10 @@ int GekkoFyre::CurlMulti::curl_xferinfo(void *p, curl_off_t dltotal, curl_off_t 
         return 0;
     }
 
+    if (active_downloads < 1) {
+        return -1;
+    }
+
     lastTime = now;
     double dlspeed = 0;
     double upspeed = 0;
