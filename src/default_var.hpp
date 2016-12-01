@@ -190,18 +190,17 @@ namespace GekkoFyre {
             std::ofstream *astream; // I/O stream
         };
 
-        struct curl_multi_destructor {
-            void operator()(CURLM *multi) {
-                if (multi != nullptr) {
-                    curl_multi_cleanup(multi);
-                }
-            }
-        };
-
         // Global information, common to all connections
         struct GlobalInfo {
-            std::shared_ptr<CURLM> multi;
+            CURLM *multi;
             int still_running;
+        };
+
+        // Monitors which downloads are actively transferring data. A hack to get things working correctly with regard
+        // to being able to halt/pause downloads in libcurl.
+        struct ActiveDownloads {
+            QString file_dest; // The file destination of the download on local storage
+            bool isActive;     // Whether the download is actively transferring data to local storage or not
         };
 
         struct MemoryStruct {

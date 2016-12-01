@@ -171,7 +171,7 @@ std::string GekkoFyre::CmnRoutines::findCfgFile(const std::string &cfgFileName)
  * under both Linux, Apple Macintosh and Microsoft Windows.
  * @note <http://stackoverflow.com/questions/5840148/how-can-i-get-a-files-size-in-c>
  * @param file_name The path of the file that you want to determine the size of.
- * @return The size of the file in question.
+ * @return The size of the file in question, in bytes.
  */
 long GekkoFyre::CmnRoutines::getFileSize(const std::string &file_name)
 {

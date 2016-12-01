@@ -539,30 +539,28 @@ void MainWindow::startDownload(const QString &file_dest, const bool &resumeDl)
             QModelIndex index = dlModel->index(indexes.at(0).row(), MN_STATUS_COL, QModelIndex());
             const GekkoFyre::DownloadStatus status = routines->convDlStat_StringToEnum(ui->downloadView->model()->data(index).toString());
 
-            if (status != GekkoFyre::DownloadStatus::Completed) {
-                try {
-                    // TODO: QFutureWatcher<GekkoFyre::CurlMulti::CurlInfo> *verifyFileFutWatch;
-                    GekkoFyre::GkCurl::CurlInfo verify = GekkoFyre::CurlEasy::verifyFileExists(url);
-                    if (verify.response_code == 200) {
-                        if (status != GekkoFyre::DownloadStatus::Downloading) {
-                            routines->modifyDlState(dest.toStdString(), GekkoFyre::DownloadStatus::Downloading);
-                            dlModel->updateCol(index, routines->convDlStat_toString(GekkoFyre::DownloadStatus::Downloading), MN_STATUS_COL);
+            try {
+                // TODO: QFutureWatcher<GekkoFyre::CurlMulti::CurlInfo> *verifyFileFutWatch;
+                GekkoFyre::GkCurl::CurlInfo verify = GekkoFyre::CurlEasy::verifyFileExists(url);
+                if (verify.response_code == 200) {
+                    if (status != GekkoFyre::DownloadStatus::Downloading) {
+                        routines->modifyDlState(dest.toStdString(), GekkoFyre::DownloadStatus::Downloading);
+                        dlModel->updateCol(index, routines->convDlStat_toString(GekkoFyre::DownloadStatus::Downloading), MN_STATUS_COL);
 
-                            QObject::connect(GekkoFyre::routine_singleton::instance(), SIGNAL(sendXferStats(GekkoFyre::GkCurl::CurlProgressPtr)), this, SLOT(recvXferStats(GekkoFyre::GkCurl::CurlProgressPtr)));
-                            QObject::connect(GekkoFyre::routine_singleton::instance(), SIGNAL(sendDlFinished(GekkoFyre::GkCurl::DlStatusMsg)), this, SLOT(recvDlFinished(GekkoFyre::GkCurl::DlStatusMsg)));
+                        QObject::connect(GekkoFyre::routine_singleton::instance(), SIGNAL(sendXferStats(GekkoFyre::GkCurl::CurlProgressPtr)), this, SLOT(recvXferStats(GekkoFyre::GkCurl::CurlProgressPtr)));
+                        QObject::connect(GekkoFyre::routine_singleton::instance(), SIGNAL(sendDlFinished(GekkoFyre::GkCurl::DlStatusMsg)), this, SLOT(recvDlFinished(GekkoFyre::GkCurl::DlStatusMsg)));
 
-                            // This is required for signaling, otherwise QVariant does not know the type.
-                            qRegisterMetaType<GekkoFyre::GkCurl::CurlProgressPtr>("curlProgressPtr");
-                            qRegisterMetaType<GekkoFyre::GkCurl::DlStatusMsg>("DlStatusMsg");
+                        // This is required for signaling, otherwise QVariant does not know the type.
+                        qRegisterMetaType<GekkoFyre::GkCurl::CurlProgressPtr>("curlProgressPtr");
+                        qRegisterMetaType<GekkoFyre::GkCurl::DlStatusMsg>("DlStatusMsg");
 
-                            // Emit the signal data necessary to initiate a download
-                            emit sendStartDownload(url, dest, resumeDl);
-                            return;
-                        }
+                        // Emit the signal data necessary to initiate a download
+                        emit sendStartDownload(url, dest, resumeDl);
+                        return;
                     }
-                } catch (const std::exception &e) {
-                    QMessageBox::warning(this, tr("Error!"), QString("%1").arg(e.what()), QMessageBox::Ok);
                 }
+            } catch (const std::exception &e) {
+                QMessageBox::warning(this, tr("Error!"), QString("%1").arg(e.what()), QMessageBox::Ok);
             }
         }
     }
@@ -630,42 +628,56 @@ void MainWindow::on_dlstartToolBtn_clicked()
     QModelIndexList indexes = ui->downloadView->selectionModel()->selectedRows();
     if (indexes.size() > 0) {
         if (indexes.at(0).isValid()) {
-            const QString dest = ui->downloadView->model()->data(ui->downloadView->model()->index(indexes.at(0).row(), MN_DESTINATION_COL)).toString();
+            const QString dest = ui->downloadView->model()->data(
+                    ui->downloadView->model()->index(indexes.at(0).row(), MN_DESTINATION_COL)).toString();
             fs::path dest_boost_path(dest.toStdString());
+            QModelIndex index = dlModel->index(indexes.at(0).row(), MN_STATUS_COL, QModelIndex());
+            const GekkoFyre::DownloadStatus status = routines->convDlStat_StringToEnum(
+                    ui->downloadView->model()->data(index).toString());
 
-            if (fs::exists(dest_boost_path)) {
-                QMessageBox file_ask;
-                file_ask.setWindowTitle(tr("Pre-existing file!"));
-                file_ask.setText(tr("The file, \"%1\", already exists. Do you want to resume the download?").arg(dest));
-                file_ask.setStandardButtons(QMessageBox::Yes | QMessageBox::No | QMessageBox::Cancel);
-                file_ask.setDefaultButton(QMessageBox::No);
-                file_ask.setModal(false);
-                int ret = file_ask.exec();
+            if (status != GekkoFyre::DownloadStatus::Downloading || status != GekkoFyre::DownloadStatus::Completed) {
+                if (fs::exists(dest_boost_path)) {
+                    QMessageBox file_ask;
+                    file_ask.setWindowTitle(tr("Pre-existing file!"));
+                    file_ask.setText(
+                            tr("The file, \"%1\", already exists. Do you want to resume the download?").arg(dest));
+                    file_ask.setStandardButtons(QMessageBox::Yes | QMessageBox::No | QMessageBox::Cancel);
+                    file_ask.setDefaultButton(QMessageBox::No);
+                    file_ask.setModal(false);
+                    int ret = file_ask.exec();
 
-                try {
-                    switch (ret) {
-                        case QMessageBox::Yes:
-                            startDownload(dest, true);
-                            return;
-                        case QMessageBox::No:
-                            askDeleteFile(dest);
-                            startDownload(dest, false);
-                            return;
-                        case QMessageBox::Cancel:
-                            askDeleteFile(dest);
-                            startDownload(dest, false);
-                            return;
+                    try {
+                        switch (ret) {
+                            case QMessageBox::Yes:
+                                startDownload(dest, true);
+                                return;
+                            case QMessageBox::No:
+                                askDeleteFile(dest);
+                                startDownload(dest, false);
+                                return;
+                            case QMessageBox::Cancel:
+                                askDeleteFile(dest);
+                                startDownload(dest, false);
+                                return;
+                        }
+                    } catch (const std::exception &e) {
+                        QMessageBox::warning(this, tr("Error!"), QString("%1").arg(e.what()), QMessageBox::Ok);
+                        return;
                     }
-                } catch (const std::exception &e) {
-                    QMessageBox::warning(this, tr("Error!"), QString("%1").arg(e.what()), QMessageBox::Ok);
+                } else {
+                    try {
+                        startDownload(dest, false);
+                        return;
+                    } catch (const std::exception &e) {
+                        QMessageBox::warning(this, tr("Error!"), QString("%1").arg(e.what()), QMessageBox::Ok);
+                        return;
+                    }
                 }
-            } else {
-                try {
-                    startDownload(dest, false);
-                    return;
-                } catch (const std::exception &e) {
-                    QMessageBox::warning(this, tr("Error!"), QString("%1").arg(e.what()), QMessageBox::Ok);
-                }
+            } else if (status == GekkoFyre::DownloadStatus::Failed) {
+                QMessageBox::warning(this, tr("Error!"), tr("The download has failed in some way. Please delete it and re-add the "
+                                                                    "information to FyreDL before trying again."),
+                                     QMessageBox::Ok);
+                return;
             }
         }
     }
@@ -925,8 +937,10 @@ void MainWindow::manageDlStats()
                     std::ostringstream oss_dlnow;
                     oss_dlnow << routines->numberConverter(dl_stat_element.dlnow).toStdString() << tr("/sec").toStdString();
 
+                    long cur_file_size = GekkoFyre::CmnRoutines::getFileSize(dl_stat.at(j).file_dest);
+
                     dlModel->updateCol(dlModel->index(i, MN_DOWNSPEED_COL), QString::fromStdString(oss_dlnow.str()), MN_DOWNSPEED_COL);
-                    dlModel->updateCol(dlModel->index(i, MN_DOWNLOADED_COL), routines->numberConverter(dl_stat_element.dltotal), MN_DOWNLOADED_COL);
+                    dlModel->updateCol(dlModel->index(i, MN_DOWNLOADED_COL), routines->numberConverter(cur_file_size), MN_DOWNLOADED_COL);
 
                     // Update the 'download speed' spline-graph, via the file location
                     if (!graph_init.empty()) {
