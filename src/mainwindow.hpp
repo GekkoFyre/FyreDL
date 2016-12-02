@@ -82,13 +82,12 @@ private:
     void delCharts(const std::string &file_dest);
     void updateChart();
 
-    bool askDeleteFile(const QString &file_dest);
+    bool askDeleteFile(const QString &file_dest, const bool &noRestart = false);
     void startDownload(const QString &file_dest, const bool &resumeDl = true);
 
     downloadModel *dlModel;
     GekkoFyre::CmnRoutines *routines;
     GekkoFyre::CurlMulti *curl_multi;
-    GekkoFyre::DownloadStatus status;
     std::vector<GekkoFyre::GkCurl::CurlProgressPtr> dl_stat;
     std::vector<GekkoFyre::GkGraph::GraphInit> graph_init;
     QString curr_shown_graphs;
@@ -117,6 +116,7 @@ private slots:
     void on_removeToolBtn_clicked();
     void on_clearhistoryToolBtn_clicked();
     void on_settingsToolBtn_clicked();
+    void on_restartToolBtn_clicked();
     void on_downloadView_customContextMenuRequested(const QPoint &pos);
     void keyUpDlModelSlot();
     void keyDownDlModelSlot();

@@ -528,7 +528,7 @@ pugi::xml_node GekkoFyre::CmnRoutines::createNewXmlFile(const std::string &xmlCf
  * @param xmlCfgFile
  * @return
  */
-bool GekkoFyre::CmnRoutines::delDownloadItem(const QString &effec_url, const std::string &xmlCfgFile)
+bool GekkoFyre::CmnRoutines::delDownloadItem(const QString &file_dest, const std::string &xmlCfgFile)
 {
     fs::path xmlCfgFile_loc = findCfgFile(xmlCfgFile);
     sys::error_code ec;
@@ -551,7 +551,7 @@ bool GekkoFyre::CmnRoutines::delDownloadItem(const QString &effec_url, const std
         pugi::xml_node items = doc.child(XML_PARENT_NODE);
         for (const auto& file: items.children(XML_CHILD_NODE_FILE)) {
             for (const auto& item: file.children(XML_CHILD_ITEM_FILE)) {
-                if (file.find_child_by_attribute(XML_ITEM_ATTR_FILE_EFFEC_URL, effec_url.toStdString().c_str())) {
+                if (file.find_child_by_attribute(XML_ITEM_ATTR_FILE_FLOC, file_dest.toStdString().c_str())) {
                     item.parent().remove_child(item);
                 }
             }
