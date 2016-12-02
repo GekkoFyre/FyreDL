@@ -137,6 +137,13 @@ extern "C" {
 #define CSV_FIELD_HASH "hash"
 
 namespace GekkoFyre {
+    // * If status is paused, and paused is unclicked, or start is clicked, then the download resumes.
+    //      * So, pause does just that. It lets you resume from where you left off. Pause the connection to the server/
+    //             destination, but don't terminate it. Leave it for as long as naturally possible.
+    // * Stop terminates the connection to the server and poses a prompt to to the user asking if he/she wants to delete
+    //              the file.
+    //      * Ask the user if he/she wants to be prompted about file deletion next time, and whether to automatically
+    //              delete if no prompts are chosen. NOTE: Resume does not come into this at all.
     enum DownloadStatus {
         Downloading,
         Completed,
@@ -149,7 +156,7 @@ namespace GekkoFyre {
 
     enum DownloadType {
         HTTP,
-        FTP,
+        FTP,    // Separate handler needed for if there are authentication issues
         Torrent
     };
 

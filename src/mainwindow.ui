@@ -111,6 +111,23 @@
          </widget>
         </item>
         <item>
+         <widget class="QToolButton" name="restartToolBtn">
+          <property name="text">
+           <string/>
+          </property>
+          <property name="icon">
+           <iconset resource="assets.qrc">
+            <normaloff>:/icons/assets-img/gnome-session-reboot.png</normaloff>:/icons/assets-img/gnome-session-reboot.png</iconset>
+          </property>
+          <property name="iconSize">
+           <size>
+            <width>64</width>
+            <height>64</height>
+           </size>
+          </property>
+         </widget>
+        </item>
+        <item>
          <widget class="QToolButton" name="dlstopToolBtn">
           <property name="toolTip">
            <string>Stop</string>

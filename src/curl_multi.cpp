@@ -237,7 +237,18 @@ void GekkoFyre::CurlMulti::recvNewDl(const QString &url, const QString &fileLoc,
             }
         }
 
-        if (fileLoc.isEmpty() || url.isEmpty()) { throw std::invalid_argument(tr("An invalid file location and/or URL has been given!").toStdString()); }
+        if (fileLoc.isEmpty() || url.isEmpty()) {
+            throw std::invalid_argument(tr("An invalid file location and/or URL has been given!").toStdString());
+        }
+
+        if (stat_uuid.empty()) {
+            std::string new_uuid = createId();
+            GekkoFyre::GkCurl::ActiveDownloads dl_stat_temp;
+            dl_stat_temp.file_dest = fileLoc;
+            dl_stat_temp.isActive = false;
+            transfer_monitoring[new_uuid] = dl_stat_temp;
+            dl_stat = dl_stat_temp;
+        }
 
         if ((!stat_uuid.empty() && !dl_stat.isActive) || (stat_uuid.empty())) {
             if (resumeDl) {
@@ -738,11 +749,19 @@ std::string GekkoFyre::CurlMulti::new_conn(const QString &url, const QString &fi
         std::throw_with_nested(std::runtime_error(tr("Error with internal libcurl function!\n\n%1").arg(e.what()).toStdString()));
     }
 
-    GekkoFyre::GkCurl::ActiveDownloads transf_info;
-    transf_info.file_dest = fileLoc;
-    transf_info.isActive = true;
-    transfer_monitoring[uuid] = transf_info;
+    std::string stat_uuid;
+    for (auto const &entry : transfer_monitoring) {
+        if (fileLoc == entry.second.file_dest) {
+            stat_uuid = entry.first;
+            break;
+        }
+    }
 
+    if (stat_uuid.empty()) {
+        throw std::runtime_error(tr("Warning, 'stat_uuid' is empty!").toStdString());
+    }
+
+    transfer_monitoring[stat_uuid].isActive = true;
     eh_vec[uuid] = *ci;
     return uuid;
 }
