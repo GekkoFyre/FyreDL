@@ -93,6 +93,7 @@ extern "C" {
 // Download and File I/O
 #define WRITE_BUFFER_SIZE (CURL_MAX_WRITE_SIZE * 8) // Measured in bytes, see <https://curl.haxx.se/libcurl/c/CURLOPT_BUFFERSIZE.html>
 #define CURL_MAX_WAIT_MSECS (15 * 1000) // Measured in milliseconds
+#define FREE_DSK_SPACE_MULTIPLIER 3
 
 // XML configuration
 #define XML_PARENT_NODE "fyredl-db"
@@ -239,7 +240,6 @@ namespace GekkoFyre {
         };
 
         struct DlStatusMsg {
-            bool dl_compl_succ;   // Whether the download was completed successfully or aborted with an error
             double content_len;   // The content-length of the finished download
             QString url;          // The URL of the download in question
             std::string file_loc; // The full location of where the file is being saved to disk
@@ -252,7 +252,6 @@ namespace GekkoFyre {
             std::string file_dest;         // The destination of where the download is being saved to disk
             std::time_t timer_begin;       // The time since epoch at which the timer begun (for charting facilities)
             bool timer_set;                // Whether the timer, 'timer_begin' has been set for this object or not
-            bool dl_complete;              // Whether the download has completed or not. Used for correctly displaying the statistics in the GUI.
         };
 
         struct CurlDlInfo {
@@ -268,7 +267,7 @@ namespace GekkoFyre {
         };
 
         struct CurlInit {
-            std::shared_ptr<ConnInfo> conn_info;
+            ConnInfo *conn_info;
             MemoryStruct mem_chunk;
             FileStream file_buf;
             CurlProgressPtr prog;

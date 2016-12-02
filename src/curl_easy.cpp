@@ -64,7 +64,7 @@ GekkoFyre::GkCurl::CurlInit *GekkoFyre::CurlEasy::new_easy_handle(const QString 
 {
     GekkoFyre::GkCurl::CurlInit *ci;
     ci = new GekkoFyre::GkCurl::CurlInit;
-    ci->conn_info.reset(new GekkoFyre::GkCurl::ConnInfo);
+    ci->conn_info = new GekkoFyre::GkCurl::ConnInfo;
 
     curl_global_init(CURL_GLOBAL_DEFAULT);
     ci->conn_info->easy = curl_easy_init(); // Initiate the curl session
@@ -110,7 +110,7 @@ GekkoFyre::GkCurl::CurlInit *GekkoFyre::CurlEasy::new_easy_handle(const QString 
 
     curl_easy_setopt(ci->conn_info->easy, CURLOPT_VERBOSE, 1L);
     curl_easy_setopt(ci->conn_info->easy, CURLOPT_ERRORBUFFER, ci->conn_info->error);
-    curl_easy_setopt(ci->conn_info->easy, CURLOPT_PRIVATE, ci->conn_info.get());
+    curl_easy_setopt(ci->conn_info->easy, CURLOPT_PRIVATE, ci->conn_info);
     curl_easy_setopt(ci->conn_info->easy, CURLOPT_LOW_SPEED_TIME, 3L);
     curl_easy_setopt(ci->conn_info->easy, CURLOPT_LOW_SPEED_LIMIT, 10L);
 

@@ -497,7 +497,7 @@ bool MainWindow::askDeleteFile(const QString &file_dest)
     if (fs::exists(dest_boost_path)) {
         QMessageBox file_ask;
         file_ask.setWindowTitle(tr("Pre-existing file!"));
-        file_ask.setText(tr("Do you want to remove the file and then restart the download?").arg(file_dest));
+        file_ask.setText(tr("Do you want to remove the file and then restart the download?"));
         file_ask.setStandardButtons(QMessageBox::Yes | QMessageBox::No | QMessageBox::Cancel);
         file_ask.setDefaultButton(QMessageBox::No);
         file_ask.setModal(false);
@@ -545,19 +545,25 @@ void MainWindow::startDownload(const QString &file_dest, const bool &resumeDl)
                 GekkoFyre::GkCurl::CurlInfo verify = GekkoFyre::CurlEasy::verifyFileExists(url);
                 if (verify.response_code == 200) {
                     if (status != GekkoFyre::DownloadStatus::Downloading) {
-                        routines->modifyDlState(dest.toStdString(), GekkoFyre::DownloadStatus::Downloading);
-                        dlModel->updateCol(index, routines->convDlStat_toString(GekkoFyre::DownloadStatus::Downloading), MN_STATUS_COL);
+                        double freeDiskSpace = (double)routines->freeDiskSpace(QDir(dest).path());
+                        GekkoFyre::GkCurl::CurlInfoExt extended_info = GekkoFyre::CurlEasy::curlGrabInfo(url);
+                        if ((unsigned long int)((extended_info.content_length * FREE_DSK_SPACE_MULTIPLIER) < freeDiskSpace)) {
+                            routines->modifyDlState(dest.toStdString(), GekkoFyre::DownloadStatus::Downloading);
+                            dlModel->updateCol(index, routines->convDlStat_toString(GekkoFyre::DownloadStatus::Downloading), MN_STATUS_COL);
 
-                        QObject::connect(GekkoFyre::routine_singleton::instance(), SIGNAL(sendXferStats(GekkoFyre::GkCurl::CurlProgressPtr)), this, SLOT(recvXferStats(GekkoFyre::GkCurl::CurlProgressPtr)));
-                        QObject::connect(GekkoFyre::routine_singleton::instance(), SIGNAL(sendDlFinished(GekkoFyre::GkCurl::DlStatusMsg)), this, SLOT(recvDlFinished(GekkoFyre::GkCurl::DlStatusMsg)));
+                            QObject::connect(GekkoFyre::routine_singleton::instance(), SIGNAL(sendXferStats(GekkoFyre::GkCurl::CurlProgressPtr)), this, SLOT(recvXferStats(GekkoFyre::GkCurl::CurlProgressPtr)));
+                            QObject::connect(GekkoFyre::routine_singleton::instance(), SIGNAL(sendDlFinished(GekkoFyre::GkCurl::DlStatusMsg)), this, SLOT(recvDlFinished(GekkoFyre::GkCurl::DlStatusMsg)));
 
-                        // This is required for signaling, otherwise QVariant does not know the type.
-                        qRegisterMetaType<GekkoFyre::GkCurl::CurlProgressPtr>("curlProgressPtr");
-                        qRegisterMetaType<GekkoFyre::GkCurl::DlStatusMsg>("DlStatusMsg");
+                            // This is required for signaling, otherwise QVariant does not know the type.
+                            qRegisterMetaType<GekkoFyre::GkCurl::CurlProgressPtr>("curlProgressPtr");
+                            qRegisterMetaType<GekkoFyre::GkCurl::DlStatusMsg>("DlStatusMsg");
 
-                        // Emit the signal data necessary to initiate a download
-                        emit sendStartDownload(url, dest, resumeDl);
-                        return;
+                            // Emit the signal data necessary to initiate a download
+                            emit sendStartDownload(url, dest, resumeDl);
+                            return;
+                        } else {
+                            throw std::runtime_error(tr("Not enough free disk space!").toStdString());
+                        }
                     }
                 }
             } catch (const std::exception &e) {
@@ -637,42 +643,44 @@ void MainWindow::on_dlstartToolBtn_clicked()
             const GekkoFyre::DownloadStatus status = routines->convDlStat_StringToEnum(
                     ui->downloadView->model()->data(index).toString());
 
-            if (status != GekkoFyre::DownloadStatus::Downloading || status != GekkoFyre::DownloadStatus::Completed) {
-                if (fs::exists(dest_boost_path)) {
-                    QMessageBox file_ask;
-                    file_ask.setWindowTitle(tr("Pre-existing file!"));
-                    file_ask.setText(
-                            tr("The file, \"%1\", already exists. Do you want to resume the download?").arg(dest));
-                    file_ask.setStandardButtons(QMessageBox::Yes | QMessageBox::No | QMessageBox::Cancel);
-                    file_ask.setDefaultButton(QMessageBox::No);
-                    file_ask.setModal(false);
-                    int ret = file_ask.exec();
+            if (status != GekkoFyre::DownloadStatus::Completed) {
+                if (status != GekkoFyre::DownloadStatus::Downloading) {
+                    if (fs::exists(dest_boost_path)) {
+                        QMessageBox file_ask;
+                        file_ask.setWindowTitle(tr("Pre-existing file!"));
+                        file_ask.setText(
+                                tr("The file, \"%1\", already exists. Do you want to resume the download?").arg(dest));
+                        file_ask.setStandardButtons(QMessageBox::Yes | QMessageBox::No | QMessageBox::Cancel);
+                        file_ask.setDefaultButton(QMessageBox::No);
+                        file_ask.setModal(false);
+                        int ret = file_ask.exec();
 
-                    try {
-                        switch (ret) {
-                            case QMessageBox::Yes:
-                                startDownload(dest, true);
-                                return;
-                            case QMessageBox::No:
-                                askDeleteFile(dest);
-                                startDownload(dest, false);
-                                return;
-                            case QMessageBox::Cancel:
-                                askDeleteFile(dest);
-                                startDownload(dest, false);
-                                return;
+                        try {
+                            switch (ret) {
+                                case QMessageBox::Yes:
+                                    startDownload(dest, true);
+                                    return;
+                                case QMessageBox::No:
+                                    askDeleteFile(dest);
+                                    startDownload(dest, false);
+                                    return;
+                                case QMessageBox::Cancel:
+                                    askDeleteFile(dest);
+                                    startDownload(dest, false);
+                                    return;
+                            }
+                        } catch (const std::exception &e) {
+                            QMessageBox::warning(this, tr("Error!"), QString("%1").arg(e.what()), QMessageBox::Ok);
+                            return;
                         }
-                    } catch (const std::exception &e) {
-                        QMessageBox::warning(this, tr("Error!"), QString("%1").arg(e.what()), QMessageBox::Ok);
-                        return;
-                    }
-                } else {
-                    try {
-                        startDownload(dest, false);
-                        return;
-                    } catch (const std::exception &e) {
-                        QMessageBox::warning(this, tr("Error!"), QString("%1").arg(e.what()), QMessageBox::Ok);
-                        return;
+                    } else {
+                        try {
+                            startDownload(dest, false);
+                            return;
+                        } catch (const std::exception &e) {
+                            QMessageBox::warning(this, tr("Error!"), QString("%1").arg(e.what()), QMessageBox::Ok);
+                            return;
+                        }
                     }
                 }
             } else if (status == GekkoFyre::DownloadStatus::Failed) {
@@ -731,10 +739,12 @@ void MainWindow::on_dlstopToolBtn_clicked()
             QModelIndex index = dlModel->index(indexes.at(0).row(), MN_STATUS_COL, QModelIndex());
             const GekkoFyre::DownloadStatus status = routines->convDlStat_StringToEnum(ui->downloadView->model()->data(index).toString());
             QObject::connect(this, SIGNAL(sendStopDownload(QString)), GekkoFyre::routine_singleton::instance(), SLOT(recvStopDl(QString)));
-            if (status != GekkoFyre::DownloadStatus::Stopped && status != GekkoFyre::DownloadStatus::Completed) {
-                emit sendStopDownload(dest);
-                routines->modifyDlState(dest.toStdString(), GekkoFyre::DownloadStatus::Stopped);
-                dlModel->updateCol(index, routines->convDlStat_toString(GekkoFyre::DownloadStatus::Stopped), MN_STATUS_COL);
+            if (status != GekkoFyre::DownloadStatus::Stopped) {
+                if (status != GekkoFyre::DownloadStatus::Completed) {
+                    emit sendStopDownload(dest);
+                    routines->modifyDlState(dest.toStdString(), GekkoFyre::DownloadStatus::Stopped);
+                    dlModel->updateCol(index, routines->convDlStat_toString(GekkoFyre::DownloadStatus::Stopped), MN_STATUS_COL);
+                }
             }
         } catch (const std::exception &e) {
             QMessageBox::warning(this, tr("Error!"), QString("%1").arg(e.what()), QMessageBox::Ok);
@@ -933,7 +943,7 @@ void MainWindow::manageDlStats()
                 dl_stat.at(j).timer_set = true;
             }
 
-            if (ui->downloadView->model()->data(find_index).toString().toStdString() == dl_stat.at(j).file_dest && !dl_stat.at(j).dl_complete) {
+            if (ui->downloadView->model()->data(find_index).toString().toStdString() == dl_stat.at(j).file_dest) {
                 try {
                     GekkoFyre::GkCurl::CurlDlStats dl_stat_element = dl_stat.at(j).stat.back();
                     std::ostringstream oss_dlnow;
@@ -1005,13 +1015,6 @@ void MainWindow::recvDlFinished(const GekkoFyre::GkCurl::DlStatusMsg &status)
                                 file_hash = routines->cryptoFileHash(
                                         QString::fromStdString(status.file_loc), dl_mini_info_vec.at(j).hash_type,
                                         QString::fromStdString(dl_mini_info_vec.at(j).hash_val_given));
-                                break;
-                            }
-                        }
-
-                        for (size_t j = 0; j < dl_stat.size(); ++j) {
-                            if (status.file_loc == dl_stat.at(j).file_dest) {
-                                dl_stat.at(j).dl_complete = true;
                                 break;
                             }
                         }
