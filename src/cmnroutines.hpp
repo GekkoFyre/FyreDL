@@ -91,7 +91,7 @@ public:
 
     std::string findCfgFile(const std::string &cfgFileName);
     static long getFileSize(const std::string &file_name);
-    qint64 freeDiskSpace(const QStorageInfo &storage = QStorageInfo::root());
+    unsigned long int freeDiskSpace(const QString &path = QDir::rootPath());
     GekkoFyre::GkFile::FileHash cryptoFileHash(const QString &file_dest, const GekkoFyre::HashType &hash_type,
                                                const QString &given_hash_val);
 

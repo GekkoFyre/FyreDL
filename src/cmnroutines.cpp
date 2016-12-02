@@ -66,7 +66,9 @@
 #define _GNU_SOURCE
 #endif
 
-extern "C" {}
+extern "C" {
+#include <sys/statvfs.h>
+}
 
 #else
 #error "Platform not supported!"
@@ -190,14 +192,23 @@ long GekkoFyre::CmnRoutines::getFileSize(const std::string &file_name)
  * @brief GekkoFyre::CmnRoutines::freeDiskSpace() gives you the free disk-space available to the current user
  * of the system at the given path.
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
- * @note <http://doc.qt.io/qt-5/qstorageinfo.html>
- *       <http://stackoverflow.com/questions/1732717/how-to-determine-how-much-free-space-on-a-drive-in-qt>
+ * @note <https://msdn.microsoft.com/en-us/library/windows/desktop/aa364937(v=vs.85).aspx>
+ *       <http://forums.codeguru.com/showthread.php?424302-disk-space&p=1578378#post1578378>
  * @param path The path to determine the free disk space of.
- * @return A 64-bit value determining free disk-space.
+ * @return A (presumably 64-bit) value determining free disk-space.
  */
-qint64 GekkoFyre::CmnRoutines::freeDiskSpace(const QStorageInfo &storage)
+unsigned long int GekkoFyre::CmnRoutines::freeDiskSpace(const QString &path)
 {
-    return storage.bytesAvailable();
+    #ifdef _WIN32
+    #elif __linux__
+    struct statvfs64 fiData;
+    fs::path boost_path(path.toStdString());
+    statvfs64(boost_path.remove_filename().c_str(), &fiData);
+    __fsblkcnt64_t freeSpace = (fiData.f_bavail * fiData.f_bsize);
+    return (unsigned long int)freeSpace;
+    #else
+    #error "Platform not supported!"
+    #endif
 }
 
 /**

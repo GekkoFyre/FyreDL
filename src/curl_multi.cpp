@@ -186,7 +186,6 @@ bool GekkoFyre::CurlMulti::fileStream()
                     eh_vec.erase(ptr_uuid);
                     transfer_monitoring.erase(stat_uuid);
                     --active_downloads;
-                    status_msg.dl_compl_succ = true;
 
                     mutex.lock();
                     routine_singleton::instance()->sendDlFinished(status_msg);
@@ -627,7 +626,7 @@ std::string GekkoFyre::CurlMulti::new_conn(const QString &url, const QString &fi
     ci = new GekkoFyre::GkCurl::CurlInit;
 
     try {
-        ci->conn_info.reset(new GekkoFyre::GkCurl::ConnInfo);
+        ci->conn_info = new GekkoFyre::GkCurl::ConnInfo;
         ci->conn_info->easy = curl_easy_init();
 
         if (ci->conn_info->easy == nullptr) {
@@ -722,7 +721,7 @@ std::string GekkoFyre::CurlMulti::new_conn(const QString &url, const QString &fi
 
         curl_easy_setopt(ci->conn_info->easy, CURLOPT_VERBOSE, FYREDL_LIBCURL_VERBOSE);
         curl_easy_setopt(ci->conn_info->easy, CURLOPT_ERRORBUFFER, ci->conn_info->error);
-        curl_easy_setopt(ci->conn_info->easy, CURLOPT_PRIVATE, ci->conn_info.get());
+        curl_easy_setopt(ci->conn_info->easy, CURLOPT_PRIVATE, ci->conn_info);
         curl_easy_setopt(ci->conn_info->easy, CURLOPT_LOW_SPEED_TIME, FYREDL_CONN_LOW_SPEED_TIME);
         curl_easy_setopt(ci->conn_info->easy, CURLOPT_LOW_SPEED_LIMIT, FYREDL_CONN_LOW_SPEED_CUTOUT);
 
@@ -809,14 +808,14 @@ void GekkoFyre::CurlMulti::recvStopDl(const QString &fileLoc)
 
     if (ptr_uuid.empty() || stat_uuid.empty()) {
         // Display an error so that we do not read into uninitialized memory!
-        throw std::runtime_error(tr("Warning, 'ptr_uuid' is empty!").toStdString());
+        throw std::runtime_error(tr("Warning, either 'ptr_uuid' or 'stat_uuid' is empty!").toStdString());
     }
 
     if (dl_stat.isActive) {
+        transfer_monitoring[stat_uuid].isActive = false;
         --active_downloads;
         // https://curl.haxx.se/libcurl/c/curl_multi_add_handle.html
         curl_multi_remove_handle(gi->multi, curl_struct->conn_info->easy);
-        transfer_monitoring[stat_uuid].isActive = false;
     }
 
     return;
