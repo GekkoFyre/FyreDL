@@ -165,7 +165,7 @@ MainWindow::~MainWindow()
 void MainWindow::addDownload()
 {
     AddURL *add_url = new AddURL(this);
-    QObject::connect(add_url, SIGNAL(sendDetails(std::string,double,int,double,int,int,GekkoFyre::DownloadStatus,std::string,std::string)), this, SLOT(sendDetails(std::string,double,int,double,int,int,GekkoFyre::DownloadStatus,std::string,std::string)));
+    QObject::connect(add_url, SIGNAL(sendDetails(std::string,double,int,double,int,int,GekkoFyre::DownloadStatus,std::string,std::string,GekkoFyre::HashType,std::string,long long,bool,std::string)), this, SLOT(sendDetails(std::string,double,int,double,int,int,GekkoFyre::DownloadStatus,std::string,std::string,GekkoFyre::HashType,std::string,long long,bool,std::string)));
     add_url->setAttribute(Qt::WA_DeleteOnClose, true);
     add_url->open();
     return;
@@ -799,31 +799,35 @@ void MainWindow::on_dlpauseToolBtn_clicked()
 void MainWindow::on_dlstopToolBtn_clicked()
 {
     QModelIndexList indexes = ui->downloadView->selectionModel()->selectedRows();
-    try {
-        const QString url = ui->downloadView->model()->data(ui->downloadView->model()->index(indexes.at(0).row(), MN_URL_COL)).toString();
-        const QString dest = ui->downloadView->model()->data(ui->downloadView->model()->index(indexes.at(0).row(), MN_DESTINATION_COL)).toString();
+    if (indexes.size() > 0) {
+        if (indexes.at(0).isValid()) {
+            try {
+                const QString url = ui->downloadView->model()->data(ui->downloadView->model()->index(indexes.at(0).row(), MN_URL_COL)).toString();
+                const QString dest = ui->downloadView->model()->data(ui->downloadView->model()->index(indexes.at(0).row(), MN_DESTINATION_COL)).toString();
 
-        QModelIndex index = dlModel->index(indexes.at(0).row(), MN_STATUS_COL, QModelIndex());
-        const GekkoFyre::DownloadStatus status = routines->convDlStat_StringToEnum(ui->downloadView->model()->data(index).toString());
-        if (status != GekkoFyre::DownloadStatus::Stopped) {
-            if (status != GekkoFyre::DownloadStatus::Completed) {
-                if (status != GekkoFyre::DownloadStatus::Failed) {
-                    if (status != GekkoFyre::DownloadStatus::Invalid) {
-                        QObject::connect(this, SIGNAL(sendStopDownload(QString)), GekkoFyre::routine_singleton::instance(), SLOT(recvStopDl(QString)));
-                        emit sendStopDownload(dest);
-                        routines->modifyDlState(dest.toStdString(), GekkoFyre::DownloadStatus::Stopped);
-                        dlModel->updateCol(index, routines->convDlStat_toString(GekkoFyre::DownloadStatus::Stopped), MN_STATUS_COL);
-                        askDeleteFile(dest, true);
+                QModelIndex index = dlModel->index(indexes.at(0).row(), MN_STATUS_COL, QModelIndex());
+                const GekkoFyre::DownloadStatus status = routines->convDlStat_StringToEnum(ui->downloadView->model()->data(index).toString());
+                if (status != GekkoFyre::DownloadStatus::Stopped) {
+                    if (status != GekkoFyre::DownloadStatus::Completed) {
+                        if (status != GekkoFyre::DownloadStatus::Failed) {
+                            if (status != GekkoFyre::DownloadStatus::Invalid) {
+                                QObject::connect(this, SIGNAL(sendStopDownload(QString)), GekkoFyre::routine_singleton::instance(), SLOT(recvStopDl(QString)));
+                                emit sendStopDownload(dest);
+                                routines->modifyDlState(dest.toStdString(), GekkoFyre::DownloadStatus::Stopped);
+                                dlModel->updateCol(index, routines->convDlStat_toString(GekkoFyre::DownloadStatus::Stopped), MN_STATUS_COL);
+                                askDeleteFile(dest, true);
+                            }
+                        } else {
+                            QMessageBox::warning(this, tr("Error!"), tr("Please delete the download before re-adding the information once more!"), QMessageBox::Ok);
+                            return;
+                        }
                     }
-                } else {
-                    QMessageBox::warning(this, tr("Error!"), tr("Please delete the download before re-adding the information once more!"), QMessageBox::Ok);
-                    return;
                 }
+            } catch (const std::exception &e) {
+                QMessageBox::warning(this, tr("Error!"), QString("%1").arg(e.what()), QMessageBox::Ok);
+                return;
             }
         }
-    } catch (const std::exception &e) {
-        QMessageBox::warning(this, tr("Error!"), QString("%1").arg(e.what()), QMessageBox::Ok);
-        return;
     }
 }
 
@@ -956,6 +960,86 @@ void MainWindow::on_restartToolBtn_clicked()
 }
 
 /**
+ * @brief MainWindow::on_actionComma_Separated_Values_triggered
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @date 2016-12-03
+ */
+void MainWindow::on_actionComma_Separated_Values_triggered()
+{}
+
+/**
+ * @brief MainWindow::on_actionRe_set_all_dialog_prompts_triggered
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @date 2016-12-03
+ */
+void MainWindow::on_actionRe_set_all_dialog_prompts_triggered()
+{}
+
+/**
+ * @brief MainWindow::on_actionPreference_s_triggered
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @date 2016-12-03
+ */
+void MainWindow::on_actionPreference_s_triggered()
+{}
+
+/**
+ * @brief MainWindow::on_action_Halt_triggered
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @date 2016-12-03
+ */
+void MainWindow::on_action_Halt_triggered()
+{}
+
+/**
+ * @brief MainWindow::on_action_Resume_triggered
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @date 2016-12-03
+ */
+void MainWindow::on_action_Resume_triggered()
+{}
+
+/**
+ * @brief MainWindow::on_action_Pause_triggered
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @date 2016-12-03
+ */
+void MainWindow::on_action_Pause_triggered()
+{}
+
+/**
+ * @brief MainWindow::on_action_Cleanup_erroneous_tasks_triggered
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @date 2016-12-03
+ */
+void MainWindow::on_action_Cleanup_erroneous_tasks_triggered()
+{}
+
+/**
+ * @brief MainWindow::on_actionR_estart_triggered
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @date 2016-12-03
+ */
+void MainWindow::on_actionR_estart_triggered()
+{}
+
+/**
+ * @brief MainWindow::on_actionEdi_t_triggered
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @date 2016-12-03
+ */
+void MainWindow::on_actionEdi_t_triggered()
+{}
+
+/**
+ * @brief MainWindow::on_action_Delete_triggered
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @date 2016-12-03
+ */
+void MainWindow::on_action_Delete_triggered()
+{}
+
+/**
  * @brief MainWindow::on_downloadView_customContextMenuRequested
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
  * @date   2016-10-15
@@ -996,20 +1080,39 @@ void MainWindow::keyDownDlModelSlot()
 void MainWindow::sendDetails(const std::string &fileName, const double &fileSize, const int &downloaded,
                              const double &progress, const int &upSpeed, const int &downSpeed,
                              const GekkoFyre::DownloadStatus &status, const std::string &url,
-                             const std::string &destination)
+                             const std::string &destination, const GekkoFyre::HashType &hash_type,
+                             const std::string &hash_val, const long long &resp_code, const bool &stat_ok,
+                             const std::string &stat_msg)
 {
     QList<std::vector<QString>> list = dlModel->getList();
-    std::vector<QString> fileNameVector;
-    fileNameVector.push_back(QString::fromStdString(fileName));
-    if (!list.contains(fileNameVector) && !fileNameVector.empty()) {
-        insertNewRow(fileName, fileSize, downloaded, progress, upSpeed, downSpeed, status, url, destination);
-        return;
-    } else {
-        QMessageBox::information(this, tr("Duplicate entry"), tr("A duplicate of, \"%1\", was entered!")
-                                 .arg(QString::fromStdString(fileName)), QMessageBox::Ok);
-        return;
+
+    for (int i = 0; i < list.size(); ++i) {
+        for (size_t j = 0; j < list.at(i).size(); ++j) {
+            if (list.at(i).at(j) == QString::fromStdString(destination)) {
+                QMessageBox::information(this, tr("Duplicate entry..."), tr("There has been an attempt at a duplicate "
+                                                                                 "entry!\n\n%1")
+                        .arg(QString::fromStdString(destination)), QMessageBox::Ok);
+                return;
+            }
+        }
     }
 
+    insertNewRow(fileName, fileSize, downloaded, progress, upSpeed, downSpeed, status, url, destination);
+
+    // Write the output to an XML file, with file-name 'CFG_HISTORY_FILE'
+    GekkoFyre::GkCurl::CurlDlInfo dl_info;
+    dl_info.dlStatus = status;
+    dl_info.file_loc = destination;
+    dl_info.ext_info.content_length = fileSize;
+    dl_info.ext_info.effective_url = url;
+    dl_info.ext_info.response_code = resp_code;
+    dl_info.ext_info.status_ok = stat_ok;
+    dl_info.ext_info.status_msg = stat_msg;
+    dl_info.cId = 0;
+    dl_info.timestamp = 0;
+    dl_info.hash_type = hash_type;
+    dl_info.hash_val_given = hash_val;
+    routines->writeDownloadItem(dl_info);
     return;
 }
 

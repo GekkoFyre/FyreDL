@@ -637,7 +637,9 @@
      <string>&amp;Edit</string>
     </property>
     <addaction name="action_Resume"/>
+    <addaction name="action_Halt"/>
     <addaction name="action_Pause"/>
+    <addaction name="actionR_estart"/>
     <addaction name="action_Cleanup_erroneous_tasks"/>
     <addaction name="separator"/>
     <addaction name="actionEdi_t"/>
@@ -653,12 +655,21 @@
     <property name="title">
      <string>&amp;Tools</string>
     </property>
+    <widget class="QMenu" name="menuE_xport">
+     <property name="title">
+      <string>E&amp;xport</string>
+     </property>
+     <addaction name="actionComma_Separated_Values"/>
+    </widget>
     <addaction name="action_Limit_Upload_Download"/>
+    <addaction name="separator"/>
+    <addaction name="menuE_xport"/>
    </widget>
    <widget class="QMenu" name="menu_Window">
     <property name="title">
      <string>&amp;Window</string>
     </property>
+    <addaction name="actionRe_set_all_dialog_prompts"/>
    </widget>
    <widget class="QMenu" name="menu_Help">
     <property name="title">
@@ -687,65 +698,119 @@
    <property name="text">
     <string>&amp;Open a File...</string>
    </property>
+   <property name="shortcut">
+    <string>Ctrl+O</string>
+   </property>
   </action>
   <action name="actionEnter_URL">
    <property name="text">
     <string>Enter &amp;URL...</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+U</string>
    </property>
   </action>
   <action name="actionE_xit">
    <property name="text">
     <string>E&amp;xit</string>
    </property>
+   <property name="shortcut">
+    <string>Ctrl+W</string>
+   </property>
   </action>
   <action name="action_Resume">
    <property name="text">
     <string>&amp;Resume</string>
+   </property>
+   <property name="toolTip">
+    <string>Resume the download from where it was paused earlier</string>
+   </property>
+   <property name="shortcut">
+    <string>R</string>
    </property>
   </action>
   <action name="action_Pause">
    <property name="text">
     <string>&amp;Pause</string>
    </property>
+   <property name="toolTip">
+    <string>Pause the download for resumption later</string>
+   </property>
+   <property name="shortcut">
+    <string>P</string>
+   </property>
   </action>
   <action name="action_Cleanup_erroneous_tasks">
    <property name="text">
     <string>&amp;Cleanup erroneous tasks</string>
+   </property>
+   <property name="toolTip">
+    <string>Cleanup any completed downloads from the history screen</string>
+   </property>
+   <property name="shortcut">
+    <string>C</string>
    </property>
   </action>
   <action name="actionEdi_t">
    <property name="text">
     <string>Edi&amp;t</string>
    </property>
+   <property name="toolTip">
+    <string>Edit download</string>
+   </property>
+   <property name="shortcut">
+    <string>E</string>
+   </property>
   </action>
   <action name="action_Delete">
    <property name="text">
     <string>&amp;Delete</string>
+   </property>
+   <property name="toolTip">
+    <string>Delete download</string>
+   </property>
+   <property name="shortcut">
+    <string>D</string>
    </property>
   </action>
   <action name="actionC_ut">
    <property name="text">
     <string>C&amp;ut</string>
    </property>
+   <property name="shortcut">
+    <string>Ctrl+X</string>
+   </property>
   </action>
   <action name="actionC_opy">
    <property name="text">
     <string>C&amp;opy</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+C</string>
    </property>
   </action>
   <action name="actionP_aste">
    <property name="text">
     <string>P&amp;aste</string>
    </property>
+   <property name="shortcut">
+    <string>Ctrl+V</string>
+   </property>
   </action>
   <action name="actionPreference_s">
    <property name="text">
     <string>Preference&amp;s...</string>
    </property>
+   <property name="shortcut">
+    <string>Ctrl+P</string>
+   </property>
   </action>
   <action name="action_Documentation">
    <property name="text">
     <string>&amp;Documentation</string>
+   </property>
+   <property name="toolTip">
+    <string>FyreDL documentation</string>
    </property>
   </action>
   <action name="action_About">
@@ -756,6 +821,47 @@
   <action name="action_Limit_Upload_Download">
    <property name="text">
     <string>&amp;Limit Upload/Download...</string>
+   </property>
+   <property name="toolTip">
+    <string>Limit upload/download bandwidth usage</string>
+   </property>
+  </action>
+  <action name="actionComma_Separated_Values">
+   <property name="text">
+    <string>Comma Separated &amp;Values</string>
+   </property>
+   <property name="toolTip">
+    <string>Export your download history as a CSV list</string>
+   </property>
+  </action>
+  <action name="actionRe_set_all_dialog_prompts">
+   <property name="text">
+    <string>Re&amp;set all dialog prompts</string>
+   </property>
+   <property name="toolTip">
+    <string>Reset all that you have told FyreDL to remember, with regard to dialogs</string>
+   </property>
+  </action>
+  <action name="action_Halt">
+   <property name="text">
+    <string>&amp;Halt</string>
+   </property>
+   <property name="toolTip">
+    <string>Stop the download and possibly delete</string>
+   </property>
+   <property name="shortcut">
+    <string>H</string>
+   </property>
+  </action>
+  <action name="actionR_estart">
+   <property name="text">
+    <string>R&amp;estart</string>
+   </property>
+   <property name="toolTip">
+    <string>Restart the download from the very beginning</string>
+   </property>
+   <property name="shortcut">
+    <string>Alt+R</string>
    </property>
   </action>
  </widget>

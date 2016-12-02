@@ -826,6 +826,29 @@ GekkoFyre::DownloadStatus GekkoFyre::CmnRoutines::convDlStat_StringToEnum(const 
     }
 }
 
+GekkoFyre::HashType GekkoFyre::CmnRoutines::convHashType_StringToEnum(const QString &hashType)
+{
+    if (hashType == QString("MD5")) {
+        return GekkoFyre::HashType::MD5;
+    } else if (hashType == QString("SHA-1")) {
+        return GekkoFyre::HashType::SHA1;
+    } else if (hashType == QString("SHA-256")) {
+        return GekkoFyre::HashType::SHA256;
+    } else if (hashType == QString("SHA-512")) {
+        return GekkoFyre::HashType::SHA512;
+    } else if (hashType == QString("SHA3-256")) {
+        return GekkoFyre::HashType::SHA3_256;
+    } else if (hashType == QString("SHA3-512")) {
+        return GekkoFyre::HashType::SHA3_512;
+    } else if (hashType == tr("None")) {
+        return GekkoFyre::HashType::None;
+    } else if (hashType == tr("Unknown")) {
+        return GekkoFyre::HashType::CannotDetermine;
+    } else {
+        return GekkoFyre::HashType::CannotDetermine;
+    }
+}
+
 QString GekkoFyre::CmnRoutines::numberConverter(const double &value)
 {
     QMutexLocker locker(&mutex);

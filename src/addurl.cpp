@@ -134,17 +134,16 @@ void AddURL::on_buttonBox_accepted()
                             dl_info.hash_type = GekkoFyre::HashType::None;
                             dl_info.hash_val_given = "";
                         } else {
-                            dl_info.hash_type = GekkoFyre::HashType::CannotDetermine;
+                            dl_info.hash_type = routines->convHashType_StringToEnum(ui->hashType_comboBox->currentText());
                             dl_info.hash_val_given = hash_plaintext.toStdString();
                         }
-
-                        // Write the output to an XML file, with file-name 'CFG_HISTORY_FILE'
-                        routines->writeDownloadItem(dl_info);
 
                         // Send any new details to the QTableView model/view routines, whereupon 'ui->downloadView' is
                         // updated with the latest data.
                         emit sendDetails(dl_info.ext_info.effective_url, dl_info.ext_info.content_length, 0, 0, 0,
-                                         0, dl_info.dlStatus, dl_info.ext_info.effective_url, dl_info.file_loc);
+                                         0, dl_info.dlStatus, dl_info.ext_info.effective_url, dl_info.file_loc,
+                                         dl_info.hash_type, dl_info.hash_val_given, dl_info.ext_info.response_code,
+                                         dl_info.ext_info.status_ok, info_ext.status_msg);
                         return AddURL::done(QDialog::Accepted);
                     } else {
                         // We received something other than a '200' response code, so either the URL does not exist or
@@ -299,13 +298,12 @@ void AddURL::on_buttonBox_accepted()
                         dl_info.timestamp = 0;
                     }
 
-                    // Write the data to an XML file, specifically 'CFG_HISTORY_FILE'
-                    routines->writeDownloadItem(dl_info);
-
                     // Send any new details to the QTableView model/view routines, whereupon 'ui->downloadView' is
                     // updated with the latest data.
                     emit sendDetails(dl_info.ext_info.effective_url, dl_info.ext_info.content_length, 0, 0, 0,
-                                     0, dl_info.dlStatus, dl_info.ext_info.effective_url, dl_info.file_loc);
+                                     0, dl_info.dlStatus, dl_info.ext_info.effective_url, dl_info.file_loc,
+                                     dl_info.hash_type, dl_info.hash_val_given, dl_info.ext_info.response_code,
+                                     dl_info.ext_info.status_ok, "");
                 }
 
                 // Clear the 'temporary' struct-holding std::vector<CsvImport>()

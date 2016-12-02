@@ -88,6 +88,7 @@ public:
     GekkoFyre::DownloadStatus convDlStat_IntToEnum(const int &s);
     QString convDlStat_toString(const GekkoFyre::DownloadStatus &status);
     GekkoFyre::DownloadStatus convDlStat_StringToEnum(const QString &status);
+    GekkoFyre::HashType convHashType_StringToEnum(const QString &hashType);
 
     std::string findCfgFile(const std::string &cfgFileName);
     static long getFileSize(const std::string &file_name);
