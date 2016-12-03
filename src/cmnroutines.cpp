@@ -172,13 +172,22 @@ std::string GekkoFyre::CmnRoutines::findCfgFile(const std::string &cfgFileName)
  * @brief GekkoFyre::CmnRoutines::getFileSize finds the size of a file /without/ having to 'open' it. Portable
  * under both Linux, Apple Macintosh and Microsoft Windows.
  * @note <http://stackoverflow.com/questions/5840148/how-can-i-get-a-files-size-in-c>
+ *       <http://stackoverflow.com/questions/8991192/check-filesize-without-opening-file-in-c>
  * @param file_name The path of the file that you want to determine the size of.
  * @return The size of the file in question, in bytes.
  */
 long GekkoFyre::CmnRoutines::getFileSize(const std::string &file_name)
 {
     #ifdef _WIN32
-    // TODO: Fill out this section for Win32!
+    WIN32_FILE_ATTRIBUTE_DATA fad;
+    if (!GetFileAttributesEx(file_name.c_str(), GetFileExInfoStandard, &fad)) {
+        return -1; // error condition, could call GetLastError to find out more
+    }
+
+    LARGE_INTEGER size;
+    size.HighPart = fad.nFileSizeHigh;
+    size.LowPart = fad.nFileSizeLow;
+    return (long)size.QuadPart;
     #elif __linux__
     struct stat64 stat_buf;
     int rc = stat64(file_name.c_str(), &stat_buf);
@@ -200,6 +209,12 @@ long GekkoFyre::CmnRoutines::getFileSize(const std::string &file_name)
 unsigned long int GekkoFyre::CmnRoutines::freeDiskSpace(const QString &path)
 {
     #ifdef _WIN32
+    ULARGE_INTEGER liFreeBytesAvailable;
+    ULARGE_INTEGER liTotalNumberOfBytes;
+    ULARGE_INTEGER liTotalNumberOfFreeBytes;
+    LPCSTR liDirectoryName(path.toStdString().c_str());
+    GetDiskFreeSpaceEx(liDirectoryName, &liFreeBytesAvailable, &liTotalNumberOfBytes, &liTotalNumberOfFreeBytes);
+    return (unsigned long int)(LONGLONG)liTotalNumberOfFreeBytes.QuadPart;
     #elif __linux__
     struct statvfs64 fiData;
     fs::path boost_path(path.toStdString());

@@ -60,12 +60,6 @@
 #include <QMutex>
 #include <QShortcut>
 
-#ifdef _WIN32
-#define _WIN32_WINNT 0x06000100
-#include <SDKDDKVer.h>
-#include <Windows.h>
-#endif
-
 namespace sys = boost::system;
 namespace fs = boost::filesystem;
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWindow)
@@ -74,20 +68,6 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
 
     try {
         #ifdef _WIN32
-        HANDLE  m_hStartEvent = CreateEventW(NULL, FALSE, FALSE, L"Global\\FyreDL");
-        if (m_hStartEvent == NULL) {
-            CloseHandle(m_hStartEvent);
-            throw std::runtime_error("Unable to create handle! Not enough memory?");
-        }
-
-        if (GetLastError() == ERROR_ALREADY_EXISTS) {
-            CloseHandle(m_hStartEvent);
-            m_hStartEvent = NULL;
-
-            // Already exists!
-            // Send message from here to existing copy of application
-            throw std::runtime_error("Application is already open!");
-        }
         #elif __linux__
         SingletonProcess singleton(37563);
         if (!singleton()) {

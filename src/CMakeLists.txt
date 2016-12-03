@@ -256,9 +256,10 @@ IF(${CMAKE_SYSTEM_NAME} MATCHES "Windows" OR "cygwin" OR "mingw") # Check if we 
     if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC") # Check if we are using the Visual Studio compiler
         set(CMAKE_GENERATOR "Visual Studio")
         set_target_properties(fyredl PROPERTIES LINK_FLAGS "/SUBSYSTEM:CONSOLE")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DWIN32_LEAN_AND_MEAN")
         message(STATUS "Using the Microsoft Visual C++ compiler!")
     elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU" OR "Clang")
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mwindows -Wno-shorten-64-to-32 -Wno-sign-conversion") # This is apparently not tested!
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mwindows -WIN32_LEAN_AND_MEAN -Wno-shorten-64-to-32 -Wno-sign-conversion") # This is apparently not tested!
         message(STATUS "Using either the GCC or Clang compiler!")
     else()
         message(SEND_ERROR "You are using an unsupported Microsoft Windows compiler! (Not MSVC or GCC)")
