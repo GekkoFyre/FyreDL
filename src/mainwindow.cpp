@@ -59,6 +59,10 @@
 #include <QItemSelectionModel>
 #include <QMutex>
 #include <QShortcut>
+#include <QUrl>
+#include <QDir>
+#include <QDateTime>
+#include <QDate>
 
 namespace sys = boost::system;
 namespace fs = boost::filesystem;
@@ -537,7 +541,7 @@ void MainWindow::startDownload(const QString &file_dest, const bool &resumeDl)
                 GekkoFyre::GkCurl::CurlInfo verify = GekkoFyre::CurlEasy::verifyFileExists(url);
                 if (verify.response_code == 200) {
                     if (status != GekkoFyre::DownloadStatus::Downloading) {
-                        double freeDiskSpace = (double)routines->freeDiskSpace(QDir(dest).path());
+                        double freeDiskSpace = (double)routines->freeDiskSpace(QDir(dest).absolutePath());
                         GekkoFyre::GkCurl::CurlInfoExt extended_info = GekkoFyre::CurlEasy::curlGrabInfo(url);
                         if ((unsigned long int)((extended_info.content_length * FREE_DSK_SPACE_MULTIPLIER) < freeDiskSpace)) {
                             routines->modifyDlState(dest.toStdString(), GekkoFyre::DownloadStatus::Downloading);
@@ -561,6 +565,67 @@ void MainWindow::startDownload(const QString &file_dest, const bool &resumeDl)
             } catch (const std::exception &e) {
                 QMessageBox::warning(this, tr("Error!"), QString("%1").arg(e.what()), QMessageBox::Ok);
             }
+        }
+    }
+
+    return;
+}
+
+void MainWindow::general_extraDetails()
+{
+    QModelIndexList indexes = ui->downloadView->selectionModel()->selectedRows();
+    if (indexes.size() > 0) {
+        if (indexes.at(0).isValid()) {
+            const QModelIndex url_index = dlModel->index(indexes.at(0).row(), MN_URL_COL, QModelIndex());
+            const QModelIndex dest_index = dlModel->index(indexes.at(0).row(), MN_DESTINATION_COL, QModelIndex());
+            const QModelIndex size_index = dlModel->index(indexes.at(0).row(), MN_FILESIZE_COL, QModelIndex());
+            const QString url_string = ui->downloadView->model()->data(url_index).toString();
+            const QString dest_string = ui->downloadView->model()->data(dest_index).toString();
+            const QString size_string = ui->downloadView->model()->data(size_index).toString();
+            ui->fileNameDataLabel->setText(QUrl(url_string).fileName());
+            ui->destDataLabel->setText(QString::fromStdString(fs::path(dest_string.toStdString()).remove_filename().string()));
+            ui->totSizeDataLabel->setText(size_string);
+            ui->urlDataLabel->setText(url_string);
+
+            std::vector<GekkoFyre::GkCurl::CurlDlInfo> dl_info = routines->readDownloadInfo();
+            long long insert_time = 0;
+            long long complt_time = 0;
+            for (size_t i = 0; i < dl_info.size(); ++i) {
+                if (dl_info.at(i).file_loc == dest_string.toStdString()) {
+                    insert_time = dl_info.at(i).insert_timestamp;
+                    complt_time = dl_info.at(i).complt_timestamp;
+                    break;
+                }
+            }
+
+            if (insert_time > 0) {
+                // We have a timestamp
+                ui->createTimeDataLabel->setText(QDateTime::fromTime_t((uint)insert_time).toString());
+            } else {
+                // Insert a 'N/A'
+                ui->createTimeDataLabel->setText(tr("N/A"));
+            }
+
+            if (complt_time > 0) {
+                // We have a timestamp
+                ui->compTimeDataLabel->setText(QDateTime::fromTime_t((uint)complt_time).toString());
+            } else {
+                // Insert a 'N/A'
+                ui->compTimeDataLabel->setText(tr("N/A"));
+            }
+        }
+    }
+
+    return;
+}
+
+void MainWindow::transfer_extraDetails()
+{
+    QModelIndexList indexes = ui->downloadView->selectionModel()->selectedRows();
+    if (indexes.size() > 0) {
+        if (indexes.at(0).isValid()) {
+            QModelIndex url_index = dlModel->index(indexes.at(0).row(), MN_URL_COL, QModelIndex());
+            const QString url_string = ui->downloadView->model()->data(url_index).toString();
         }
     }
 
@@ -1037,24 +1102,71 @@ void MainWindow::on_downloadView_customContextMenuRequested(const QPoint &pos)
     menu->popup(ui->downloadView->viewport()->mapToGlobal(pos));
 }
 
+/**
+ * @brief MainWindow::on_downloadView_activated is initiated whenever a row in 'downloadView' is activated say by
+ * pressing Enter, double-clicking, etc.
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @date 2016-12-04
+ * @param index The currently selected row.
+ */
+void MainWindow::on_downloadView_activated(const QModelIndex &index)
+{
+    general_extraDetails();
+    transfer_extraDetails();
+}
+
+/**
+ * @brief MainWindow::on_downloadView_clicked is initiated whenever a row is activated by a single mouse-click.
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @date 2016-12-04
+ * @param index The currently selected row.
+ */
+void MainWindow::on_downloadView_clicked(const QModelIndex &index)
+{
+    general_extraDetails();
+    transfer_extraDetails();
+}
+
+/**
+ * @brief MainWindow::keyUpDlModelSlot is activated whenever the 'Key_Up' is pressed, anywhere inside the program.
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @date 2016-12-04
+ */
 void MainWindow::keyUpDlModelSlot()
 {
     QModelIndexList indexes = ui->downloadView->selectionModel()->selectedRows();
     int row = indexes.at(0).row();
-    --row;
-    ui->downloadView->selectRow(row);
+    if (indexes.size() > 0) {
+        if (indexes.at(0).isValid()) {
+            --row;
+            ui->downloadView->selectRow(row);
 
-    updateChart();
+            updateChart();
+            general_extraDetails();
+            transfer_extraDetails();
+        }
+    }
 }
 
+/**
+ * @brief MainWindow::keyDownDlModelSlot is activated whenever the 'Key_Down' is pressed, anywhere inside the program.
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @date 2016-12-04
+ */
 void MainWindow::keyDownDlModelSlot()
 {
     QModelIndexList indexes = ui->downloadView->selectionModel()->selectedRows();
     int row = indexes.at(0).row();
-    ++row;
-    ui->downloadView->selectRow(row);
+    if (indexes.size() > 0) {
+        if (indexes.at(0).isValid()) {
+            ++row;
+            ui->downloadView->selectRow(row);
 
-    updateChart();
+            updateChart();
+            general_extraDetails();
+            transfer_extraDetails();
+        }
+    }
 }
 
 void MainWindow::sendDetails(const std::string &fileName, const double &fileSize, const int &downloaded,
@@ -1089,7 +1201,7 @@ void MainWindow::sendDetails(const std::string &fileName, const double &fileSize
     dl_info.ext_info.status_ok = stat_ok;
     dl_info.ext_info.status_msg = stat_msg;
     dl_info.cId = 0;
-    dl_info.timestamp = 0;
+    dl_info.insert_timestamp = 0;
     dl_info.hash_type = hash_type;
     dl_info.hash_val_given = hash_val;
     routines->writeDownloadItem(dl_info);
@@ -1236,7 +1348,7 @@ void MainWindow::recvDlFinished(const GekkoFyre::GkCurl::DlStatusMsg &status)
                         }
 
                         routines->modifyDlState(status.file_loc, GekkoFyre::DownloadStatus::Completed, file_hash.checksum.toStdString(),
-                                                file_hash.hash_verif);
+                                                file_hash.hash_verif, QDateTime::currentDateTime().toTime_t());
                         dlModel->updateCol(stat_index, routines->convDlStat_toString(GekkoFyre::DownloadStatus::Completed), MN_STATUS_COL);
 
                         // Update the 'downloaded amount' because the statistics routines are not always accurate, due to only

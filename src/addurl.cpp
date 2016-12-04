@@ -127,7 +127,7 @@ void AddURL::on_buttonBox_accepted()
                         dl_info.ext_info.response_code = info_ext.response_code;
                         dl_info.ext_info.status_ok = info_ext.status_ok;
                         dl_info.cId = 0;
-                        dl_info.timestamp = 0;
+                        dl_info.insert_timestamp = 0;
 
                         // Set default values for the hash(es) if none specified by the user
                         if (hash_plaintext.isEmpty()) {
@@ -266,7 +266,7 @@ void AddURL::on_buttonBox_accepted()
                         dl_info.ext_info.response_code = info_ext.response_code;
                         dl_info.ext_info.status_ok = info_ext.status_ok;
                         dl_info.cId = 0;
-                        dl_info.timestamp = 0;
+                        dl_info.insert_timestamp = 0;
                     } else {
                         // #####################################
                         // The URL does not exist! It's invalid.
@@ -295,7 +295,7 @@ void AddURL::on_buttonBox_accepted()
                         dl_info.ext_info.response_code = info.response_code;
                         dl_info.ext_info.status_ok = false;
                         dl_info.cId = 0;
-                        dl_info.timestamp = 0;
+                        dl_info.insert_timestamp = 0;
                     }
 
                     // Send any new details to the QTableView model/view routines, whereupon 'ui->downloadView' is

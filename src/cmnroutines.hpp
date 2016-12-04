@@ -102,9 +102,10 @@ public:
     bool writeDownloadItem(GekkoFyre::GkCurl::CurlDlInfo &dl_info_list, const std::string &xmlCfgFile = CFG_HISTORY_FILE);
     pugi::xml_node createNewXmlFile(const std::string &xmlCfgFile = CFG_HISTORY_FILE);
     bool delDownloadItem(const QString &file_dest, const std::string &xmlCfgFile = CFG_HISTORY_FILE);
-    bool modifyDlState(const std::string &file_loc, const DownloadStatus &status, const std::string &hash_checksum = "",
+    bool modifyDlState(const std::string &file_loc, const DownloadStatus &status,
+                       const std::string &hash_checksum = "",
                        const GekkoFyre::HashVerif &ret_succ_type = GekkoFyre::HashVerif::Analyzing,
-                       const std::string &xmlCfgFile = CFG_HISTORY_FILE);
+                       const long long &complt_timestamp = 0, const std::string &xmlCfgFile = CFG_HISTORY_FILE);
 
 private:
     QMutex mutex;

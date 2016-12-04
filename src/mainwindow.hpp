@@ -49,6 +49,7 @@
 #include "curl_multi.hpp"
 #include "addurl.hpp"
 #include <vector>
+#include <string>
 #include <QMainWindow>
 #include <QString>
 #include <QtConcurrent/QtConcurrent>
@@ -84,6 +85,9 @@ private:
 
     bool askDeleteFile(const QString &file_dest, const bool &noRestart = false);
     void startDownload(const QString &file_dest, const bool &resumeDl = true);
+
+    void general_extraDetails();
+    void transfer_extraDetails();
 
     downloadModel *dlModel;
     GekkoFyre::CmnRoutines *routines;
@@ -131,6 +135,8 @@ private slots:
     void on_action_Delete_triggered();
 
     void on_downloadView_customContextMenuRequested(const QPoint &pos);
+    void on_downloadView_activated(const QModelIndex &index);
+    void on_downloadView_clicked(const QModelIndex &index);
     void keyUpDlModelSlot();
     void keyDownDlModelSlot();
     void sendDetails(const std::string &fileName, const double &fileSize, const int &downloaded,

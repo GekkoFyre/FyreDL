@@ -377,7 +377,7 @@ std::vector<GekkoFyre::GkCurl::CurlDlInfo> GekkoFyre::CmnRoutines::readDownloadI
                     i.cId = item.attribute(XML_ITEM_ATTR_FILE_CID).as_uint();
                     i.file_loc = item.attribute(XML_ITEM_ATTR_FILE_FLOC).value();
                     i.dlStatus = GekkoFyre::DownloadStatus::Unknown;
-                    i.timestamp = 0;
+                    i.insert_timestamp = 0;
                     i.ext_info.status_msg = "";
                     i.ext_info.effective_url = item.attribute(XML_ITEM_ATTR_FILE_EFFEC_URL).value();
                     i.ext_info.response_code = -1;
@@ -391,7 +391,8 @@ std::vector<GekkoFyre::GkCurl::CurlDlInfo> GekkoFyre::CmnRoutines::readDownloadI
                     i.cId = item.attribute(XML_ITEM_ATTR_FILE_CID).as_uint();
                     i.file_loc = item.attribute(XML_ITEM_ATTR_FILE_FLOC).value();
                     i.dlStatus = convDlStat_IntToEnum(item.attribute(XML_ITEM_ATTR_FILE_STAT).as_int());
-                    i.timestamp = item.attribute(XML_ITEM_ATTR_FILE_INSERT_DATE).as_uint();
+                    i.insert_timestamp = item.attribute(XML_ITEM_ATTR_FILE_INSERT_DATE).as_llong();
+                    i.complt_timestamp = item.attribute(XML_ITEM_ATTR_FILE_COMPLT_DATE).as_llong();
                     i.ext_info.status_msg = item.attribute(XML_ITEM_ATTR_FILE_STATMSG).value();
                     i.ext_info.effective_url = item.attribute(XML_ITEM_ATTR_FILE_EFFEC_URL).value();
                     i.ext_info.response_code = item.attribute(XML_ITEM_ATTR_FILE_RESP_CODE).as_llong();
@@ -435,7 +436,8 @@ bool GekkoFyre::CmnRoutines::writeDownloadItem(GekkoFyre::GkCurl::CurlDlInfo &dl
                 unsigned int cId = 0;
                 dl_info.dlStatus = GekkoFyre::DownloadStatus::Unknown;
                 QDateTime now = QDateTime::currentDateTime();
-                dl_info.timestamp = now.toTime_t();
+                dl_info.insert_timestamp = now.toTime_t();
+                dl_info.complt_timestamp = 0;
                 dl_info.ext_info.status_msg = "";
 
                 // Generate new XML document within memory
@@ -481,7 +483,8 @@ bool GekkoFyre::CmnRoutines::writeDownloadItem(GekkoFyre::GkCurl::CurlDlInfo &dl
                 nodeChild.append_attribute(XML_ITEM_ATTR_FILE_CID) = dl_info.cId;
                 nodeChild.append_attribute(XML_ITEM_ATTR_FILE_FLOC) = dl_info.file_loc.c_str();
                 nodeChild.append_attribute(XML_ITEM_ATTR_FILE_STAT) = convDlStat_toInt(dl_info.dlStatus);
-                nodeChild.append_attribute(XML_ITEM_ATTR_FILE_INSERT_DATE) = dl_info.timestamp;
+                nodeChild.append_attribute(XML_ITEM_ATTR_FILE_INSERT_DATE) = dl_info.insert_timestamp;
+                nodeChild.append_attribute(XML_ITEM_ATTR_FILE_COMPLT_DATE) = dl_info.complt_timestamp;
                 nodeChild.append_attribute(XML_ITEM_ATTR_FILE_STATMSG) = dl_info.ext_info.status_msg.c_str();
                 nodeChild.append_attribute(XML_ITEM_ATTR_FILE_EFFEC_URL) = dl_info.ext_info.effective_url.c_str();
                 nodeChild.append_attribute(XML_ITEM_ATTR_FILE_RESP_CODE) = dl_info.ext_info.response_code;
@@ -600,6 +603,7 @@ bool GekkoFyre::CmnRoutines::modifyDlState(const std::string &file_loc,
                                            const GekkoFyre::DownloadStatus &status,
                                            const std::string &hash_checksum,
                                            const GekkoFyre::HashVerif &ret_succ_type,
+                                           const long long &complt_timestamp,
                                            const std::string &xmlCfgFile)
 {
     fs::path xmlCfgFile_loc = findCfgFile(xmlCfgFile);
@@ -628,6 +632,10 @@ bool GekkoFyre::CmnRoutines::modifyDlState(const std::string &file_loc,
                     if (!hash_checksum.empty()) {
                         item.attribute(XML_ITEM_ATTR_FILE_HASH_VAL_RTRND).set_value(hash_checksum.c_str());
                         item.attribute(XML_ITEM_ATTR_FILE_HASH_SUCC_TYPE).set_value(convHashVerif_toInt(ret_succ_type));
+                    }
+
+                    if (complt_timestamp > 0) {
+                        item.attribute(XML_ITEM_ATTR_FILE_COMPLT_DATE).set_value(complt_timestamp);
                     }
                 }
             }
