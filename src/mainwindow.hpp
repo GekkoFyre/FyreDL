@@ -49,6 +49,7 @@
 #include "curl_multi.hpp"
 #include "addurl.hpp"
 #include <vector>
+#include <string>
 #include <QMainWindow>
 #include <QString>
 #include <QtConcurrent/QtConcurrent>
@@ -85,6 +86,9 @@ private:
     bool askDeleteFile(const QString &file_dest, const bool &noRestart = false);
     void startDownload(const QString &file_dest, const bool &resumeDl = true);
 
+    void general_extraDetails();
+    void transfer_extraDetails();
+
     downloadModel *dlModel;
     GekkoFyre::CmnRoutines *routines;
     GekkoFyre::CurlMulti *curl_multi;
@@ -107,6 +111,7 @@ private slots:
     void on_actionE_xit_triggered();
     void on_action_About_triggered();
     void on_action_Documentation_triggered();
+
     void on_addurlToolBtn_clicked();
     void on_addfileToolBtn_clicked();
     void on_printToolBtn_clicked();
@@ -117,13 +122,29 @@ private slots:
     void on_clearhistoryToolBtn_clicked();
     void on_settingsToolBtn_clicked();
     void on_restartToolBtn_clicked();
+
+    void on_actionComma_Separated_Values_triggered();
+    void on_actionRe_set_all_dialog_prompts_triggered();
+    void on_actionPreference_s_triggered();
+    void on_action_Halt_triggered();
+    void on_action_Resume_triggered();
+    void on_action_Pause_triggered();
+    void on_action_Cleanup_erroneous_tasks_triggered();
+    void on_actionR_estart_triggered();
+    void on_actionEdi_t_triggered();
+    void on_action_Delete_triggered();
+
     void on_downloadView_customContextMenuRequested(const QPoint &pos);
+    void on_downloadView_activated(const QModelIndex &index);
+    void on_downloadView_clicked(const QModelIndex &index);
     void keyUpDlModelSlot();
     void keyDownDlModelSlot();
     void sendDetails(const std::string &fileName, const double &fileSize, const int &downloaded,
                      const double &progress, const int &upSpeed, const int &downSpeed,
                      const GekkoFyre::DownloadStatus &status, const std::string &url,
-                     const std::string &destination);
+                     const std::string &destination, const GekkoFyre::HashType &hash_type,
+                     const std::string &hash_val, const long long &resp_code, const bool &stat_ok,
+                     const std::string &stat_msg);
     void recvXferStats(const GekkoFyre::GkCurl::CurlProgressPtr &info);
     void manageDlStats();
     void recvDlFinished(const GekkoFyre::GkCurl::DlStatusMsg &status);

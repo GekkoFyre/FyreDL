@@ -58,10 +58,6 @@ extern "C" {
 }
 
 #ifdef _WIN32
-#define _WIN32_WINNT 0x06000100
-#include <SDKDDKVer.h>
-#include <Windows.h>
-
 #elif __linux__
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
@@ -102,7 +98,8 @@ extern "C" {
 #define XML_ITEM_ATTR_FILE_CID "content-id"                // The unique, content integer ID of the download in the XML history file
 #define XML_ITEM_ATTR_FILE_FLOC "file-loc"                 // Location of the file on user's storage disk
 #define XML_ITEM_ATTR_FILE_STAT "status"                   // The download status (i.e., downloading, completed, unknown, etc.)
-#define XML_ITEM_ATTR_FILE_INSERT_DATE "insert-date"       // Date upon which the download was added to the XML history file
+#define XML_ITEM_ATTR_FILE_INSERT_DATE "insert-date"       // Date and time upon which the download was added to the XML history file
+#define XML_ITEM_ATTR_FILE_COMPLT_DATE "complt-date"       // Date and time upon which the download was completed
 #define XML_ITEM_ATTR_FILE_STATMSG "status-msg"            // Status message returned by the libcurl library
 #define XML_ITEM_ATTR_FILE_EFFEC_URL "effec-url"           // Given, proper URL returned from the (source) web-server
 #define XML_ITEM_ATTR_FILE_RESP_CODE "resp-code"           // Given return-code returned from the (source) web-server
@@ -259,12 +256,14 @@ namespace GekkoFyre {
             std::string file_dest;         // The destination of where the download is being saved to disk
             std::time_t timer_begin;       // The time since epoch at which the timer begun (for charting facilities)
             bool timer_set;                // Whether the timer, 'timer_begin' has been set for this object or not
+            double content_length;         // The file size of the download, as given by the web-server
         };
 
         struct CurlDlInfo {
             std::string file_loc;                // The location of the downloaded file being streamed towards
             unsigned int cId;                    // Automatically incremented Content ID for each download/file
-            uint timestamp;                      // The date/time of the download/file having been inserted into the history file
+            long long insert_timestamp;          // The date/time of the download/file having been inserted into the history file
+            long long complt_timestamp;          // The date/time of the download/file having completed transfer
             GekkoFyre::DownloadStatus dlStatus;  // Status of the downloading file(s) in question
             CurlInfoExt ext_info;                // Extended info about the file(s) themselves
             GekkoFyre::HashType hash_type;       // The actual type of hash used (e.g., CRC32/MD5/SHA1/SHA256/SHA512)

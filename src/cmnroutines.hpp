@@ -78,6 +78,7 @@ public:
     double percentDownloaded(const double &content_length, const double &amountDl);
 
     void print_exception(const std::exception &e, int level = 0);
+    bool singleAppInstance_Win32();
 
     int convDlStat_toInt(const GekkoFyre::DownloadStatus &status);
     int convHashType_toInt(const GekkoFyre::HashType &hash_type);
@@ -88,6 +89,7 @@ public:
     GekkoFyre::DownloadStatus convDlStat_IntToEnum(const int &s);
     QString convDlStat_toString(const GekkoFyre::DownloadStatus &status);
     GekkoFyre::DownloadStatus convDlStat_StringToEnum(const QString &status);
+    GekkoFyre::HashType convHashType_StringToEnum(const QString &hashType);
 
     std::string findCfgFile(const std::string &cfgFileName);
     static long getFileSize(const std::string &file_name);
@@ -101,9 +103,10 @@ public:
     bool writeDownloadItem(GekkoFyre::GkCurl::CurlDlInfo &dl_info_list, const std::string &xmlCfgFile = CFG_HISTORY_FILE);
     pugi::xml_node createNewXmlFile(const std::string &xmlCfgFile = CFG_HISTORY_FILE);
     bool delDownloadItem(const QString &file_dest, const std::string &xmlCfgFile = CFG_HISTORY_FILE);
-    bool modifyDlState(const std::string &file_loc, const DownloadStatus &status, const std::string &hash_checksum = "",
+    bool modifyDlState(const std::string &file_loc, const DownloadStatus &status,
+                       const std::string &hash_checksum = "",
                        const GekkoFyre::HashVerif &ret_succ_type = GekkoFyre::HashVerif::Analyzing,
-                       const std::string &xmlCfgFile = CFG_HISTORY_FILE);
+                       const long long &complt_timestamp = 0, const std::string &xmlCfgFile = CFG_HISTORY_FILE);
 
 private:
     QMutex mutex;

@@ -150,6 +150,58 @@ double GekkoFyre::CmnRoutines::percentDownloaded(const double &content_length, c
 }
 
 /**
+ * @brief GekkoFyre::CmnRoutines::print_exception_qmsgbox recursively prints out all the exceptions from the
+ * immediate cause.
+ * @date 2016-11-12
+ * @note <http://en.cppreference.com/w/cpp/error/throw_with_nested>
+ * @param e
+ * @param level
+ */
+void GekkoFyre::CmnRoutines::print_exception(const std::exception &e, int level)
+{
+    std::cerr << std::string((unsigned long)level, ' ') << tr("exception: ").toStdString() << e.what() << std::endl;
+    try {
+        std::rethrow_if_nested(e);
+    } catch (const std::exception &e) {
+        print_exception(e, (level + 1));
+    } catch (...) {}
+}
+
+/**
+ * @brief GekkoFyre::CmnRoutines::singleAppInstance_Win32 detects, under Microsoft Windows, if an existing instance of this
+ * application is already open, even across different logins.
+ * @author krishna_kp <http://stackoverflow.com/questions/4191465/how-to-run-only-one-instance-of-application>
+ * @date 2013-06-07
+ * @return Returns false upon finding an existing instance of this application, otherwise returns true on finding none.
+ */
+bool GekkoFyre::CmnRoutines::singleAppInstance_Win32()
+{
+    #ifdef _WIN32
+    HANDLE m_hStartEvent = CreateEventW(NULL, FALSE, FALSE, L"Global\\FyreDL");
+    if(m_hStartEvent == NULL) {
+        CloseHandle(m_hStartEvent);
+        return false;
+    }
+
+    if (GetLastError() == ERROR_ALREADY_EXISTS) {
+        CloseHandle(m_hStartEvent);
+        m_hStartEvent = NULL;
+            QMessageBox::information(nullptr, tr("Greetings!"), tr("It seems that an existing instance of this application "
+                                                                   "is already open! Please close that first before "
+                                                                   "re-opening again."),
+                             QMessageBox::Ok);
+        return false;
+    }
+
+    return true;
+    #elif __linux__
+    return true;
+    #else
+    #error "Platform not supported!"
+    #endif
+}
+
+/**
  * @brief GekkoFyre::CmnRoutines::findCfgFile finds the defined configuration file and checks if it exists.
  * @note <http://theboostcpplibraries.com/boost.filesystem-paths>
  * @param cfgFileName
@@ -172,13 +224,22 @@ std::string GekkoFyre::CmnRoutines::findCfgFile(const std::string &cfgFileName)
  * @brief GekkoFyre::CmnRoutines::getFileSize finds the size of a file /without/ having to 'open' it. Portable
  * under both Linux, Apple Macintosh and Microsoft Windows.
  * @note <http://stackoverflow.com/questions/5840148/how-can-i-get-a-files-size-in-c>
+ *       <http://stackoverflow.com/questions/8991192/check-filesize-without-opening-file-in-c>
  * @param file_name The path of the file that you want to determine the size of.
  * @return The size of the file in question, in bytes.
  */
 long GekkoFyre::CmnRoutines::getFileSize(const std::string &file_name)
 {
     #ifdef _WIN32
-    // TODO: Fill out this section for Win32!
+    WIN32_FILE_ATTRIBUTE_DATA fad;
+    if (!GetFileAttributesEx(file_name.c_str(), GetFileExInfoStandard, &fad)) {
+        return -1; // error condition, could call GetLastError to find out more
+    }
+
+    LARGE_INTEGER size;
+    size.HighPart = fad.nFileSizeHigh;
+    size.LowPart = fad.nFileSizeLow;
+    return (long)size.QuadPart;
     #elif __linux__
     struct stat64 stat_buf;
     int rc = stat64(file_name.c_str(), &stat_buf);
@@ -200,6 +261,12 @@ long GekkoFyre::CmnRoutines::getFileSize(const std::string &file_name)
 unsigned long int GekkoFyre::CmnRoutines::freeDiskSpace(const QString &path)
 {
     #ifdef _WIN32
+    ULARGE_INTEGER liFreeBytesAvailable;
+    ULARGE_INTEGER liTotalNumberOfBytes;
+    ULARGE_INTEGER liTotalNumberOfFreeBytes;
+    LPCSTR liDirectoryName(path.toStdString().c_str());
+    GetDiskFreeSpaceEx(liDirectoryName, &liFreeBytesAvailable, &liTotalNumberOfBytes, &liTotalNumberOfFreeBytes);
+    return (unsigned long int)(LONGLONG)liTotalNumberOfFreeBytes.QuadPart;
     #elif __linux__
     struct statvfs64 fiData;
     fs::path boost_path(path.toStdString());
@@ -362,7 +429,7 @@ std::vector<GekkoFyre::GkCurl::CurlDlInfo> GekkoFyre::CmnRoutines::readDownloadI
                     i.cId = item.attribute(XML_ITEM_ATTR_FILE_CID).as_uint();
                     i.file_loc = item.attribute(XML_ITEM_ATTR_FILE_FLOC).value();
                     i.dlStatus = GekkoFyre::DownloadStatus::Unknown;
-                    i.timestamp = 0;
+                    i.insert_timestamp = 0;
                     i.ext_info.status_msg = "";
                     i.ext_info.effective_url = item.attribute(XML_ITEM_ATTR_FILE_EFFEC_URL).value();
                     i.ext_info.response_code = -1;
@@ -376,7 +443,8 @@ std::vector<GekkoFyre::GkCurl::CurlDlInfo> GekkoFyre::CmnRoutines::readDownloadI
                     i.cId = item.attribute(XML_ITEM_ATTR_FILE_CID).as_uint();
                     i.file_loc = item.attribute(XML_ITEM_ATTR_FILE_FLOC).value();
                     i.dlStatus = convDlStat_IntToEnum(item.attribute(XML_ITEM_ATTR_FILE_STAT).as_int());
-                    i.timestamp = item.attribute(XML_ITEM_ATTR_FILE_INSERT_DATE).as_uint();
+                    i.insert_timestamp = item.attribute(XML_ITEM_ATTR_FILE_INSERT_DATE).as_llong();
+                    i.complt_timestamp = item.attribute(XML_ITEM_ATTR_FILE_COMPLT_DATE).as_llong();
                     i.ext_info.status_msg = item.attribute(XML_ITEM_ATTR_FILE_STATMSG).value();
                     i.ext_info.effective_url = item.attribute(XML_ITEM_ATTR_FILE_EFFEC_URL).value();
                     i.ext_info.response_code = item.attribute(XML_ITEM_ATTR_FILE_RESP_CODE).as_llong();
@@ -420,7 +488,8 @@ bool GekkoFyre::CmnRoutines::writeDownloadItem(GekkoFyre::GkCurl::CurlDlInfo &dl
                 unsigned int cId = 0;
                 dl_info.dlStatus = GekkoFyre::DownloadStatus::Unknown;
                 QDateTime now = QDateTime::currentDateTime();
-                dl_info.timestamp = now.toTime_t();
+                dl_info.insert_timestamp = now.toTime_t();
+                dl_info.complt_timestamp = 0;
                 dl_info.ext_info.status_msg = "";
 
                 // Generate new XML document within memory
@@ -466,7 +535,8 @@ bool GekkoFyre::CmnRoutines::writeDownloadItem(GekkoFyre::GkCurl::CurlDlInfo &dl
                 nodeChild.append_attribute(XML_ITEM_ATTR_FILE_CID) = dl_info.cId;
                 nodeChild.append_attribute(XML_ITEM_ATTR_FILE_FLOC) = dl_info.file_loc.c_str();
                 nodeChild.append_attribute(XML_ITEM_ATTR_FILE_STAT) = convDlStat_toInt(dl_info.dlStatus);
-                nodeChild.append_attribute(XML_ITEM_ATTR_FILE_INSERT_DATE) = dl_info.timestamp;
+                nodeChild.append_attribute(XML_ITEM_ATTR_FILE_INSERT_DATE) = dl_info.insert_timestamp;
+                nodeChild.append_attribute(XML_ITEM_ATTR_FILE_COMPLT_DATE) = dl_info.complt_timestamp;
                 nodeChild.append_attribute(XML_ITEM_ATTR_FILE_STATMSG) = dl_info.ext_info.status_msg.c_str();
                 nodeChild.append_attribute(XML_ITEM_ATTR_FILE_EFFEC_URL) = dl_info.ext_info.effective_url.c_str();
                 nodeChild.append_attribute(XML_ITEM_ATTR_FILE_RESP_CODE) = dl_info.ext_info.response_code;
@@ -585,6 +655,7 @@ bool GekkoFyre::CmnRoutines::modifyDlState(const std::string &file_loc,
                                            const GekkoFyre::DownloadStatus &status,
                                            const std::string &hash_checksum,
                                            const GekkoFyre::HashVerif &ret_succ_type,
+                                           const long long &complt_timestamp,
                                            const std::string &xmlCfgFile)
 {
     fs::path xmlCfgFile_loc = findCfgFile(xmlCfgFile);
@@ -613,6 +684,10 @@ bool GekkoFyre::CmnRoutines::modifyDlState(const std::string &file_loc,
                     if (!hash_checksum.empty()) {
                         item.attribute(XML_ITEM_ATTR_FILE_HASH_VAL_RTRND).set_value(hash_checksum.c_str());
                         item.attribute(XML_ITEM_ATTR_FILE_HASH_SUCC_TYPE).set_value(convHashVerif_toInt(ret_succ_type));
+                    }
+
+                    if (complt_timestamp > 0) {
+                        item.attribute(XML_ITEM_ATTR_FILE_COMPLT_DATE).set_value(complt_timestamp);
                     }
                 }
             }
@@ -826,6 +901,29 @@ GekkoFyre::DownloadStatus GekkoFyre::CmnRoutines::convDlStat_StringToEnum(const 
     }
 }
 
+GekkoFyre::HashType GekkoFyre::CmnRoutines::convHashType_StringToEnum(const QString &hashType)
+{
+    if (hashType == QString("MD5")) {
+        return GekkoFyre::HashType::MD5;
+    } else if (hashType == QString("SHA-1")) {
+        return GekkoFyre::HashType::SHA1;
+    } else if (hashType == QString("SHA-256")) {
+        return GekkoFyre::HashType::SHA256;
+    } else if (hashType == QString("SHA-512")) {
+        return GekkoFyre::HashType::SHA512;
+    } else if (hashType == QString("SHA3-256")) {
+        return GekkoFyre::HashType::SHA3_256;
+    } else if (hashType == QString("SHA3-512")) {
+        return GekkoFyre::HashType::SHA3_512;
+    } else if (hashType == tr("None")) {
+        return GekkoFyre::HashType::None;
+    } else if (hashType == tr("Unknown")) {
+        return GekkoFyre::HashType::CannotDetermine;
+    } else {
+        return GekkoFyre::HashType::CannotDetermine;
+    }
+}
+
 QString GekkoFyre::CmnRoutines::numberConverter(const double &value)
 {
     QMutexLocker locker(&mutex);
@@ -840,22 +938,4 @@ QString GekkoFyre::CmnRoutines::numberConverter(const double &value)
         QString conv = bytesToKilobytes(value);
         return conv;
     }
-}
-
-/**
- * @brief GekkoFyre::CmnRoutines::print_exception_qmsgbox recursively prints out all the exceptions from the
- * immediate cause.
- * @date 2016-11-12
- * @note <http://en.cppreference.com/w/cpp/error/throw_with_nested>
- * @param e
- * @param level
- */
-void GekkoFyre::CmnRoutines::print_exception(const std::exception &e, int level)
-{
-    std::cerr << std::string((unsigned long)level, ' ') << tr("exception: ").toStdString() << e.what() << std::endl;
-    try {
-        std::rethrow_if_nested(e);
-    } catch (const std::exception &e) {
-        print_exception(e, (level + 1));
-    } catch (...) {}
 }

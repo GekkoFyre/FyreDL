@@ -694,6 +694,7 @@ std::string GekkoFyre::CurlMulti::new_conn(const QString &url, const QString &fi
         ci->prog.url = url.toStdString();
         ci->prog.file_dest = fileLoc.toStdString();
         ci->prog.timer_set = false;
+        ci->prog.content_length = 0;
         ci->prog.curl = ci->conn_info->easy;
 
         /* xferinfo was introduced in 7.32.0, no earlier libcurl versions will

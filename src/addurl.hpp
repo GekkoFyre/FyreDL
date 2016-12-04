@@ -70,7 +70,9 @@ signals:
     void sendDetails(const std::string &fileName, const double &fileSize, const int &downloaded,
                      const double &progress, const int &upSpeed, const int &downSpeed,
                      const GekkoFyre::DownloadStatus &status, const std::string &url,
-                     const std::string &destination);
+                     const std::string &destination, const GekkoFyre::HashType &hash_type,
+                     const std::string &hash_val, const long long &resp_code, const bool &stat_ok,
+                     const std::string &stat_msg);
 
 private:
     Ui::AddURL *ui;
