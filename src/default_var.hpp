@@ -256,6 +256,7 @@ namespace GekkoFyre {
             std::string file_dest;         // The destination of where the download is being saved to disk
             std::time_t timer_begin;       // The time since epoch at which the timer begun (for charting facilities)
             bool timer_set;                // Whether the timer, 'timer_begin' has been set for this object or not
+            double content_length;         // The file size of the download, as given by the web-server
         };
 
         struct CurlDlInfo {

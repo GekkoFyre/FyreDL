@@ -150,6 +150,58 @@ double GekkoFyre::CmnRoutines::percentDownloaded(const double &content_length, c
 }
 
 /**
+ * @brief GekkoFyre::CmnRoutines::print_exception_qmsgbox recursively prints out all the exceptions from the
+ * immediate cause.
+ * @date 2016-11-12
+ * @note <http://en.cppreference.com/w/cpp/error/throw_with_nested>
+ * @param e
+ * @param level
+ */
+void GekkoFyre::CmnRoutines::print_exception(const std::exception &e, int level)
+{
+    std::cerr << std::string((unsigned long)level, ' ') << tr("exception: ").toStdString() << e.what() << std::endl;
+    try {
+        std::rethrow_if_nested(e);
+    } catch (const std::exception &e) {
+        print_exception(e, (level + 1));
+    } catch (...) {}
+}
+
+/**
+ * @brief GekkoFyre::CmnRoutines::singleAppInstance_Win32 detects, under Microsoft Windows, if an existing instance of this
+ * application is already open, even across different logins.
+ * @author krishna_kp <http://stackoverflow.com/questions/4191465/how-to-run-only-one-instance-of-application>
+ * @date 2013-06-07
+ * @return Returns false upon finding an existing instance of this application, otherwise returns true on finding none.
+ */
+bool GekkoFyre::CmnRoutines::singleAppInstance_Win32()
+{
+    #ifdef _WIN32
+    HANDLE m_hStartEvent = CreateEventW(NULL, FALSE, FALSE, L"Global\\FyreDL");
+    if(m_hStartEvent == NULL) {
+        CloseHandle(m_hStartEvent);
+        return false;
+    }
+
+    if (GetLastError() == ERROR_ALREADY_EXISTS) {
+        CloseHandle(m_hStartEvent);
+        m_hStartEvent = NULL;
+            QMessageBox::information(nullptr, tr("Greetings!"), tr("It seems that an existing instance of this application "
+                                                                   "is already open! Please close that first before "
+                                                                   "re-opening again."),
+                             QMessageBox::Ok);
+        return false;
+    }
+
+    return true;
+    #elif __linux__
+    return true;
+    #else
+    #error "Platform not supported!"
+    #endif
+}
+
+/**
  * @brief GekkoFyre::CmnRoutines::findCfgFile finds the defined configuration file and checks if it exists.
  * @note <http://theboostcpplibraries.com/boost.filesystem-paths>
  * @param cfgFileName
@@ -886,22 +938,4 @@ QString GekkoFyre::CmnRoutines::numberConverter(const double &value)
         QString conv = bytesToKilobytes(value);
         return conv;
     }
-}
-
-/**
- * @brief GekkoFyre::CmnRoutines::print_exception_qmsgbox recursively prints out all the exceptions from the
- * immediate cause.
- * @date 2016-11-12
- * @note <http://en.cppreference.com/w/cpp/error/throw_with_nested>
- * @param e
- * @param level
- */
-void GekkoFyre::CmnRoutines::print_exception(const std::exception &e, int level)
-{
-    std::cerr << std::string((unsigned long)level, ' ') << tr("exception: ").toStdString() << e.what() << std::endl;
-    try {
-        std::rethrow_if_nested(e);
-    } catch (const std::exception &e) {
-        print_exception(e, (level + 1));
-    } catch (...) {}
 }

@@ -78,6 +78,7 @@ public:
     double percentDownloaded(const double &content_length, const double &amountDl);
 
     void print_exception(const std::exception &e, int level = 0);
+    bool singleAppInstance_Win32();
 
     int convDlStat_toInt(const GekkoFyre::DownloadStatus &status);
     int convHashType_toInt(const GekkoFyre::HashType &hash_type);

@@ -72,6 +72,9 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
 
     try {
         #ifdef _WIN32
+        if (!routines->singleAppInstance_Win32()) {
+            QCoreApplication::quit(); // Exit with status code '0'
+        }
         #elif __linux__
         SingletonProcess singleton(37563);
         if (!singleton()) {
@@ -1226,6 +1229,8 @@ void MainWindow::recvXferStats(const GekkoFyre::GkCurl::CurlProgressPtr &info)
     curl_multi_mutex.unlock();
     prog_temp.url = info.url;
     prog_temp.file_dest = info.file_dest;
+    prog_temp.content_length = info.content_length;
+    prog_temp.timer_set = info.timer_set;
 
     bool alreadyExists = false;
     for (size_t i = 0; i < dl_stat.size(); ++i) {
@@ -1273,6 +1278,16 @@ void MainWindow::manageDlStats()
 
             if (ui->downloadView->model()->data(find_index).toString().toStdString() == dl_stat.at(j).file_dest) {
                 try {
+                    std::vector<GekkoFyre::GkCurl::CurlDlInfo> xml_history_info = routines->readDownloadInfo();
+                    if (dl_stat.at(j).content_length == 0) {
+                        for (size_t o = 0; o < xml_history_info.size(); ++o) {
+                            if (xml_history_info.at(o).file_loc == dl_stat.at(j).file_dest) {
+                                dl_stat.at(j).content_length = xml_history_info.at(o).ext_info.content_length;
+                                break;
+                            }
+                        }
+                    }
+
                     GekkoFyre::GkCurl::CurlDlStats dl_stat_element = dl_stat.at(j).stat.back();
                     std::ostringstream oss_dlnow;
                     oss_dlnow << routines->numberConverter(dl_stat_element.dlnow).toStdString() << tr("/sec").toStdString();
@@ -1281,6 +1296,7 @@ void MainWindow::manageDlStats()
 
                     dlModel->updateCol(dlModel->index(i, MN_DOWNSPEED_COL), QString::fromStdString(oss_dlnow.str()), MN_DOWNSPEED_COL);
                     dlModel->updateCol(dlModel->index(i, MN_DOWNLOADED_COL), routines->numberConverter(cur_file_size), MN_DOWNLOADED_COL);
+                    dlModel->updateCol(dlModel->index(i, MN_PROGRESS_COL), routines->percentDownloaded(dl_stat.at(j).content_length, cur_file_size), MN_PROGRESS_COL);
 
                     // Update the 'download speed' spline-graph, via the file location
                     if (!graph_init.empty()) {
