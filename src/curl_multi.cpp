@@ -113,7 +113,7 @@ bool GekkoFyre::CurlMulti::fileStream()
             // after waiting for action with select().
             // If you want stuff to happen "in the background", you need to start a new thread and do the
             // transfer there.
-            do {
+            while ((gi->still_running > 0 && active_downloads > 0) || (gi->still_running != 0)) {
                 CURLMcode mc; // curl_multi_wait() return code
                 int numfds = 0; // Number of file descriptors
 
@@ -137,8 +137,10 @@ bool GekkoFyre::CurlMulti::fileStream()
 
                 if (active_downloads > 0) {
                     curl_multi_perform(gi->multi, &gi->still_running);
+                } else {
+                    break;
                 }
-            } while ((gi->still_running > 0 && active_downloads > 0) || (gi->still_running != 0));
+            };
 
             while ((msg = curl_multi_info_read(gi->multi, &msgs_left))) {
                 if (msg->msg == CURLMSG_DONE) {
