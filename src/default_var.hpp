@@ -70,15 +70,16 @@ extern "C" {
 #error "Platform not supported!"
 #endif
 
-#define FYREDL_PROG_VERS "0.0.1"          // The application version
-#define FYREDL_USER_AGENT "FyreDL/0.0.1"  // The user-agent displayed externally by FyreDL, along with the application version.
-#define CFG_HISTORY_FILE "fyredl.xml"     // The configuration/history file-name used by FyreDL. Location is set within the application's GUI.
-#define ENBL_GUI_CHARTS false             // Whether to enable charts/graphs within the GUI, to chart the progress of downloads.
-#define FYREDL_LIBCURL_VERBOSE 1L         // Set to '1L' if you want libcurl to tell you what it's up to!
-#define FYREDL_CONN_TIMEOUT 60L           // The duration, in seconds, until a timeout occurs when attempting to make a connection.
-#define FYREDL_CONN_LOW_SPEED_CUTOUT 512L // The average transfer speed in bytes per second to be considered below before connection cut-off.
-#define FYREDL_CONN_LOW_SPEED_TIME 10L    // The number of seconds that the transfer speed should be below 'FYREDL_CONN_LOW_SPEED_CUTOUT' before connection cut-off.
-#define FYREDL_EST_WAIT_TIME_PRECISION 3  // The significant digit precision of the estimated wait time counter for each active transfer
+#define FYREDL_PROG_VERS "0.0.1"                // The application version
+#define FYREDL_USER_AGENT "FyreDL/0.0.1"        // The user-agent displayed externally by FyreDL, along with the application version.
+#define CFG_HISTORY_FILE "fyredl_history.xml"   // The history file-name used by FyreDL. Location is also set within the application's GUI.
+#define CFG_SETTINGS_FILE "fyredl_settings.xml" // The configuration file-name used by FyreDL. Location is also set within the application's GUI.
+#define ENBL_GUI_CHARTS false                   // Whether to enable charts/graphs within the GUI, to chart the progress of downloads.
+#define FYREDL_LIBCURL_VERBOSE 1L               // Set to '1L' if you want libcurl to tell you what it's up to!
+#define FYREDL_CONN_TIMEOUT 60L                 // The duration, in seconds, until a timeout occurs when attempting to make a connection.
+#define FYREDL_CONN_LOW_SPEED_CUTOUT 512L       // The average transfer speed in bytes per second to be considered below before connection cut-off.
+#define FYREDL_CONN_LOW_SPEED_TIME 10L          // The number of seconds that the transfer speed should be below 'FYREDL_CONN_LOW_SPEED_CUTOUT' before connection cut-off.
+#define FYREDL_EST_WAIT_TIME_PRECISION 3        // The significant digit precision of the estimated wait time counter for each active transfer
 
 //
 // ###################################
@@ -94,6 +95,11 @@ extern "C" {
 
 // XML configuration
 #define XML_PARENT_NODE "fyredl-db"
+
+#define XML_CHILD_NODE_VERS "fyredl-xml"
+#define XML_CHILD_ITEM_VERS "version"
+#define XML_ITEM_ATTR_VERS_NO "supported"                 // The supported XML file version for this particular FyreDL build
+
 #define XML_CHILD_NODE_FILE "file"
 #define XML_CHILD_ITEM_FILE "item"
 #define XML_ITEM_ATTR_FILE_CID "content-id"                // The unique, content integer ID of the download in the XML history file
@@ -109,6 +115,11 @@ extern "C" {
 #define XML_ITEM_ATTR_FILE_HASH_VAL_GIVEN "hash-val-given" // The hash-value that was given by the user
 #define XML_ITEM_ATTR_FILE_HASH_VAL_RTRND "hash-val-rtrnd" // The hash-value that was calculated after the download (presumably) succeeded
 #define XML_ITEM_ATTR_FILE_HASH_SUCC_TYPE "hash-succ-type" // Whether the calculated hash of the download matched the given hash or not
+
+#define XML_CHILD_NODE_SETTINGS "settings"
+#define XML_CHILD_ITEM_SETTINGS "user"
+#define XML_ITEM_ATTR_SETTINGS_WIN_Y "main-win-y"
+#define XML_ITEM_ATTR_SETTINGS_WIN_X "main-win-x"
 
 // These determine the columns used in QTableView
 #define MN_FILENAME_COL 0
@@ -293,6 +304,13 @@ namespace GekkoFyre {
             DownSpeedGraph down_speed;
             QString file_dest;
             bool currShown;
+        };
+    }
+
+    namespace GkSettings {
+        struct FyreDL {
+            int main_win_x;
+            int main_win_y;
         };
     }
 }

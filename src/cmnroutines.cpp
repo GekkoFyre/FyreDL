@@ -444,7 +444,7 @@ void GekkoFyre::CmnRoutines::clearLayout(QLayout *layout)
  * @date   2016-10
  * @note   <http://www.gerald-fahrnholz.eu/sw/DocGenerated/HowToUse/html/group___grp_pugi_xml.html>
  *         <http://stackoverflow.com/questions/16155888/proper-way-to-parse-xml-using-pugixml>
- * @param xmlCfgFile
+ * @param xmlCfgFile is the XML history file in question.
  * @return
  */
 std::vector<GekkoFyre::GkCurl::CurlDlInfo> GekkoFyre::CmnRoutines::readDownloadInfo(const std::string &xmlCfgFile,
@@ -517,7 +517,7 @@ std::vector<GekkoFyre::GkCurl::CurlDlInfo> GekkoFyre::CmnRoutines::readDownloadI
  * @note   <http://stackoverflow.com/questions/9387610/what-xml-parser-should-i-use-in-c>
  *         <http://www.gerald-fahrnholz.eu/sw/DocGenerated/HowToUse/html/group___grp_pugi_xml.html>
  * @param dl_info
- * @param xmlCfgFile
+ * @param xmlCfgFile is the XML history file in question.
  * @return
  */
 bool GekkoFyre::CmnRoutines::writeDownloadItem(GekkoFyre::GkCurl::CurlDlInfo &dl_info,
@@ -622,6 +622,10 @@ pugi::xml_node GekkoFyre::CmnRoutines::createNewXmlFile(const std::string &xmlCf
     // A valid XML doc must contain a single root node of any name
     pugi::xml_node root = doc.append_child(XML_PARENT_NODE);
 
+    pugi::xml_node xml_version_node = root.append_child(XML_CHILD_NODE_VERS);
+    pugi::xml_node xml_version_child = xml_version_node.append_child(XML_CHILD_ITEM_VERS);
+    xml_version_child.append_attribute(XML_ITEM_ATTR_VERS_NO) = FYREDL_PROG_VERS;
+
     // Save XML tree to file.
     // Remark: second optional param is indent string to be used;
     // default indentation is tab character.
@@ -640,7 +644,7 @@ pugi::xml_node GekkoFyre::CmnRoutines::createNewXmlFile(const std::string &xmlCf
  * @note   <http://www.gerald-fahrnholz.eu/sw/DocGenerated/HowToUse/html/group___grp_pugi_xml.html>
  *         <http://stackoverflow.com/questions/19196683/c-pugixml-get-children-of-parent-by-attribute-id>
  * @param dl_info
- * @param xmlCfgFile
+ * @param xmlCfgFile is the XML history file in question.
  * @return
  */
 bool GekkoFyre::CmnRoutines::delDownloadItem(const QString &file_dest, const std::string &xmlCfgFile)
@@ -689,6 +693,8 @@ bool GekkoFyre::CmnRoutines::delDownloadItem(const QString &file_dest, const std
 /**
  * @brief GekkoFyre::CmnRoutines::modifyDlState allows the modification of the download state, whether it
  * be 'paused', 'actively downloading', 'unknown', or something else, it will update the given XML history file.
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @date 2016-10
  * @param file_loc relates to the location of the download on the user's local storage.
  * @param status is the download state you wish to change towards.
  * @param hash_checksum is the calculated checksum of the file in question.
@@ -707,9 +713,6 @@ bool GekkoFyre::CmnRoutines::modifyDlState(const std::string &file_loc,
     fs::path xmlCfgFile_loc = findCfgFile(xmlCfgFile);
     sys::error_code ec;
     if (fs::exists(xmlCfgFile_loc, ec) && fs::is_regular_file(xmlCfgFile_loc)) {
-        std::vector<GekkoFyre::GkCurl::CurlDlInfo> dl_info_list;
-        dl_info_list = readDownloadInfo(xmlCfgFile);
-
         pugi::xml_document doc;
 
         // Load XML into memory
@@ -1012,4 +1015,159 @@ QString GekkoFyre::CmnRoutines::numberConverter(const double &value)
         QString conv = bytesToKilobytes(value);
         return conv;
     }
+}
+
+/**
+ * @brief GekkoFyre::CmnRoutines::writeXmlSettings creates a new XML entry where there is none in regards to the saving
+ * of settings information.
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @date 2016-12-06
+ * @param settings The settings information that needs to be saved.
+ * @param xmlCfgFile The XML configuration file in question.
+ * @return '1' indicates an already existing entry, '0' indicates an entry was successfully added, and '-1' indicates
+ * an error at an attempt to add an entry.
+ */
+short GekkoFyre::CmnRoutines::writeXmlSettings(const GekkoFyre::GkSettings::FyreDL &settings,
+                                               const std::string &xmlCfgFile)
+{
+    fs::path xmlCfgFile_loc = findCfgFile(xmlCfgFile);
+    sys::error_code ec;
+    if (!xmlCfgFile_loc.string().empty()) {
+        pugi::xml_node root;
+
+        // Generate new XML document within memory
+        pugi::xml_document doc;
+        // Alternatively store as shared pointer if tree shall be used for longer
+        // time or multiple client calls:
+        // std::shared_ptr<pugi::xml_document> spDoc = std::make_shared<pugi::xml_document>();
+
+        if (!fs::exists(xmlCfgFile_loc, ec) && !fs::is_regular_file(xmlCfgFile_loc)) {
+            root = createNewXmlFile(xmlCfgFile);
+        }
+
+        // Load XML into memory
+        // Remark: to fully read declaration entries you have to specify, "pugi::parse_declaration"
+        pugi::xml_parse_result result = doc.load_file(xmlCfgFile_loc.string().c_str(), pugi::parse_default|pugi::parse_declaration);
+        if (!result) {
+            throw std::invalid_argument(tr("XML parse error: %1, character pos= %2")
+                                                .arg(result.description(),
+                                                     QString::number(result.offset)).toStdString());
+        }
+
+        unsigned short counter = 0;
+        pugi::xml_node items = doc.child(XML_PARENT_NODE);
+        for (const auto& file: items.children(XML_CHILD_NODE_SETTINGS)) {
+            for (const auto &item: file.children(XML_CHILD_ITEM_SETTINGS)) {
+                Q_UNUSED(item);
+                ++counter;
+            }
+        }
+
+        if (counter > 0) {
+            return 1;
+        }
+
+        // A valid XML document must have a single root node
+        root = doc.document_element();
+
+        pugi::xml_node nodeParent = root.append_child(XML_CHILD_NODE_SETTINGS);
+        pugi::xml_node nodeChild = nodeParent.append_child(XML_CHILD_ITEM_SETTINGS);
+        if (settings.main_win_y > 0 && settings.main_win_x > 0) {
+            nodeChild.append_attribute(XML_ITEM_ATTR_SETTINGS_WIN_Y) = settings.main_win_y;
+            nodeChild.append_attribute(XML_ITEM_ATTR_SETTINGS_WIN_X) = settings.main_win_x;
+        }
+
+        bool saveSucceed = doc.save_file(xmlCfgFile_loc.string().c_str(), PUGIXML_TEXT("    "));
+        if (!saveSucceed) {
+            throw std::runtime_error(tr("Error with saving XML config file!").toStdString());
+        } else {
+            return 0;
+        }
+    } else {
+        throw std::invalid_argument(tr("Internal error: no path has been given for the XML "
+                                               "configuration file!").toStdString());
+    }
+
+    return -1;
+}
+
+/**
+ * @brief GekkoFyre::CmnRoutines::readXmlSettings reads an already pre-existing, XML configuration file for FyreDL.
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @date 2016-12-06
+ * @param xmlCfgFile The XML configuration file in question.
+ * @return The data read from the XML configuration file.
+ */
+GekkoFyre::GkSettings::FyreDL GekkoFyre::CmnRoutines::readXmlSettings(const std::string &xmlCfgFile)
+{
+    fs::path xmlCfgFile_loc = findCfgFile(xmlCfgFile);
+    sys::error_code ec;
+    GekkoFyre::GkSettings::FyreDL settings;
+    settings.main_win_x = 0;
+    settings.main_win_y = 0;
+    if (fs::exists(xmlCfgFile_loc, ec) && fs::is_regular_file(xmlCfgFile_loc)) {
+        pugi::xml_document doc;
+        pugi::xml_parse_result result = doc.load_file(xmlCfgFile_loc.string().c_str(), pugi::parse_default|pugi::parse_declaration);
+        if (!result) {
+            throw std::invalid_argument(tr("XML parse error: %1, character pos= %2")
+                                                .arg(result.description(),
+                                                     QString::number(result.offset)).toStdString());
+        }
+
+        pugi::xml_node items = doc.child(XML_PARENT_NODE);
+        const auto xml_settings_node = items.child(XML_CHILD_NODE_SETTINGS);
+        const auto xml_user_item = xml_settings_node.child(XML_CHILD_ITEM_SETTINGS);
+        settings.main_win_x = xml_user_item.attribute(XML_ITEM_ATTR_SETTINGS_WIN_X).as_int();
+        settings.main_win_y = xml_user_item.attribute(XML_ITEM_ATTR_SETTINGS_WIN_Y).as_int();
+    }
+
+    return settings;
+}
+
+/**
+ * @brief GekkoFyre::CmnRoutines::modifyXmlSettings modifies an already pre-existing, XML configuration file for FyreDL.
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @date 2016-12-06
+ * @param settings The settings information that needs to be saved.
+ * @param xmlCfgFile The XML configuration file in question.
+ * @return Whether the operation was a success or not.
+ */
+bool GekkoFyre::CmnRoutines::modifyXmlSettings(const GekkoFyre::GkSettings::FyreDL &settings,
+                                               const std::string &xmlCfgFile)
+{
+    fs::path xmlCfgFile_loc = findCfgFile(xmlCfgFile);
+    sys::error_code ec;
+    if (fs::exists(xmlCfgFile_loc, ec) && fs::is_regular_file(xmlCfgFile_loc)) {
+        pugi::xml_document doc;
+
+        // Load XML into memory
+        // Remark: to fully read declaration entries you have to specify, "pugi::parse_declaration"
+        pugi::xml_parse_result result = doc.load_file(xmlCfgFile_loc.string().c_str(),
+                                                      pugi::parse_default|pugi::parse_declaration);
+        if (!result) {
+            throw std::invalid_argument(tr("XML parse error: %1, character pos= %2")
+                                                .arg(result.description(),
+                                                     QString::number(result.offset)).toStdString());
+        }
+
+        pugi::xml_node items = doc.child(XML_PARENT_NODE);
+        const auto xml_settings_node = items.child(XML_CHILD_NODE_SETTINGS);
+        const auto xml_user_item = xml_settings_node.child(XML_CHILD_ITEM_SETTINGS);
+        if (settings.main_win_x > 0 && settings.main_win_y > 0) {
+            xml_user_item.attribute(XML_ITEM_ATTR_SETTINGS_WIN_X).set_value(settings.main_win_x);
+            xml_user_item.attribute(XML_ITEM_ATTR_SETTINGS_WIN_Y).set_value(settings.main_win_y);
+        }
+
+        bool saveSucceed = doc.save_file(xmlCfgFile_loc.string().c_str(), PUGIXML_TEXT("    "));
+        if (!saveSucceed) {
+            throw std::runtime_error(tr("Error with saving XML config file!").toStdString());
+        }
+
+        return true;
+    } else {
+        throw std::invalid_argument(tr("XML config file does not exist! Location attempt: "
+                                               "%1").arg(xmlCfgFile_loc.string().c_str()).toStdString());
+    }
+
+    return false;
 }

@@ -132,6 +132,17 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
 
 MainWindow::~MainWindow()
 {
+    try {
+        GekkoFyre::GkSettings::FyreDL settings;
+        settings.main_win_x = ui->centralWidget->geometry().width();
+        settings.main_win_y = ui->centralWidget->geometry().height();
+        if (routines->writeXmlSettings(settings) == 1) {
+            routines->modifyXmlSettings(settings);
+        }
+    } catch (const std::exception &e) {
+        QMessageBox::warning(this, tr("Error!"), QString("%1").arg(e.what()), QMessageBox::Ok);
+    }
+
     delete ui;
     emit finish_curl_multi_thread();
     delete routines;

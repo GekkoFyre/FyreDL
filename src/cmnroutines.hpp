@@ -114,6 +114,12 @@ public:
                        const long long &complt_timestamp = 0,
                        const std::string &xmlCfgFile = CFG_HISTORY_FILE);
 
+    short writeXmlSettings(const GekkoFyre::GkSettings::FyreDL &settings,
+                           const std::string &xmlCfgFile = CFG_SETTINGS_FILE);
+    GekkoFyre::GkSettings::FyreDL readXmlSettings(const std::string &xmlCfgFile = CFG_SETTINGS_FILE);
+    bool modifyXmlSettings(const GekkoFyre::GkSettings::FyreDL &settings,
+                           const std::string &xmlCfgFile = CFG_SETTINGS_FILE);
+
 private:
     QMutex mutex;
 };
