@@ -593,6 +593,7 @@ void MainWindow::general_extraDetails()
             std::vector<GekkoFyre::GkCurl::CurlDlInfo> dl_info = routines->readDownloadInfo();
             long long insert_time = 0;
             long long complt_time = 0;
+            double content_length = 0;
             std::string hash_val_given = "";
             std::string hash_val_calc = "";
             QString hashType = "";
@@ -600,11 +601,35 @@ void MainWindow::general_extraDetails()
                 if (dl_info.at(i).file_loc == dest_string.toStdString()) {
                     insert_time = dl_info.at(i).insert_timestamp;
                     complt_time = dl_info.at(i).complt_timestamp;
+                    content_length = dl_info.at(i).ext_info.content_length;
                     hash_val_given = dl_info.at(i).hash_val_given;
                     hash_val_calc = dl_info.at(i).hash_val_rtrnd;
                     hashType = routines->convHashType_toString(dl_info.at(i).hash_type);
                     break;
                 }
+            }
+
+            double curr_dl_amount = 0;
+            double curr_dl_speed = 0;
+            if (dl_stat.size() > 0) {
+                for (size_t i = 0; i < dl_stat.size(); ++i) {
+                    if (dl_stat.at(i).file_dest == dest_string.toStdString()) {
+                        if (dl_stat.at(i).stat.size() > 0) {
+                            curr_dl_amount = dl_stat.at(i).stat.back().dltotal;
+                            curr_dl_speed = dl_stat.at(i).stat.back().dlnow;
+                            break;
+                        }
+
+                        break;
+                    }
+                }
+            }
+
+            if (curr_dl_amount != 0) {
+                double estWaitTime = routines->estimatedTimeLeft(content_length, curr_dl_amount, curr_dl_speed);
+                ui->estWaitTimeDataLabel->setText(routines->timeBeautify(estWaitTime));
+            } else {
+                ui->estWaitTimeDataLabel->setText(tr("N/A"));
             }
 
             ui->hashTypeDataLabel->setText(hashType);
@@ -1337,7 +1362,10 @@ void MainWindow::manageDlStats()
                                     double passed_time = std::difftime(cur_time, dl_stat.at(j).timer_begin);
                                     graph_init.at(k).down_speed.down_speed_vals.push_back(std::make_pair(dl_stat_element.dlnow,
                                                                                                          passed_time));
+                                    general_extraDetails();
+                                    transfer_extraDetails();
                                     updateChart();
+                                    break;
                                 }
                             } else {
                                 throw std::invalid_argument(tr("Invalid file destination and/or graphing pointer(s) have been given!").toStdString());

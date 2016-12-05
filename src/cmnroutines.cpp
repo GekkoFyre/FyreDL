@@ -150,6 +150,43 @@ double GekkoFyre::CmnRoutines::percentDownloaded(const double &content_length, c
 }
 
 /**
+ * @brief GekkoFyre::CmnRoutines::estimatedTimeLeft estimates the amount of time left on a transfer that is downloading.
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @date 2016-12-05
+ * @param content_length The file-size of the download in question.
+ * @param amountDl The current downloaded amount.
+ * @param down_speed The current transfer rate on the download.
+ * @return The time in seconds until the transfer is finished.
+ */
+double GekkoFyre::CmnRoutines::estimatedTimeLeft(const double &content_length, const double &amountDl,
+                                                 const double &down_speed)
+{
+    double timeLeft = ((content_length - amountDl) / down_speed);
+    return timeLeft;
+}
+
+QString GekkoFyre::CmnRoutines::timeBeautify(const double &secondsToConvert)
+{
+    std::ostringstream oss;
+    double convertedTime = 0;
+    if (secondsToConvert > 60) {
+        // Minutes
+        convertedTime = (secondsToConvert / 60);
+        oss << std::setprecision(FYREDL_EST_WAIT_TIME_PRECISION) << convertedTime << " " << tr("minutes").toStdString();
+    } else if (secondsToConvert > (60 * 60)) {
+        // Hours
+        convertedTime = (secondsToConvert / (60 * 60));
+        oss << std::setprecision(FYREDL_EST_WAIT_TIME_PRECISION) << convertedTime << " " << tr("hours").toStdString();
+    } else if (secondsToConvert > ((60 * 60) * 24)) {
+        // Days
+        convertedTime = (secondsToConvert / ((60 * 60) * 24));
+        oss << std::setprecision(FYREDL_EST_WAIT_TIME_PRECISION) << convertedTime << " " << tr("days").toStdString();
+    }
+
+    return QString::fromStdString(oss.str());
+}
+
+/**
  * @brief GekkoFyre::CmnRoutines::print_exception_qmsgbox recursively prints out all the exceptions from the
  * immediate cause.
  * @date 2016-11-12

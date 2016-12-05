@@ -78,6 +78,7 @@ extern "C" {
 #define FYREDL_CONN_TIMEOUT 60L           // The duration, in seconds, until a timeout occurs when attempting to make a connection.
 #define FYREDL_CONN_LOW_SPEED_CUTOUT 512L // The average transfer speed in bytes per second to be considered below before connection cut-off.
 #define FYREDL_CONN_LOW_SPEED_TIME 10L    // The number of seconds that the transfer speed should be below 'FYREDL_CONN_LOW_SPEED_CUTOUT' before connection cut-off.
+#define FYREDL_EST_WAIT_TIME_PRECISION 3  // The significant digit precision of the estimated wait time counter for each active transfer
 
 //
 // ###################################

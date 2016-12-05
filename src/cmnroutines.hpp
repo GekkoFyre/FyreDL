@@ -76,6 +76,9 @@ public:
     QString numberSeperators(const QVariant &value);
     QString numberConverter(const double &value);
     double percentDownloaded(const double &content_length, const double &amountDl);
+    double estimatedTimeLeft(const double &content_length, const double &amountDl,
+                             const double &down_speed);
+    QString timeBeautify(const double &secondsToConvert);
 
     void print_exception(const std::exception &e, int level = 0);
     bool singleAppInstance_Win32();
