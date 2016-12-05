@@ -240,9 +240,9 @@
                  <property name="geometry">
                   <rect>
                    <x>0</x>
-                   <y>0</y>
+                   <y>-152</y>
                    <width>962</width>
-                   <height>196</height>
+                   <height>274</height>
                   </rect>
                  </property>
                  <layout class="QVBoxLayout" name="verticalLayout_8">
@@ -255,52 +255,17 @@
                       </property>
                      </widget>
                     </item>
-                    <item row="1" column="0">
-                     <widget class="QLabel" name="destinationLabel">
-                      <property name="text">
-                       <string>Destination: </string>
-                      </property>
-                     </widget>
-                    </item>
-                    <item row="2" column="0">
-                     <widget class="QLabel" name="totalSizeLabel">
-                      <property name="text">
-                       <string>Total Size: </string>
-                      </property>
-                     </widget>
-                    </item>
-                    <item row="3" column="0">
-                     <widget class="QLabel" name="urlLabel">
-                      <property name="text">
-                       <string>URL: </string>
-                      </property>
-                     </widget>
-                    </item>
-                    <item row="4" column="0">
-                     <widget class="QLabel" name="createdTimeLabel">
-                      <property name="text">
-                       <string>Created Time: </string>
-                      </property>
-                     </widget>
-                    </item>
-                    <item row="5" column="0">
-                     <widget class="QLabel" name="completedTimeLabel">
-                      <property name="text">
-                       <string>Completed Time: </string>
-                      </property>
-                     </widget>
-                    </item>
-                    <item row="6" column="0">
-                     <widget class="QLabel" name="estimatedWaitTimeLabel">
-                      <property name="text">
-                       <string>Estimated Wait Time: </string>
-                      </property>
-                     </widget>
-                    </item>
                     <item row="0" column="1">
                      <widget class="QLabel" name="fileNameDataLabel">
                       <property name="text">
                        <string>N/A</string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="1" column="0">
+                     <widget class="QLabel" name="destinationLabel">
+                      <property name="text">
+                       <string>Destination: </string>
                       </property>
                      </widget>
                     </item>
@@ -311,10 +276,24 @@
                       </property>
                      </widget>
                     </item>
+                    <item row="2" column="0">
+                     <widget class="QLabel" name="totalSizeLabel">
+                      <property name="text">
+                       <string>Total Size: </string>
+                      </property>
+                     </widget>
+                    </item>
                     <item row="2" column="1">
                      <widget class="QLabel" name="totSizeDataLabel">
                       <property name="text">
                        <string>N/A</string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="3" column="0">
+                     <widget class="QLabel" name="urlLabel">
+                      <property name="text">
+                       <string>URL: </string>
                       </property>
                      </widget>
                     </item>
@@ -325,10 +304,24 @@
                       </property>
                      </widget>
                     </item>
+                    <item row="4" column="0">
+                     <widget class="QLabel" name="createdTimeLabel">
+                      <property name="text">
+                       <string>Created Time: </string>
+                      </property>
+                     </widget>
+                    </item>
                     <item row="4" column="1">
                      <widget class="QLabel" name="createTimeDataLabel">
                       <property name="text">
                        <string>N/A</string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="5" column="0">
+                     <widget class="QLabel" name="completedTimeLabel">
+                      <property name="text">
+                       <string>Completed Time: </string>
                       </property>
                      </widget>
                     </item>
@@ -339,8 +332,57 @@
                       </property>
                      </widget>
                     </item>
+                    <item row="6" column="0">
+                     <widget class="QLabel" name="estimatedWaitTimeLabel">
+                      <property name="text">
+                       <string>Estimated Wait Time: </string>
+                      </property>
+                     </widget>
+                    </item>
                     <item row="6" column="1">
                      <widget class="QLabel" name="estWaitTimeDataLabel">
+                      <property name="text">
+                       <string>N/A</string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="7" column="0">
+                     <widget class="QLabel" name="hashTypeLabel">
+                      <property name="text">
+                       <string>Hash Type: </string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="7" column="1">
+                     <widget class="QLabel" name="hashTypeDataLabel">
+                      <property name="text">
+                       <string>N/A</string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="8" column="0">
+                     <widget class="QLabel" name="givenHashLabel">
+                      <property name="text">
+                       <string>Given Hash Value: </string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="8" column="1">
+                     <widget class="QLabel" name="givenHashDataLabel">
+                      <property name="text">
+                       <string>N/A</string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="9" column="0">
+                     <widget class="QLabel" name="calcHashLabel">
+                      <property name="text">
+                       <string>Calc. Hash Value: </string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="9" column="1">
+                     <widget class="QLabel" name="calcHashDataLabel">
                       <property name="text">
                        <string>N/A</string>
                       </property>

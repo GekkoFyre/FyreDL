@@ -593,13 +593,21 @@ void MainWindow::general_extraDetails()
             std::vector<GekkoFyre::GkCurl::CurlDlInfo> dl_info = routines->readDownloadInfo();
             long long insert_time = 0;
             long long complt_time = 0;
+            std::string hash_val_given = "";
+            std::string hash_val_calc = "";
+            QString hashType = "";
             for (size_t i = 0; i < dl_info.size(); ++i) {
                 if (dl_info.at(i).file_loc == dest_string.toStdString()) {
                     insert_time = dl_info.at(i).insert_timestamp;
                     complt_time = dl_info.at(i).complt_timestamp;
+                    hash_val_given = dl_info.at(i).hash_val_given;
+                    hash_val_calc = dl_info.at(i).hash_val_rtrnd;
+                    hashType = routines->convHashType_toString(dl_info.at(i).hash_type);
                     break;
                 }
             }
+
+            ui->hashTypeDataLabel->setText(hashType);
 
             if (insert_time > 0) {
                 // We have a timestamp
@@ -615,6 +623,22 @@ void MainWindow::general_extraDetails()
             } else {
                 // Insert a 'N/A'
                 ui->compTimeDataLabel->setText(tr("N/A"));
+            }
+
+            if (!hash_val_given.empty()) {
+                // We have a hash value!
+                ui->givenHashDataLabel->setText(QString::fromStdString(hash_val_given));
+            } else {
+                // Insert a 'N/A'
+                ui->givenHashDataLabel->setText(tr("N/A"));
+            }
+
+            if (!hash_val_calc.empty()) {
+                // We have a calculated hash value!
+                ui->calcHashDataLabel->setText(QString::fromStdString(hash_val_calc));
+            } else {
+                // Insert a 'N/A'
+                ui->calcHashDataLabel->setText(tr("N/A"));
             }
         }
     }
@@ -1267,7 +1291,6 @@ void MainWindow::recvXferStats(const GekkoFyre::GkCurl::CurlProgressPtr &info)
  */
 void MainWindow::manageDlStats()
 {
-    // TODO: Have FyreDL immediately stop this routine, MainWindow::manageDlStats(), after a download is completed.
     for (int i = 0; i < dlModel->getList().size(); ++i) {
         QModelIndex find_index = dlModel->index(i, MN_DESTINATION_COL);
         for (size_t j = 0; j < dl_stat.size(); ++j) {
@@ -1308,7 +1331,6 @@ void MainWindow::manageDlStats()
 
                                 // Make sure we are using the right 'graph_init' element!
                                 if (graph_init.at(k).file_dest.toStdString() == dl_stat.at(j).file_dest) {
-                                    // TODO: Fix the SIGSEGV bug relating to the code immediately below! NOTE: It only occurs some of the time.
                                     // Append our statistics to the 'graph_init' struct and thus, the graph in question
                                     std::time_t cur_time;
                                     std::time(&cur_time);
@@ -1355,16 +1377,25 @@ void MainWindow::recvDlFinished(const GekkoFyre::GkCurl::DlStatusMsg &status)
                         GekkoFyre::GkFile::FileHash file_hash;
                         std::vector<GekkoFyre::GkCurl::CurlDlInfo> dl_mini_info_vec = routines->readDownloadInfo(CFG_HISTORY_FILE, true);
                         for (size_t j = 0; j < dl_mini_info_vec.size(); ++j) {
-                            if (dl_mini_info_vec.at(j).file_loc == status.file_loc && dl_mini_info_vec.at(j).ext_info.effective_url == status.url.toStdString()) {
-                                file_hash = routines->cryptoFileHash(
-                                        QString::fromStdString(status.file_loc), dl_mini_info_vec.at(j).hash_type,
-                                        QString::fromStdString(dl_mini_info_vec.at(j).hash_val_given));
-                                break;
+                            if (dl_mini_info_vec.at(j).file_loc == status.file_loc) {
+                                switch (dl_mini_info_vec.at(j).hash_type) {
+                                    case GekkoFyre::HashType::CannotDetermine:
+                                    case GekkoFyre::HashType::None:
+                                        file_hash = routines->cryptoFileHash(
+                                                QString::fromStdString(status.file_loc), GekkoFyre::HashType::SHA1, "");
+                                        break;
+                                    default:
+                                        file_hash = routines->cryptoFileHash(
+                                                QString::fromStdString(status.file_loc), dl_mini_info_vec.at(j).hash_type,
+                                                QString::fromStdString(dl_mini_info_vec.at(j).hash_val_given));
+                                        break;
+                                }
                             }
                         }
 
                         routines->modifyDlState(status.file_loc, GekkoFyre::DownloadStatus::Completed, file_hash.checksum.toStdString(),
-                                                file_hash.hash_verif, QDateTime::currentDateTime().toTime_t());
+                                                file_hash.hash_verif, file_hash.hash_type,
+                                                QDateTime::currentDateTime().toTime_t());
                         dlModel->updateCol(stat_index, routines->convDlStat_toString(GekkoFyre::DownloadStatus::Completed), MN_STATUS_COL);
 
                         // Update the 'downloaded amount' because the statistics routines are not always accurate, due to only
@@ -1373,12 +1404,6 @@ void MainWindow::recvDlFinished(const GekkoFyre::GkCurl::DlStatusMsg &status)
                         return;
                     }
                 }
-
-                // There is a bug where every second, third, fourth, etc. download will skip the status check to see if the
-                // entry-row in question is 'Downloading' and thus not hit the return in that code bracket, thereby ending up at
-                // this exception. Disabling this exception temporarily fixes this problem at the cost of performance for many file
-                // downloads within the one session.
-                // TODO: Fix the aforementioned problem!
 
                 /*
                 throw std::invalid_argument(tr("Error with completing the download: %1")

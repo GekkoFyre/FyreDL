@@ -90,6 +90,7 @@ public:
     QString convDlStat_toString(const GekkoFyre::DownloadStatus &status);
     GekkoFyre::DownloadStatus convDlStat_StringToEnum(const QString &status);
     GekkoFyre::HashType convHashType_StringToEnum(const QString &hashType);
+    QString convHashType_toString(const GekkoFyre::HashType &hash_type);
 
     std::string findCfgFile(const std::string &cfgFileName);
     static long getFileSize(const std::string &file_name);
@@ -106,7 +107,9 @@ public:
     bool modifyDlState(const std::string &file_loc, const DownloadStatus &status,
                        const std::string &hash_checksum = "",
                        const GekkoFyre::HashVerif &ret_succ_type = GekkoFyre::HashVerif::Analyzing,
-                       const long long &complt_timestamp = 0, const std::string &xmlCfgFile = CFG_HISTORY_FILE);
+                       const GekkoFyre::HashType &hash_type = GekkoFyre::HashType::None,
+                       const long long &complt_timestamp = 0,
+                       const std::string &xmlCfgFile = CFG_HISTORY_FILE);
 
 private:
     QMutex mutex;

@@ -296,71 +296,79 @@ GekkoFyre::GkFile::FileHash GekkoFyre::CmnRoutines::cryptoFileHash(const QString
                                                                    const QString &given_hash_val)
 {
     GekkoFyre::GkFile::FileHash info;
-    if (!given_hash_val.isEmpty()) {
-        QFile f(file_dest);
-        fs::path boost_file_path(file_dest.toStdString());
-        if (f.exists() && !fs::is_directory(boost_file_path)) {
-            if (!f.open(QIODevice::ReadOnly)) {
-                // The file is already opened by another application on the system! Throw exception...
-                throw std::runtime_error(tr("Unable to continue! The file, \"%1\", is already opened by another application.")
-                                                 .arg(file_dest).toStdString());
-            }
+    QFile f(file_dest);
+    fs::path boost_file_path(file_dest.toStdString());
+    if (f.exists() && !fs::is_directory(boost_file_path)) {
+        if (!f.open(QIODevice::ReadOnly)) {
+            // The file is already opened by another application on the system! Throw exception...
+            throw std::runtime_error(tr("Unable to continue! The file, \"%1\", is already opened by another application.")
+                                             .arg(file_dest).toStdString());
+        }
 
-            QByteArray result;
-            info.hash_type = hash_type;
-            if ((hash_type == GekkoFyre::HashType::MD5 || hash_type == GekkoFyre::HashType::SHA1 ||
-                hash_type == GekkoFyre::HashType::SHA256||  hash_type == GekkoFyre::HashType::SHA512 ||
-                hash_type == GekkoFyre::HashType::SHA3_256 ||  hash_type == GekkoFyre::HashType::SHA3_512) &&
-                    hash_type != GekkoFyre::HashType::None) {
-                QCryptographicHash hash(convHashType_toAlgo(hash_type));
-                if (hash.addData(&f)) {
-                    result = hash.result();
-                    info.checksum = result.toHex();
+        QByteArray result;
+        info.hash_type = hash_type;
+        if (hash_type == GekkoFyre::HashType::MD5 || hash_type == GekkoFyre::HashType::SHA1 ||
+             hash_type == GekkoFyre::HashType::SHA256||  hash_type == GekkoFyre::HashType::SHA512 ||
+             hash_type == GekkoFyre::HashType::SHA3_256 ||  hash_type == GekkoFyre::HashType::SHA3_512) {
+            QCryptographicHash hash(convHashType_toAlgo(hash_type));
+            if (hash.addData(&f)) {
+                result = hash.result();
+                info.checksum = result.toHex();
+                if (!given_hash_val.isEmpty()) {
+                    // There is a given hash to compare against!
                     if (info.checksum == given_hash_val) {
+                        // The calculated checksum MATCHES the given hash!
                         info.hash_verif = GekkoFyre::HashVerif::Verified;
                         return info;
                     } else {
+                        // The calculated checksum does NOT match the given hash!
                         info.hash_verif = GekkoFyre::HashVerif::Corrupt;
                         return info;
                     }
+                } else {
+                    // There is no given hash to compare against
+                    info.hash_verif = GekkoFyre::HashVerif::NotApplicable;
+                    return info;
                 }
-            } else if (hash_type == GekkoFyre::HashType::None) {
-                info.hash_type = GekkoFyre::HashType::None;
-                info.hash_verif = GekkoFyre::HashVerif::NotApplicable;
-                info.checksum = "";
-                return info;
-            } else {
-                // We need to find the hash-type!
-                std::vector<QString> vec_hash_val;
-                std::vector<GekkoFyre::HashType> vec_hash_type;
-                vec_hash_type.push_back(GekkoFyre::HashType::MD5);
-                vec_hash_type.push_back(GekkoFyre::HashType::SHA1);
-                vec_hash_type.push_back(GekkoFyre::HashType::SHA256);
-                vec_hash_type.push_back(GekkoFyre::HashType::SHA512);
-                vec_hash_type.push_back(GekkoFyre::HashType::SHA3_256);
-                vec_hash_type.push_back(GekkoFyre::HashType::SHA3_512);
-                for (size_t i = 0; i < vec_hash_type.size(); ++i) {
-                    QCryptographicHash hash(convHashType_toAlgo(vec_hash_type.at(i)));
-                    if (hash.addData(&f)) {
-                        result = hash.result();
-                        vec_hash_val.push_back(result.toHex());
-                    }
+            }
+        } else if (hash_type == GekkoFyre::HashType::None) {
+            info.hash_type = GekkoFyre::HashType::None;
+            info.hash_verif = GekkoFyre::HashVerif::NotApplicable;
+            info.checksum = "";
+            return info;
+        } else {
+            // We need to find the hash-type!
+            std::vector<QString> vec_hash_val;
+            std::vector<GekkoFyre::HashType> vec_hash_type;
+            vec_hash_type.push_back(GekkoFyre::HashType::MD5);
+            vec_hash_type.push_back(GekkoFyre::HashType::SHA1);
+            vec_hash_type.push_back(GekkoFyre::HashType::SHA256);
+            vec_hash_type.push_back(GekkoFyre::HashType::SHA512);
+            vec_hash_type.push_back(GekkoFyre::HashType::SHA3_256);
+            vec_hash_type.push_back(GekkoFyre::HashType::SHA3_512);
+            for (size_t i = 0; i < vec_hash_type.size(); ++i) {
+                QCryptographicHash hash(convHashType_toAlgo(vec_hash_type.at(i)));
+                if (hash.addData(&f)) {
+                    result = hash.result();
+                    vec_hash_val.push_back(result.toHex());
                 }
+            }
 
-                for (size_t i = 0; i < vec_hash_val.size(); ++i) {
-                    info.checksum = vec_hash_val.at(i);
-                    info.hash_type = GekkoFyre::HashType::CannotDetermine;
+            for (size_t i = 0; i < vec_hash_val.size(); ++i) {
+                info.checksum = vec_hash_val.at(i);
+                info.hash_type = GekkoFyre::HashType::CannotDetermine;
+                if (!given_hash_val.isEmpty()) {
                     if (vec_hash_val.at(i) == given_hash_val) {
                         info.hash_verif = GekkoFyre::HashVerif::Verified;
                         return info;
                     }
                 }
-
-                info.hash_verif = GekkoFyre::HashVerif::NotApplicable;
-                info.hash_type = GekkoFyre::HashType::CannotDetermine;
-                info.checksum = "";
-                return info;
             }
+
+            info.hash_verif = GekkoFyre::HashVerif::NotApplicable;
+            info.hash_type = GekkoFyre::HashType::CannotDetermine;
+            info.checksum = "";
+            return info;
         }
     }
 
@@ -655,6 +663,7 @@ bool GekkoFyre::CmnRoutines::modifyDlState(const std::string &file_loc,
                                            const GekkoFyre::DownloadStatus &status,
                                            const std::string &hash_checksum,
                                            const GekkoFyre::HashVerif &ret_succ_type,
+                                           const GekkoFyre::HashType &hash_type,
                                            const long long &complt_timestamp,
                                            const std::string &xmlCfgFile)
 {
@@ -682,6 +691,10 @@ bool GekkoFyre::CmnRoutines::modifyDlState(const std::string &file_loc,
                 if (file.find_child_by_attribute(XML_ITEM_ATTR_FILE_FLOC, file_loc.c_str())) {
                     item.attribute(XML_ITEM_ATTR_FILE_STAT).set_value(convDlStat_toInt(status));
                     if (!hash_checksum.empty()) {
+                        if (hash_type != GekkoFyre::HashType::None) {
+                            item.attribute(XML_ITEM_ATTR_FILE_HASH_TYPE).set_value(convHashType_toInt(hash_type));
+                        }
+
                         item.attribute(XML_ITEM_ATTR_FILE_HASH_VAL_RTRND).set_value(hash_checksum.c_str());
                         item.attribute(XML_ITEM_ATTR_FILE_HASH_SUCC_TYPE).set_value(convHashVerif_toInt(ret_succ_type));
                     }
@@ -921,6 +934,30 @@ GekkoFyre::HashType GekkoFyre::CmnRoutines::convHashType_StringToEnum(const QStr
         return GekkoFyre::HashType::CannotDetermine;
     } else {
         return GekkoFyre::HashType::CannotDetermine;
+    }
+}
+
+QString GekkoFyre::CmnRoutines::convHashType_toString(const GekkoFyre::HashType &hash_type)
+{
+    switch (hash_type) {
+        case GekkoFyre::HashType::MD5:
+            return QString("MD5");
+        case GekkoFyre::HashType::SHA1:
+            return QString("SHA-1");
+        case GekkoFyre::HashType::SHA256:
+            return QString("SHA-256");
+        case GekkoFyre::HashType::SHA512:
+            return QString("SHA-512");
+        case GekkoFyre::HashType::SHA3_256:
+            return QString("SHA3-512");
+        case GekkoFyre::HashType::SHA3_512:
+            return QString("SHA3-512");
+        case GekkoFyre::HashType::None:
+            return tr("None");
+        case GekkoFyre::HashType::CannotDetermine:
+            return tr("Unknown");
+        default:
+            return tr("Unknown");
     }
 }
 
