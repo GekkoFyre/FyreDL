@@ -145,6 +145,19 @@ extern "C" {
 #define CSV_FIELD_DEST "destination"
 #define CSV_FIELD_HASH "hash"
 
+// [ Enum values ]
+// Download Types
+#define ENUM_GEKKOFYRE_DOWN_TYPE_HTTP 0
+#define ENUM_GEKKOFYRE_DOWN_TYPE_FTP 1
+#define ENUM_GEKKOFYRE_DOWN_TYPE_TORRENT 2
+#define ENUM_GEKKOFYRE_DOWN_TYPE_MAGNET_LINK 3
+
+// Hash verification
+#define ENUM_GEKKOFYRE_HASH_VERIF_ANALYZING 1
+#define ENUM_GEKKOFYRE_HASH_VERIF_NOT_APPLIC 0
+#define ENUM_GEKKOFYRE_HASH_VERIF_VERIFIED 2
+#define ENUM_GEKKOFYRE_HASH_VERIF_CORRUPT -1
+
 namespace GekkoFyre {
     // * If status is paused, and paused is unclicked, or start is clicked, then the download resumes.
     //      * So, pause does just that. It lets you resume from where you left off. Pause the connection to the server/
@@ -165,8 +178,9 @@ namespace GekkoFyre {
 
     enum DownloadType {
         HTTP,
-        FTP,    // Separate handler needed for if there are authentication issues
-        Torrent
+        FTP,              // Separate handler needed for if there are authentication issues
+        Torrent,
+        TorrentMagnetLink
     };
 
     enum CurlGrabMethod {
@@ -197,6 +211,27 @@ namespace GekkoFyre {
             GekkoFyre::HashType hash_type;
             GekkoFyre::HashVerif hash_verif;
             QString checksum;
+        };
+    }
+
+    namespace GkTorrent {
+        struct DlTorrentInfo {
+            std::string file_loc;                // The location of the downloaded file being streamed towards
+            unsigned int cId;                    // Automatically incremented Content ID for each download/file
+            long long insert_timestamp;          // The date/time of the download/file having been inserted into the history file
+            long long complt_timestamp;          // The date/time of the download/file having completed transfer
+            GekkoFyre::DownloadStatus dlStatus;  // Status of the downloading file(s) in question
+            GekkoFyre::HashType hash_type;       // The actual type of hash used (e.g., CRC32/MD5/SHA1/SHA256/SHA512)
+            std::string hash_val_given;          // The value of the hash, if a type is specified in 'CurlDlInfo::hash_type', given by the user
+            std::string hash_val_rtrnd;          // Same as above, but calculated from the local file when, presumably, successfully downloaded
+            GekkoFyre::HashVerif hash_succ_type; // Whether the calculated hash matched the given hash or not
+        };
+    }
+
+    namespace Global {
+        struct DownloadInfo {
+            GekkoFyre::DownloadType dl_type;
+            QString download_file_loc;
         };
     }
 

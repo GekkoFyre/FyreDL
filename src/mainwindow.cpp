@@ -163,7 +163,7 @@ MainWindow::~MainWindow()
 void MainWindow::addDownload()
 {
     AddURL *add_url = new AddURL(this);
-    QObject::connect(add_url, SIGNAL(sendDetails(std::string,double,int,double,int,int,GekkoFyre::DownloadStatus,std::string,std::string,GekkoFyre::HashType,std::string,long long,bool,std::string)), this, SLOT(sendDetails(std::string,double,int,double,int,int,GekkoFyre::DownloadStatus,std::string,std::string,GekkoFyre::HashType,std::string,long long,bool,std::string)));
+    QObject::connect(add_url, SIGNAL(sendDetails(std::string,double,int,double,int,int,GekkoFyre::DownloadStatus,std::string,std::string,GekkoFyre::HashType,std::string,long long,bool,std::string,GekkoFyre::DownloadType)), this, SLOT(sendDetails(std::string,double,int,double,int,int,GekkoFyre::DownloadStatus,std::string,std::string,GekkoFyre::HashType,std::string,long long,bool,std::string,GekkoFyre::DownloadType)));
     add_url->setAttribute(Qt::WA_DeleteOnClose, true);
     add_url->open();
     return;
@@ -503,6 +503,7 @@ bool MainWindow::askDeleteFile(const QString &file_dest, const bool &noRestart)
             file_ask.setText(tr("Do you want to erase the file and then restart the download?"));
         }
 
+        file_ask.setIcon(QMessageBox::Information);
         file_ask.setStandardButtons(QMessageBox::Yes | QMessageBox::No | QMessageBox::Cancel);
         file_ask.setDefaultButton(QMessageBox::No);
         file_ask.setModal(false);
@@ -776,6 +777,7 @@ void MainWindow::on_dlstartToolBtn_clicked()
                         } else {
                             // We have NO existing file... notify the user.
                             QMessageBox file_ask;
+                            file_ask.setIcon(QMessageBox::Information);
                             file_ask.setWindowTitle(tr("Problem!"));
                             file_ask.setText(tr("The file no longer exists! Should I clear the history for this item?").arg(dest));
                             file_ask.setStandardButtons(QMessageBox::Yes | QMessageBox::No | QMessageBox::Cancel);
@@ -804,6 +806,7 @@ void MainWindow::on_dlstartToolBtn_clicked()
                         if (fs::exists(dest_boost_path) && fs::is_regular_file(dest_boost_path)) {
                             // We have an existing file!
                             QMessageBox file_ask;
+                            file_ask.setIcon(QMessageBox::Information);
                             file_ask.setWindowTitle(tr("Pre-existing file!"));
                             file_ask.setText(
                                     tr("A pre-existing file, \"%1\", with the same name has been detected. "
@@ -954,6 +957,7 @@ void MainWindow::on_removeToolBtn_clicked()
 void MainWindow::on_clearhistoryToolBtn_clicked()
 {
     QMessageBox file_ask;
+    file_ask.setIcon(QMessageBox::Information);
     file_ask.setWindowTitle(tr("FyreDL"));
     file_ask.setText(tr("Are you sure about clearing all completed downloads?"));
     file_ask.setStandardButtons(QMessageBox::Apply | QMessageBox::No | QMessageBox::Cancel);
@@ -1027,6 +1031,7 @@ void MainWindow::on_restartToolBtn_clicked()
             if (status != GekkoFyre::DownloadStatus::Invalid) {
                 if (status != GekkoFyre::DownloadStatus::Failed) {
                     QMessageBox file_ask;
+                    file_ask.setIcon(QMessageBox::Information);
                     file_ask.setWindowTitle(tr("Pre-existing file!"));
                     file_ask.setText(
                             tr("Are you sure you wish to restart the download of file, \"%1\", from the very beginning?").arg(dest));
@@ -1068,12 +1073,18 @@ void MainWindow::on_restartToolBtn_clicked()
 }
 
 /**
- * @brief MainWindow::on_actionComma_Separated_Values_triggered
+ * @brief MainWindow::on_actionComma_Separated_Values_triggered upon activation, will export the list of downloads
+ * within 'downloadView' to a given text file in the format of a CSV file.
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
- * @date 2016-12-03
+ * @date 2016-12-06
+ * @note <http://doc.qt.io/qt-5/qfiledialog.html#getSaveFileName>
  */
 void MainWindow::on_actionComma_Separated_Values_triggered()
-{}
+{
+    QMessageBox::information(this, tr("Problem!"), tr("This function is not implemented yet! Check "
+                                                              "back another time."), QMessageBox::Ok);
+    return;
+}
 
 /**
  * @brief MainWindow::on_actionRe_set_all_dialog_prompts_triggered
@@ -1237,7 +1248,7 @@ void MainWindow::sendDetails(const std::string &fileName, const double &fileSize
                              const GekkoFyre::DownloadStatus &status, const std::string &url,
                              const std::string &destination, const GekkoFyre::HashType &hash_type,
                              const std::string &hash_val, const long long &resp_code, const bool &stat_ok,
-                             const std::string &stat_msg)
+                             const std::string &stat_msg, const GekkoFyre::DownloadType &down_type)
 {
     QList<std::vector<QString>> list = dlModel->getList();
 

@@ -82,21 +82,14 @@
              </property>
             </widget>
            </item>
-           <item row="2" column="1">
-            <widget class="QLabel" name="url_descLabel">
-             <property name="text">
-              <string>( http(s)://, ftp(s)://, magnet: )</string>
-             </property>
-            </widget>
-           </item>
-           <item row="3" column="0">
+           <item row="4" column="0">
             <widget class="QLabel" name="url_hash_label">
              <property name="text">
               <string>Hash: </string>
              </property>
             </widget>
            </item>
-           <item row="3" column="1">
+           <item row="4" column="1">
             <widget class="QLineEdit" name="url_hash_lineEdit">
              <property name="toolTip">
               <string>Acceptable hashing types are CRC32, MD5, SHA1, SHA(3-)256, SHA(3-)512.</string>
@@ -106,7 +99,14 @@
              </property>
             </widget>
            </item>
-           <item row="4" column="1">
+           <item row="5" column="0">
+            <widget class="QLabel" name="label">
+             <property name="text">
+              <string>Type: </string>
+             </property>
+            </widget>
+           </item>
+           <item row="5" column="1">
             <widget class="QComboBox" name="hashType_comboBox">
              <property name="maxVisibleItems">
               <number>6</number>
@@ -156,8 +156,39 @@
              </item>
             </widget>
            </item>
-           <item row="4" column="0">
-            <widget class="QLabel" name="label">
+           <item row="2" column="1">
+            <widget class="QComboBox" name="urlType_comboBox">
+             <item>
+              <property name="text">
+               <string>HTTP(S)</string>
+              </property>
+             </item>
+             <item>
+              <property name="text">
+               <string>FTP(S)</string>
+              </property>
+             </item>
+             <item>
+              <property name="text">
+               <string>.torrent</string>
+              </property>
+             </item>
+             <item>
+              <property name="text">
+               <string>Magnet link (torrent)</string>
+              </property>
+             </item>
+            </widget>
+           </item>
+           <item row="3" column="1">
+            <layout class="QVBoxLayout" name="spacer_verticalLayout">
+             <property name="topMargin">
+              <number>5</number>
+             </property>
+            </layout>
+           </item>
+           <item row="2" column="0">
+            <widget class="QLabel" name="label_2">
              <property name="text">
               <string>Type: </string>
              </property>

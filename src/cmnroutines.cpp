@@ -810,15 +810,31 @@ int GekkoFyre::CmnRoutines::convHashVerif_toInt(const GekkoFyre::HashVerif &hash
 {
     switch (hash_verif) {
         case GekkoFyre::HashVerif::Analyzing:
-            return 1;
+            return ENUM_GEKKOFYRE_HASH_VERIF_ANALYZING;
         case GekkoFyre::HashVerif::NotApplicable:
-            return 0;
+            return ENUM_GEKKOFYRE_HASH_VERIF_NOT_APPLIC;
         case GekkoFyre::HashVerif::Verified:
-            return 2;
+            return ENUM_GEKKOFYRE_HASH_VERIF_VERIFIED;
         case GekkoFyre::HashVerif::Corrupt:
-            return -1;
+            return ENUM_GEKKOFYRE_HASH_VERIF_CORRUPT;
         default:
-            return 0;
+            return ENUM_GEKKOFYRE_HASH_VERIF_NOT_APPLIC;
+    }
+}
+
+int GekkoFyre::CmnRoutines::convDownType_toInt(const GekkoFyre::DownloadType &down_type)
+{
+    switch (down_type) {
+        case GekkoFyre::DownloadType::HTTP:
+            return ENUM_GEKKOFYRE_DOWN_TYPE_HTTP;
+        case GekkoFyre::DownloadType::FTP:
+            return ENUM_GEKKOFYRE_DOWN_TYPE_FTP;
+        case GekkoFyre::DownloadType::Torrent:
+            return ENUM_GEKKOFYRE_DOWN_TYPE_TORRENT;
+        case GekkoFyre::DownloadType::TorrentMagnetLink:
+            return ENUM_GEKKOFYRE_DOWN_TYPE_MAGNET_LINK;
+        default:
+            return ENUM_GEKKOFYRE_DOWN_TYPE_HTTP;
     }
 }
 
@@ -849,13 +865,13 @@ GekkoFyre::HashType GekkoFyre::CmnRoutines::convHashType_IntToEnum(const int &t)
 GekkoFyre::HashVerif GekkoFyre::CmnRoutines::convHashVerif_IntToEnum(const int &v)
 {
     switch (v) {
-        case 1:
+        case ENUM_GEKKOFYRE_HASH_VERIF_ANALYZING:
             return GekkoFyre::HashVerif::Analyzing;
-        case 0:
+        case ENUM_GEKKOFYRE_HASH_VERIF_NOT_APPLIC:
             return GekkoFyre::HashVerif::NotApplicable;
-        case 2:
+        case ENUM_GEKKOFYRE_HASH_VERIF_VERIFIED:
             return GekkoFyre::HashVerif::Verified;
-        case -1:
+        case ENUM_GEKKOFYRE_HASH_VERIF_CORRUPT:
             return GekkoFyre::HashVerif::Corrupt;
         default:
             return GekkoFyre::HashVerif::NotApplicable;
@@ -998,6 +1014,21 @@ QString GekkoFyre::CmnRoutines::convHashType_toString(const GekkoFyre::HashType 
             return tr("Unknown");
         default:
             return tr("Unknown");
+    }
+}
+
+GekkoFyre::DownloadType GekkoFyre::CmnRoutines::convDownType_StringToEnum(const QString &down_type)
+{
+    if (down_type == QString("HTTP(S)")) {
+        return GekkoFyre::DownloadType::HTTP;
+    } else if (down_type == QString("FTP(S)")) {
+        return GekkoFyre::DownloadType::FTP;
+    } else if (down_type == QString(".torrent")) {
+        return GekkoFyre::DownloadType::Torrent;
+    } else if (down_type == QString("Magnet link (torrent)")) {
+        return GekkoFyre::DownloadType::TorrentMagnetLink;
+    } else {
+        return GekkoFyre::DownloadType::HTTP;
     }
 }
 

@@ -93,69 +93,83 @@ void AddURL::on_buttonBox_accepted()
         // #################################
         QString file_dest = ui->url_dest_lineEdit->text();
         url_plaintext = ui->url_plainTextEdit->toPlainText();
+        QString url_type_string = ui->urlType_comboBox->currentText();
+        GekkoFyre::DownloadType url_type_enum = routines->convDownType_StringToEnum(url_type_string);
         if (file_dest.isEmpty()) {
             QMessageBox::information(this, tr("Problem!"), tr("You must specify a destination directory."),
                                      QMessageBox::Ok);
             return AddURL::done(QDialog::Rejected);
         } else if (url_plaintext.isEmpty()) {
-            QMessageBox::information(this, tr("Problem!"), tr("You must specify a URL to grab."),
+            QMessageBox::information(this, tr("Problem!"), tr("You must specify a URL/Torrent/Magnet Link to grab."),
                                      QMessageBox::Ok);
             return AddURL::done(QDialog::Rejected);
         } else {
-            try {
-                // Check that the path exists and is a /directory/.
-                std::string part_dest = ui->url_dest_lineEdit->text().toStdString();
-                fs::path boost_file_dest(part_dest);
-                if (fs::exists(boost_file_dest) && fs::is_directory(boost_file_dest)) {
-                    hash_plaintext = ui->url_hash_lineEdit->text();
-                    info = GekkoFyre::CurlEasy::verifyFileExists(url_plaintext);
-
-                    // Check that the file exists on the web-server, with a return code of '200'
-                    if (info.response_code == 200) {
-                        // The URL exists!
-                        // Now check it for more detailed information
-                        info_ext = GekkoFyre::CurlEasy::curlGrabInfo(url_plaintext);
-                        std::ostringstream file_comp_path;
-                        file_comp_path << part_dest << fs::path::preferred_separator
-                                       << routines->extractFilename(QString::fromStdString(info_ext.effective_url)).toStdString();
-
-                        // Save this more detailed information
-                        dl_info.dlStatus = GekkoFyre::DownloadStatus::Stopped;
-                        dl_info.file_loc = file_comp_path.str();
-                        dl_info.ext_info.content_length = info_ext.content_length;
-                        dl_info.ext_info.effective_url = info_ext.effective_url;
-                        dl_info.ext_info.response_code = info_ext.response_code;
-                        dl_info.ext_info.status_ok = info_ext.status_ok;
-                        dl_info.cId = 0;
-                        dl_info.insert_timestamp = 0;
-
-                        // Set default values for the hash(es) if none specified by the user
-                        if (hash_plaintext.isEmpty()) {
-                            dl_info.hash_type = GekkoFyre::HashType::None;
-                            dl_info.hash_val_given = "";
-                        } else {
-                            dl_info.hash_type = routines->convHashType_StringToEnum(ui->hashType_comboBox->currentText());
-                            dl_info.hash_val_given = hash_plaintext.toStdString();
-                        }
-
-                        // Send any new details to the QTableView model/view routines, whereupon 'ui->downloadView' is
-                        // updated with the latest data.
-                        emit sendDetails(dl_info.ext_info.effective_url, dl_info.ext_info.content_length, 0, 0, 0,
-                                         0, dl_info.dlStatus, dl_info.ext_info.effective_url, dl_info.file_loc,
-                                         dl_info.hash_type, dl_info.hash_val_given, dl_info.ext_info.response_code,
-                                         dl_info.ext_info.status_ok, info_ext.status_msg);
-                        return AddURL::done(QDialog::Accepted);
-                    } else {
-                        // We received something other than a '200' response code, so either the URL does not exist or
-                        // there was another problem that had been encountered.
-                        QMessageBox::information(this, tr("Error!"), QString("%1").arg(
-                                QString::fromStdString(info.effective_url)), QMessageBox::Ok);
-                        return AddURL::done(QDialog::Rejected);
-                    }
+            if (url_type_enum == GekkoFyre::DownloadType::HTTP || url_type_enum == GekkoFyre::DownloadType::FTP) {
+                QUrl url_validity(url_plaintext);
+                if (!url_validity.isValid()) {
+                    QMessageBox::warning(this, tr("Problem!"), tr("The URL, \"%1\", is not valid! Please enter another "
+                                                                          "one and try again.").arg(url_plaintext),
+                                         QMessageBox::Ok);
                 }
-            } catch (const std::exception &e) {
-                QMessageBox::warning(this, tr("Error!"), tr("%1").arg(e.what()), QMessageBox::Ok);
-                return;
+
+                try {
+                    // Check that the path exists and is a /directory/.
+                    std::string part_dest = ui->url_dest_lineEdit->text().toStdString();
+                    fs::path boost_file_dest(part_dest);
+                    if (fs::exists(boost_file_dest) && fs::is_directory(boost_file_dest)) {
+                        hash_plaintext = ui->url_hash_lineEdit->text();
+                        info = GekkoFyre::CurlEasy::verifyFileExists(url_plaintext);
+
+                        // Check that the file exists on the web-server, with a return code of '200'
+                        if (info.response_code == 200) {
+                            // The URL exists!
+                            // Now check it for more detailed information
+                            info_ext = GekkoFyre::CurlEasy::curlGrabInfo(url_plaintext);
+                            std::ostringstream file_comp_path;
+                            file_comp_path << part_dest << fs::path::preferred_separator
+                                           << routines->extractFilename(QString::fromStdString(info_ext.effective_url)).toStdString();
+
+                            // Save this more detailed information
+                            dl_info.dlStatus = GekkoFyre::DownloadStatus::Stopped;
+                            dl_info.file_loc = file_comp_path.str();
+                            dl_info.ext_info.content_length = info_ext.content_length;
+                            dl_info.ext_info.effective_url = info_ext.effective_url;
+                            dl_info.ext_info.response_code = info_ext.response_code;
+                            dl_info.ext_info.status_ok = info_ext.status_ok;
+                            dl_info.cId = 0;
+                            dl_info.insert_timestamp = 0;
+
+                            // Set default values for the hash(es) if none specified by the user
+                            if (hash_plaintext.isEmpty()) {
+                                dl_info.hash_type = GekkoFyre::HashType::None;
+                                dl_info.hash_val_given = "";
+                            } else {
+                                dl_info.hash_type = routines->convHashType_StringToEnum(ui->hashType_comboBox->currentText());
+                                dl_info.hash_val_given = hash_plaintext.toStdString();
+                            }
+
+                            // Send any new details to the QTableView model/view routines, whereupon 'ui->downloadView' is
+                            // updated with the latest data.
+                            emit sendDetails(dl_info.ext_info.effective_url, dl_info.ext_info.content_length, 0, 0, 0,
+                                             0, dl_info.dlStatus, dl_info.ext_info.effective_url, dl_info.file_loc,
+                                             dl_info.hash_type, dl_info.hash_val_given, dl_info.ext_info.response_code,
+                                             dl_info.ext_info.status_ok, info_ext.status_msg, url_type_enum);
+                            return AddURL::done(QDialog::Accepted);
+                        } else {
+                            // We received something other than a '200' response code, so either the URL does not exist or
+                            // there was another problem that had been encountered.
+                            QMessageBox::information(this, tr("Error!"), QString("%1").arg(
+                                    QString::fromStdString(info.effective_url)), QMessageBox::Ok);
+                            return AddURL::done(QDialog::Rejected);
+                        }
+                    }
+                } catch (const std::exception &e) {
+                    QMessageBox::warning(this, tr("Error!"), tr("%1").arg(e.what()), QMessageBox::Ok);
+                    return;
+                }
+            } else {
+                QMessageBox::information(this, tr("Problem!"), tr("This function is not supported yet! Please "
+                                                                          "check back later."), QMessageBox::Ok);
             }
         }
     } else {
@@ -303,7 +317,7 @@ void AddURL::on_buttonBox_accepted()
                     emit sendDetails(dl_info.ext_info.effective_url, dl_info.ext_info.content_length, 0, 0, 0,
                                      0, dl_info.dlStatus, dl_info.ext_info.effective_url, dl_info.file_loc,
                                      dl_info.hash_type, dl_info.hash_val_given, dl_info.ext_info.response_code,
-                                     dl_info.ext_info.status_ok, "");
+                                     dl_info.ext_info.status_ok, "", GekkoFyre::DownloadType::HTTP);
                 }
 
                 // Clear the 'temporary' struct-holding std::vector<CsvImport>()

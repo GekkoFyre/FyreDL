@@ -86,6 +86,7 @@ public:
     int convDlStat_toInt(const GekkoFyre::DownloadStatus &status);
     int convHashType_toInt(const GekkoFyre::HashType &hash_type);
     int convHashVerif_toInt(const GekkoFyre::HashVerif &hash_verif);
+    int convDownType_toInt(const GekkoFyre::DownloadType &down_type);
     GekkoFyre::HashType convHashType_IntToEnum(const int &t);
     GekkoFyre::HashVerif convHashVerif_IntToEnum(const int &v);
     QCryptographicHash::Algorithm convHashType_toAlgo(const GekkoFyre::HashType &hash_type);
@@ -94,6 +95,7 @@ public:
     GekkoFyre::DownloadStatus convDlStat_StringToEnum(const QString &status);
     GekkoFyre::HashType convHashType_StringToEnum(const QString &hashType);
     QString convHashType_toString(const GekkoFyre::HashType &hash_type);
+    GekkoFyre::DownloadType convDownType_StringToEnum(const QString &down_type);
 
     std::string findCfgFile(const std::string &cfgFileName);
     static long getFileSize(const std::string &file_name);
