@@ -231,7 +231,6 @@ namespace GekkoFyre {
     namespace Global {
         struct DownloadInfo {
             GekkoFyre::DownloadType dl_type;
-            QString download_file_loc;
         };
     }
 
@@ -336,9 +335,10 @@ namespace GekkoFyre {
         };
 
         struct GraphInit {
-            DownSpeedGraph down_speed;
-            QString file_dest;
-            bool currShown;
+            GekkoFyre::Global::DownloadInfo down_info; // Hijacking 'GraphInit' for the purpose of using this
+            DownSpeedGraph down_speed;                 // The 'download speed' graph
+            QString file_dest;                         // File destination of the download on user's local storage
+            bool currShown;                            // Whether the graph for the given 'file_dest' is actually displayed or not
         };
     }
 

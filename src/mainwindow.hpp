@@ -74,11 +74,11 @@ private:
     void insertNewRow(const std::string &fileName, const double &fileSize, const int &downloaded,
                       const double &progress, const int &upSpeed, const int &downSpeed,
                       const GekkoFyre::DownloadStatus &status, const std::string &url,
-                      const std::string &destination);
+                      const std::string &destination, const GekkoFyre::DownloadType &download_type);
     void removeSelRows();
     void resetDlStateStartup();
 
-    void initCharts(const QString &file_dest);
+    void initCharts(const QString &file_dest, const GekkoFyre::DownloadType &download_type);
     void displayCharts(const QString &file_dest);
     void delCharts(const std::string &file_dest);
     void updateChart();

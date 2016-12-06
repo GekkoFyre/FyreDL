@@ -195,7 +195,7 @@ void MainWindow::readFromHistoryFile()
                 insertNewRow(dl_history.at(i).ext_info.effective_url,
                              dl_history.at(i).ext_info.content_length, 0, 0, 0, 0,
                              dl_history.at(i).dlStatus, dl_history.at(i).ext_info.effective_url,
-                             dl_history.at(i).file_loc);
+                             dl_history.at(i).file_loc, GekkoFyre::DownloadType::HTTP);
             } else {
                 QMessageBox::information(this, tr("Problem!"), tr("The size of the download could not be "
                                                                   "determined. Please try again."),
@@ -238,7 +238,7 @@ void MainWindow::modifyHistoryFile()
 void MainWindow::insertNewRow(const std::string &fileName, const double &fileSize, const int &downloaded,
                               const double &progress, const int &upSpeed, const int &downSpeed,
                               const GekkoFyre::DownloadStatus &status, const std::string &url,
-                              const std::string &destination)
+                              const std::string &destination, const GekkoFyre::DownloadType &download_type)
 {
     dlModel->insertRows(0, 1, QModelIndex());
 
@@ -270,7 +270,7 @@ void MainWindow::insertNewRow(const std::string &fileName, const double &fileSiz
     dlModel->setData(index, QString::fromStdString(url), Qt::DisplayRole);
 
     // Initialize the graphs
-    initCharts(QString::fromStdString(destination));
+    initCharts(QString::fromStdString(destination), download_type);
 
     return;
 }
@@ -344,13 +344,14 @@ void MainWindow::resetDlStateStartup()
     return;
 }
 
-void MainWindow::initCharts(const QString &file_dest)
+void MainWindow::initCharts(const QString &file_dest, const GekkoFyre::DownloadType &download_type)
 {
     if (!file_dest.isEmpty()) {
         GekkoFyre::GkGraph::GraphInit graph;
         graph.down_speed.down_speed_vals.push_back(std::make_pair(0.0, 0.0));
         graph.down_speed.down_speed_init = false;
         graph.file_dest = file_dest;
+        graph.down_info.dl_type = download_type;
         graph_init.push_back(graph);
     } else {
         throw std::invalid_argument(tr("'file_dest' is empty!").toStdString());
@@ -1263,7 +1264,7 @@ void MainWindow::sendDetails(const std::string &fileName, const double &fileSize
         }
     }
 
-    insertNewRow(fileName, fileSize, downloaded, progress, upSpeed, downSpeed, status, url, destination);
+    insertNewRow(fileName, fileSize, downloaded, progress, upSpeed, downSpeed, status, url, destination, down_type);
 
     // Write the output to an XML file, with file-name 'CFG_HISTORY_FILE'
     GekkoFyre::GkCurl::CurlDlInfo dl_info;
@@ -1346,38 +1347,37 @@ void MainWindow::manageDlStats()
                 dl_stat.at(j).timer_set = true;
             }
 
-            if (ui->downloadView->model()->data(find_index).toString().toStdString() == dl_stat.at(j).file_dest) {
-                try {
-                    std::vector<GekkoFyre::GkCurl::CurlDlInfo> xml_history_info = routines->readDownloadInfo();
-                    if (dl_stat.at(j).content_length == 0) {
-                        for (size_t o = 0; o < xml_history_info.size(); ++o) {
-                            if (xml_history_info.at(o).file_loc == dl_stat.at(j).file_dest) {
-                                dl_stat.at(j).content_length = xml_history_info.at(o).ext_info.content_length;
-                                break;
-                            }
-                        }
-                    }
+            try {
+                for (size_t k = 0; k < graph_init.size(); ++k) {
+                    // Verify that the constants we are going to use are not empty/nullptr
+                    if (!graph_init.at(k).file_dest.isEmpty() &&
+                        !dl_stat.at(j).file_dest.empty()) {
+                        // Make sure we are using the right 'graph_init' element!
+                        if (graph_init.at(k).file_dest.toStdString() == dl_stat.at(j).file_dest) {
+                            if (graph_init.at(k).down_info.dl_type == GekkoFyre::DownloadType::HTTP ||
+                                    graph_init.at(k).down_info.dl_type == GekkoFyre::DownloadType::FTP) {
+                                if (ui->downloadView->model()->data(find_index).toString().toStdString() == dl_stat.at(j).file_dest) {
+                                    std::vector<GekkoFyre::GkCurl::CurlDlInfo> xml_history_info = routines->readDownloadInfo();
+                                    if (dl_stat.at(j).content_length == 0) {
+                                        for (size_t o = 0; o < xml_history_info.size(); ++o) {
+                                            if (xml_history_info.at(o).file_loc == dl_stat.at(j).file_dest) {
+                                                dl_stat.at(j).content_length = xml_history_info.at(o).ext_info.content_length;
+                                                break;
+                                            }
+                                        }
+                                    }
 
-                    GekkoFyre::GkCurl::CurlDlStats dl_stat_element = dl_stat.at(j).stat.back();
-                    std::ostringstream oss_dlnow;
-                    oss_dlnow << routines->numberConverter(dl_stat_element.dlnow).toStdString() << tr("/sec").toStdString();
+                                    GekkoFyre::GkCurl::CurlDlStats dl_stat_element = dl_stat.at(j).stat.back();
+                                    std::ostringstream oss_dlnow;
+                                    oss_dlnow << routines->numberConverter(dl_stat_element.dlnow).toStdString() << tr("/sec").toStdString();
 
-                    long cur_file_size = GekkoFyre::CmnRoutines::getFileSize(dl_stat.at(j).file_dest);
+                                    long cur_file_size = GekkoFyre::CmnRoutines::getFileSize(dl_stat.at(j).file_dest);
 
-                    dlModel->updateCol(dlModel->index(i, MN_DOWNSPEED_COL), QString::fromStdString(oss_dlnow.str()), MN_DOWNSPEED_COL);
-                    dlModel->updateCol(dlModel->index(i, MN_DOWNLOADED_COL), routines->numberConverter(cur_file_size), MN_DOWNLOADED_COL);
-                    dlModel->updateCol(dlModel->index(i, MN_PROGRESS_COL), routines->percentDownloaded(dl_stat.at(j).content_length, cur_file_size), MN_PROGRESS_COL);
+                                    dlModel->updateCol(dlModel->index(i, MN_DOWNSPEED_COL), QString::fromStdString(oss_dlnow.str()), MN_DOWNSPEED_COL);
+                                    dlModel->updateCol(dlModel->index(i, MN_DOWNLOADED_COL), routines->numberConverter(cur_file_size), MN_DOWNLOADED_COL);
+                                    dlModel->updateCol(dlModel->index(i, MN_PROGRESS_COL), routines->percentDownloaded(dl_stat.at(j).content_length, cur_file_size), MN_PROGRESS_COL);
 
-                    // Update the 'download speed' spline-graph, via the file location
-                    if (!graph_init.empty()) {
-                        for (size_t k = 0; k < graph_init.size(); ++k) {
-
-                            // Verify that the constants we are going to use are not empty/nullptr
-                            if (!graph_init.at(k).file_dest.isEmpty() &&
-                                    !dl_stat.at(j).file_dest.empty()) {
-
-                                // Make sure we are using the right 'graph_init' element!
-                                if (graph_init.at(k).file_dest.toStdString() == dl_stat.at(j).file_dest) {
+                                    // Update the 'download speed' spline-graph, via the file location
                                     // Append our statistics to the 'graph_init' struct and thus, the graph in question
                                     std::time_t cur_time;
                                     std::time(&cur_time);
@@ -1389,15 +1389,17 @@ void MainWindow::manageDlStats()
                                     updateChart();
                                     break;
                                 }
-                            } else {
-                                throw std::invalid_argument(tr("Invalid file destination and/or graphing pointer(s) have been given!").toStdString());
+                            } else if (graph_init.at(k).down_info.dl_type == GekkoFyre::DownloadType::Torrent) {
+                                // Torrent stats go here
+                                return;
                             }
                         }
+                    } else {
+                        throw std::invalid_argument(tr("Internal error!").toStdString());
                     }
-                } catch (const std::exception &e) {
-                    QMessageBox::warning(this, tr("Error!"), QString("%1").arg(e.what()), QMessageBox::Ok);
-                    return;
                 }
+            } catch (const std::exception &e) {
+                QMessageBox::warning(this, tr("Error!"), QString("%1").arg(e.what()), QMessageBox::Ok);
             }
         }
     }
