@@ -19,6 +19,10 @@ libcurl by Daniel Stenberg et al.
 	<https://curl.haxx.se/libcurl/>
 		MIT/X derivate license
 
+libtorrent by Arvid Norberg et al.
+	<http://www.rasterbar.com/products/libtorrent/>
+		BSD-license
+
 PugiXML by Arseny Kapoulkine et al.
 	<http://pugixml.org/>
 		MIT License

@@ -184,10 +184,10 @@ endif(Threads_FOUND)
 #
 # Find 'libtorrent'
 #
-find_package(LibTorrent REQUIRED)
-if (LIBTORRENT_FOUND)
-    set(LIBS ${LIBS} ${LIBTORRENT_LIBRARIES})
-endif(LIBTORRENT_FOUND)
+find_package(LibtorrentRasterbar REQUIRED)
+if (LibtorrentRasterbar_FOUND)
+    set(LIBS ${LIBS} ${LibtorrentRasterbar_LIBRARIES})
+endif(LibtorrentRasterbar_FOUND)
 
 #
 # Find 'libcurl'
