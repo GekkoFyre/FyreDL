@@ -182,6 +182,14 @@ if (Threads_FOUND)
 endif(Threads_FOUND)
 
 #
+# Find 'libtorrent'
+#
+find_package(LibTorrent REQUIRED)
+if (LIBTORRENT_FOUND)
+    set(LIBS ${LIBS} ${LIBTORRENT_LIBRARIES})
+endif(LIBTORRENT_FOUND)
+
+#
 # Find 'libcurl'
 #
 find_package(CURL REQUIRED)
@@ -265,6 +273,10 @@ IF(${CMAKE_SYSTEM_NAME} MATCHES "Windows" OR "cygwin" OR "mingw") # Check if we 
         message(SEND_ERROR "You are using an unsupported Microsoft Windows compiler! (Not MSVC or GCC)")
     endif()
 elseif(${CMAKE_SYSTEM_NAME} MATCHES "Linux") # Check if we are on Linux
+    set(GK_LIBTORRENT_LINKER_FLAG FALSE CACHE BOOL "Enable the linker flag for libtorrent, if you are getting 'undefined reference' errors.")
+    if (GK_LIBTORRENT_LINKER_FLAG)
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -ltorrent-rasterbar")
+    endif(GK_LIBTORRENT_LINKER_FLAG)
     install(FILES ${TRANSLATION_QM} DESTINATION translations)
     if (CMAKE_BUILD_TYPE MATCHES "Debug")
         if("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")

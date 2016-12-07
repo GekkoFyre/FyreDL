@@ -43,6 +43,12 @@
 #include "cmnroutines.hpp"
 #include <boost/filesystem.hpp>
 #include <boost/exception/all.hpp>
+#include <libtorrent/bdecode.hpp>
+#include <libtorrent/announce_entry.hpp>
+#include <libtorrent/torrent_info.hpp>
+#include <libtorrent/bencode.hpp>
+#include <libtorrent/magnet_uri.hpp>
+#include <libtorrent/hex.hpp>
 #include <cmath>
 #include <iostream>
 #include <QUrl>
@@ -74,6 +80,7 @@ extern "C" {
 #error "Platform not supported!"
 #endif
 
+using namespace libtorrent;
 namespace sys = boost::system;
 namespace fs = boost::filesystem;
 
@@ -413,6 +420,172 @@ GekkoFyre::GkFile::FileHash GekkoFyre::CmnRoutines::cryptoFileHash(const QString
     info.hash_type = GekkoFyre::HashType::None;
     info.checksum = "";
     return info;
+}
+
+int GekkoFyre::CmnRoutines::load_file(const std::string &filename, std::vector<char> &v,
+                                      libtorrent::error_code &ec, int limit)
+{
+    ec.clear();
+    FILE* f = fopen(filename.c_str(), "rb");
+    if (f == NULL)
+    {
+        ec.assign(errno, boost::system::system_category());
+        return -1;
+    }
+
+    int r = fseek(f, 0, SEEK_END);
+    if (r != 0)
+    {
+        ec.assign(errno, boost::system::system_category());
+        fclose(f);
+        return -1;
+    }
+    long s = ftell(f);
+    if (s < 0)
+    {
+        ec.assign(errno, boost::system::system_category());
+        fclose(f);
+        return -1;
+    }
+
+    if (s > limit)
+    {
+        fclose(f);
+        return -2;
+    }
+
+    r = fseek(f, 0, SEEK_SET);
+    if (r != 0)
+    {
+        ec.assign(errno, boost::system::system_category());
+        fclose(f);
+        return -1;
+    }
+
+    v.resize(s);
+    if (s == 0)
+    {
+        fclose(f);
+        return 0;
+    }
+
+    r = fread(&v[0], 1, v.size(), f);
+    if (r < 0)
+    {
+        ec.assign(errno, boost::system::system_category());
+        fclose(f);
+        return -1;
+    }
+
+    fclose(f);
+
+    if (r != s) return -3;
+
+    return 0;
+}
+
+/**
+ * @note <http://www.rasterbar.com/products/libtorrent/examples.html>
+ * @param file_dest
+ * @param item_limit
+ * @param depth_limit
+ * @return
+ */
+GekkoFyre::GkTorrent::TorrentInfo GekkoFyre::CmnRoutines::torrentFileInfo(const std::string &file_dest,
+                                                                          const int &item_limit,
+                                                                          const int &depth_limit)
+{
+    GekkoFyre::GkTorrent::TorrentInfo gk_torrent_struct;
+    gk_torrent_struct.cId = 0;
+    gk_torrent_struct.comment = "";
+    gk_torrent_struct.complt_timestamp = 0;
+    gk_torrent_struct.creator = "";
+    gk_torrent_struct.dlStatus = GekkoFyre::DownloadStatus::Failed;
+    gk_torrent_struct.file_loc = file_dest;
+    gk_torrent_struct.insert_timestamp = 0;
+    gk_torrent_struct.magnet_uri = "";
+    gk_torrent_struct.num_files = 0;
+    gk_torrent_struct.num_pieces = 0;
+    gk_torrent_struct.piece_length = 0;
+
+    std::vector<char> buf;
+    error_code ec;
+    int ret = load_file(file_dest, buf, ec, 40 * 1000000);
+    if (ret == -1) {
+        QMessageBox::warning(nullptr, tr("Error!"), tr("File too big, aborting..."), QMessageBox::Ok);
+        return gk_torrent_struct;
+    }
+
+    if (ret != 0) {
+        QMessageBox::warning(nullptr, tr("Error!"), tr("Failed to load file: %1").arg(QString::fromStdString(file_dest)), QMessageBox::Ok);
+        return gk_torrent_struct;
+    }
+
+    bdecode_node e;
+    int pos = -1;
+    std::cout << tr("Decoding! Recursion limit: %1. Total item count limit: %2.")
+            .arg(item_limit).arg(depth_limit).toStdString() << std::endl;
+    ret = bdecode(&buf[0], &buf[0] + buf.size(), e, ec, &pos, depth_limit, item_limit);
+
+    if (ret != 0) {
+        QMessageBox::warning(nullptr, tr("Error!"), tr("Failed to decode: '%1' at character: %2")
+                .arg(QString::fromStdString(ec.message())).arg(QString::number(pos)), QMessageBox::Ok);
+        return gk_torrent_struct;
+    }
+
+    torrent_info t(e, ec);
+    if (ec) {
+        QMessageBox::warning(nullptr, tr("Error!"), QString("%1").arg(QString::fromStdString(ec.message())), QMessageBox::Ok);
+        return gk_torrent_struct;
+    }
+
+    e.clear();
+    std::vector<char>().swap(buf);
+
+    //
+    // Translate info about torrent
+    //
+    typedef std::vector<std::pair<std::string, int>> node_vec;
+    const node_vec &nodes = t.nodes();
+
+    // Nodes
+    for (node_vec::const_iterator i = nodes.begin(), end(nodes.end()); i != end; ++i) {
+        gk_torrent_struct.nodes.push_back(std::make_pair(i->first, i->second));
+    }
+
+    // Trackers
+    for (std::vector<announce_entry>::const_iterator i = t.trackers().begin(); i != t.trackers().end(); ++i) {
+        gk_torrent_struct.trackers.push_back(std::make_pair(i->tier, i->url));
+    }
+
+    // std::ostringstream ih;
+    // to_hex((char const*)&t.info_hash()[0], 20, ih);
+    // ih << std::hex << t.info_hash();
+
+    gk_torrent_struct.num_pieces = t.num_pieces();
+    gk_torrent_struct.piece_length = t.piece_length();
+    gk_torrent_struct.comment = t.comment();
+    gk_torrent_struct.creator = t.creator();
+    gk_torrent_struct.magnet_uri = make_magnet_uri(t);
+    gk_torrent_struct.num_files = t.num_files();
+    gk_torrent_struct.creatn_timestamp = t.creation_date();
+    gk_torrent_struct.torrent_name = t.name();
+
+    const file_storage &st = t.files();
+    for (int i = 0; i < st.num_files(); ++i) {
+        // int first = st.map_file(i, 0, 0).piece;
+        // int last = st.map_file(i, (std::max)(boost::int64_t(st.file_size(i))-1, boost::int64_t(0)), 0).piece;
+        // int flags = st.file_flags(i);
+        GekkoFyre::GkTorrent::TorrentFile gk_torrent_file;
+        gk_torrent_file.file_path = st.file_path(i);
+        // gk_torrent_file.sha1_hash_hex = st.hash(i) != sha1_hash(0) ? to_hex(st.hash(i).to_string()) : "";
+        std::ostringstream sha1_hex;
+        sha1_hex << std::hex << st.hash(i).to_string();
+        gk_torrent_file.sha1_hash_hex = sha1_hex.str();
+        gk_torrent_struct.files_vec.push_back(gk_torrent_file);
+    }
+
+    return gk_torrent_struct;
 }
 
 /**

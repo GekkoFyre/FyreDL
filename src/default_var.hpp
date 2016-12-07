@@ -43,6 +43,7 @@
 #ifndef DEFVAR_HPP
 #define DEFVAR_HPP
 
+#include <boost/optional.hpp>
 #include <locale>
 #include <string>
 #include <iostream>
@@ -215,16 +216,28 @@ namespace GekkoFyre {
     }
 
     namespace GkTorrent {
-        struct DlTorrentInfo {
-            std::string file_loc;                // The location of the downloaded file being streamed towards
-            unsigned int cId;                    // Automatically incremented Content ID for each download/file
-            long long insert_timestamp;          // The date/time of the download/file having been inserted into the history file
-            long long complt_timestamp;          // The date/time of the download/file having completed transfer
-            GekkoFyre::DownloadStatus dlStatus;  // Status of the downloading file(s) in question
-            GekkoFyre::HashType hash_type;       // The actual type of hash used (e.g., CRC32/MD5/SHA1/SHA256/SHA512)
-            std::string hash_val_given;          // The value of the hash, if a type is specified in 'CurlDlInfo::hash_type', given by the user
-            std::string hash_val_rtrnd;          // Same as above, but calculated from the local file when, presumably, successfully downloaded
-            GekkoFyre::HashVerif hash_succ_type; // Whether the calculated hash matched the given hash or not
+        struct TorrentFile {
+            std::string sha1_hash_hex;
+            std::string file_path;
+        };
+
+        struct TorrentInfo {
+            std::string file_loc;                   // The location of the downloaded file being streamed towards
+            unsigned int cId;                       // Automatically incremented Content ID for each download/file
+            long long insert_timestamp;             // The date/time of the download/file having been inserted into the history file
+            long long complt_timestamp;             // The date/time of the download/file having completed transfer
+            boost::optional<long> creatn_timestamp; // The date/time that the torrent file was authored
+            GekkoFyre::DownloadStatus dlStatus;     // Status of the downloading file(s) in question
+            std::string comment;                    // Any comments left by the author of the torrent file in question
+            std::string creator;                    // The author of the torrent file in question
+            std::string magnet_uri;                 // The 'BitTorrent Magnet Link' URI
+            std::string torrent_name;               // Name of the torrent
+            int num_files;                          // How many files are contained within this torrent
+            int num_pieces;                         // How many pieces are contained within this torrent
+            int piece_length;                       // The length of each piece
+            std::vector<std::pair<std::string, int>> nodes;
+            std::vector<std::pair<int, std::string>> trackers;
+            std::vector<TorrentFile> files_vec;
         };
     }
 

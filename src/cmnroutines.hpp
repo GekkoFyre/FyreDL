@@ -44,6 +44,7 @@
 #define CMNROUTINES_HPP
 
 #include "default_var.hpp"
+#include <libtorrent/entry.hpp>
 #include <pugixml.hpp>
 #include <string>
 #include <cstdio>
@@ -102,6 +103,11 @@ public:
     unsigned long int freeDiskSpace(const QString &path = QDir::rootPath());
     GekkoFyre::GkFile::FileHash cryptoFileHash(const QString &file_dest, const GekkoFyre::HashType &hash_type,
                                                const QString &given_hash_val);
+    int load_file(const std::string &filename, std::vector<char> &v,
+                  libtorrent::error_code &ec, int limit = 8000000);
+    GekkoFyre::GkTorrent::TorrentInfo torrentFileInfo(const std::string &file_dest,
+                                                      const int &item_limit = 1000000,
+                                                      const int &depth_limit = 1000);
 
     void clearLayout(QLayout *layout);
 
