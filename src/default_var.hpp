@@ -101,7 +101,7 @@ extern "C" {
 #define XML_CHILD_ITEM_VERS "version"
 #define XML_ITEM_ATTR_VERS_NO "supported"                 // The supported XML file version for this particular FyreDL build
 
-#define XML_CHILD_NODE_FILE "file"
+#define XML_CHILD_NODE_FILE "http"
 #define XML_CHILD_ITEM_FILE "item"
 #define XML_ITEM_ATTR_FILE_CID "content-id"                // The unique, content integer ID of the download in the XML history file
 #define XML_ITEM_ATTR_FILE_FLOC "file-loc"                 // Location of the file on user's storage disk
@@ -116,6 +116,31 @@ extern "C" {
 #define XML_ITEM_ATTR_FILE_HASH_VAL_GIVEN "hash-val-given" // The hash-value that was given by the user
 #define XML_ITEM_ATTR_FILE_HASH_VAL_RTRND "hash-val-rtrnd" // The hash-value that was calculated after the download (presumably) succeeded
 #define XML_ITEM_ATTR_FILE_HASH_SUCC_TYPE "hash-succ-type" // Whether the calculated hash of the download matched the given hash or not
+
+#define XML_CHILD_NODE_TORRENT "torrent"
+#define XML_CHILD_NODE_TORRENT_NODES "nodes"
+#define XML_CHILD_NODE_TORRENT_FILES "files"
+#define XML_CHILD_NODE_TORRENT_TRACKERS "trackers"
+#define XML_CHILD_ITEM_TORRENT "item"
+#define XML_CHILD_NODES_NAMES_TORRENT "node-name"
+#define XML_CHILD_NODES_NUMBR_TORRENT "node-number"
+#define XML_CHILD_FILES_PATH_TORRENT "path"
+#define XML_CHILD_FILES_HASH_TORRENT "hash"
+#define XML_CHILD_TRACKERS_URL_TORRENT "url"
+#define XML_CHILD_TRACKERS_TIER_TORRENT "tier"
+#define XML_ITEM_ATTR_TORRENT_CID "cid"
+#define XML_ITEM_ATTR_TORRENT_FLOC "destination"
+#define XML_ITEM_ATTR_TORRENT_INSERT_DATE "insert-date"
+#define XML_ITEM_ATTR_TORRENT_COMPLT_DATE "complt-date"
+#define XML_ITEM_ATTR_TORRENT_CREATN_DATE "creatn-date"
+#define XML_ITEM_ATTR_TORRENT_DLSTATUS "dl-status"
+#define XML_ITEM_ATTR_TORRENT_TORRNT_COMMENT "torrnt-comment"
+#define XML_ITEM_ATTR_TORRENT_TORRNT_CREATOR "torrnt-creator"
+#define XML_ITEM_ATTR_TORRENT_MAGNET_URI "magnet-uri"
+#define XML_ITEM_ATTR_TORRENT_TORRNT_NAME "torrnt-name"
+#define XML_ITEM_ATTR_TORRENT_NUM_FILES "num-files"
+#define XML_ITEM_ATTR_TORRENT_TORRNT_PIECES "torrnt-pieces"
+#define XML_ITEM_ATTR_TORRENT_TORRNT_PIECE_LENGTH "torrnt-piece-length"
 
 #define XML_CHILD_NODE_SETTINGS "settings"
 #define XML_CHILD_ITEM_SETTINGS "user"
@@ -222,11 +247,11 @@ namespace GekkoFyre {
         };
 
         struct TorrentInfo {
-            std::string file_loc;                   // The location of the downloaded file being streamed towards
+            std::string down_dest;                  // The location of where the download is being streamed towards
             unsigned int cId;                       // Automatically incremented Content ID for each download/file
             long long insert_timestamp;             // The date/time of the download/file having been inserted into the history file
             long long complt_timestamp;             // The date/time of the download/file having completed transfer
-            boost::optional<long> creatn_timestamp; // The date/time that the torrent file was authored
+            long creatn_timestamp; // The date/time that the torrent file was authored
             GekkoFyre::DownloadStatus dlStatus;     // Status of the downloading file(s) in question
             std::string comment;                    // Any comments left by the author of the torrent file in question
             std::string creator;                    // The author of the torrent file in question

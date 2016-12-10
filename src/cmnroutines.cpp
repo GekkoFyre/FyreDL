@@ -501,7 +501,7 @@ GekkoFyre::GkTorrent::TorrentInfo GekkoFyre::CmnRoutines::torrentFileInfo(const 
     gk_torrent_struct.complt_timestamp = 0;
     gk_torrent_struct.creator = "";
     gk_torrent_struct.dlStatus = GekkoFyre::DownloadStatus::Failed;
-    gk_torrent_struct.file_loc = file_dest;
+    gk_torrent_struct.down_dest = "";
     gk_torrent_struct.insert_timestamp = 0;
     gk_torrent_struct.magnet_uri = "";
     gk_torrent_struct.num_files = 0;
@@ -568,7 +568,8 @@ GekkoFyre::GkTorrent::TorrentInfo GekkoFyre::CmnRoutines::torrentFileInfo(const 
     gk_torrent_struct.creator = t.creator();
     gk_torrent_struct.magnet_uri = make_magnet_uri(t);
     gk_torrent_struct.num_files = t.num_files();
-    gk_torrent_struct.creatn_timestamp = t.creation_date();
+    // gk_torrent_struct.creatn_timestamp = t.creation_date().get();
+    gk_torrent_struct.creatn_timestamp = 0;
     gk_torrent_struct.torrent_name = t.name();
 
     const file_storage &st = t.files();
@@ -768,6 +769,7 @@ bool GekkoFyre::CmnRoutines::writeDownloadItem(GekkoFyre::GkCurl::CurlDlInfo &dl
                 if (!saveSucceed) {
                     throw std::runtime_error(tr("Error with saving XML config file!").toStdString());
                 }
+
                 return true;
             } else {
                 throw std::invalid_argument(tr("You should not be seeing this!").toStdString());
@@ -931,6 +933,177 @@ bool GekkoFyre::CmnRoutines::modifyDlState(const std::string &file_loc,
     }
 
     return false;
+}
+
+/**
+ * @note <http://www.thomaswhitton.com/blog/2013/07/01/xml-c-plus-plus-examples/>
+ * @param gk_torrent_info
+ * @param xmlCfgFile
+ * @return
+ */
+bool GekkoFyre::CmnRoutines::writeTorrentItem(GekkoFyre::GkTorrent::TorrentInfo &gk_torrent_info,
+                                              const std::string &xmlCfgFile)
+{
+    fs::path xmlCfgFile_loc = findCfgFile(xmlCfgFile);
+    sys::error_code ec;
+    if (!gk_torrent_info.down_dest.empty()) {
+        if (!xmlCfgFile_loc.string().empty()) {
+            if (gk_torrent_info.dlStatus == GekkoFyre::DownloadStatus::Stopped || gk_torrent_info.dlStatus == GekkoFyre::DownloadStatus::Invalid ||
+                    gk_torrent_info.dlStatus == GekkoFyre::DownloadStatus::Unknown) {
+                pugi::xml_node root;
+                unsigned int cId = 0;
+                QDateTime now = QDateTime::currentDateTime();
+                gk_torrent_info.insert_timestamp = now.toTime_t();
+
+                // Generate new XML document within memory
+                pugi::xml_document doc;
+                // Alternatively store as shared pointer if tree shall be used for longer
+                // time or multiple client calls:
+                // std::shared_ptr<pugi::xml_document> spDoc = std::make_shared<pugi::xml_document>();
+
+                if (!fs::exists(xmlCfgFile_loc, ec) && !fs::is_regular_file(xmlCfgFile_loc)) {
+                    root = createNewXmlFile(xmlCfgFile);
+                } else {
+                    std::vector<GekkoFyre::GkTorrent::TorrentInfo> existing_info = readTorrentInfo(xmlCfgFile);
+
+                    // Finds the largest 'existing_info.cId' value and then increments by +1, ready for
+                    // assignment to a new download entry.
+                    for (size_t i = 0; i < existing_info.size(); ++i) {
+                        static unsigned int tmp;
+                        tmp = existing_info.at(i).cId;
+                        if (tmp > cId) {
+                            cId = tmp;
+                        } else {
+                            ++cId;
+                        }
+                    }
+                }
+
+                // Load XML into memory
+                // Remark: to fully read declaration entries you have to specify, "pugi::parse_declaration"
+                pugi::xml_parse_result result = doc.load_file(xmlCfgFile_loc.string().c_str(), pugi::parse_default|pugi::parse_declaration);
+                if (!result) {
+                    throw std::invalid_argument(tr("XML parse error: %1, character pos= %2")
+                                                        .arg(result.description(),
+                                                             QString::number(result.offset)).toStdString());
+                }
+
+                gk_torrent_info.cId = cId;
+
+                // A valid XML document must have a single root node
+                root = doc.document_element();
+
+                pugi::xml_node nodeParent = root.append_child(XML_CHILD_NODE_TORRENT);
+                pugi::xml_node nodeChild = nodeParent.append_child(XML_CHILD_ITEM_TORRENT);
+                nodeChild.append_attribute(XML_ITEM_ATTR_TORRENT_CID) = gk_torrent_info.cId;
+                nodeChild.append_attribute(XML_ITEM_ATTR_TORRENT_FLOC) = gk_torrent_info.down_dest.c_str();
+                nodeChild.append_attribute(XML_ITEM_ATTR_TORRENT_INSERT_DATE) = gk_torrent_info.insert_timestamp;
+                nodeChild.append_attribute(XML_ITEM_ATTR_TORRENT_COMPLT_DATE) = gk_torrent_info.complt_timestamp;
+                nodeChild.append_attribute(XML_ITEM_ATTR_TORRENT_CREATN_DATE) = (long long)gk_torrent_info.creatn_timestamp;
+                nodeChild.append_attribute(XML_ITEM_ATTR_TORRENT_DLSTATUS) = convDlStat_toInt(gk_torrent_info.dlStatus);
+                nodeChild.append_attribute(XML_ITEM_ATTR_TORRENT_TORRNT_COMMENT) = gk_torrent_info.comment.c_str();
+                nodeChild.append_attribute(XML_ITEM_ATTR_TORRENT_TORRNT_CREATOR) = gk_torrent_info.creator.c_str();
+                nodeChild.append_attribute(XML_ITEM_ATTR_TORRENT_MAGNET_URI) = gk_torrent_info.magnet_uri.c_str();
+                nodeChild.append_attribute(XML_ITEM_ATTR_TORRENT_TORRNT_NAME) = gk_torrent_info.torrent_name.c_str();
+                nodeChild.append_attribute(XML_ITEM_ATTR_TORRENT_NUM_FILES) = gk_torrent_info.num_files;
+                nodeChild.append_attribute(XML_ITEM_ATTR_TORRENT_TORRNT_PIECES) = gk_torrent_info.num_pieces;
+                nodeChild.append_attribute(XML_ITEM_ATTR_TORRENT_TORRNT_PIECE_LENGTH) = gk_torrent_info.piece_length;
+
+                pugi::xml_node nodeNodes = nodeChild.append_child(XML_CHILD_NODE_TORRENT_NODES);
+                for (size_t i = 0; i < gk_torrent_info.nodes.size(); ++i) {
+                    pugi::xml_node nodeNodesNames = nodeNodes.append_child(XML_CHILD_NODES_NAMES_TORRENT);
+                    nodeNodesNames.append_child(pugi::node_pcdata).set_value(gk_torrent_info.nodes.at(i).first.c_str());
+
+                    // Convert the base-10 int to char_t, in a multiplatform way!
+                    auto size = std::snprintf(nullptr, 0, "%d", gk_torrent_info.nodes.at(i).second);
+                    std::string buffer((size + 1), '\0');
+                    std::sprintf(&buffer[0], "%d", gk_torrent_info.nodes.at(i).second);
+                    pugi::xml_node nodeNodesNumbers = nodeNodesNames.append_child(XML_CHILD_NODES_NUMBR_TORRENT);
+                    nodeNodesNumbers.append_child(pugi::node_pcdata).set_value(buffer.data());
+                }
+
+                pugi::xml_node nodeFiles = nodeChild.append_child(XML_CHILD_NODE_TORRENT_FILES);
+                for (size_t i = 0; i < gk_torrent_info.files_vec.size(); ++i) {
+                    pugi::xml_node nodeFilesPath = nodeFiles.append_child(XML_CHILD_FILES_PATH_TORRENT);
+                    nodeFilesPath.append_child(pugi::node_pcdata)
+                            .set_value(gk_torrent_info.files_vec.at(i).file_path.c_str());
+                    pugi::xml_node nodeFilesHash = nodeFilesPath.append_child(XML_CHILD_FILES_HASH_TORRENT);
+                    nodeFilesHash.append_child(pugi::node_pcdata)
+                            .set_value(gk_torrent_info.files_vec.at(i).sha1_hash_hex.c_str());
+                }
+
+                pugi::xml_node nodeTrackers = nodeChild.append_child(XML_CHILD_NODE_TORRENT_TRACKERS);
+                for (size_t i = 0; i < gk_torrent_info.trackers.size(); ++i) {
+                    // Convert the base-10 int to char_t, in a multiplatform way!
+                    auto size = std::snprintf(nullptr, 0, "%d", gk_torrent_info.trackers.at(i).first);
+                    std::string buffer((size + 1), '\0');
+                    std::sprintf(&buffer[0], "%d", gk_torrent_info.trackers.at(i).first);
+                    pugi::xml_node nodeTrackersTier = nodeTrackers.append_child(XML_CHILD_TRACKERS_TIER_TORRENT);
+                    nodeTrackersTier.append_child(pugi::node_pcdata).set_value(buffer.data());
+
+                    pugi::xml_node nodeTrackersUrl = nodeTrackersTier.append_child(XML_CHILD_TRACKERS_URL_TORRENT);
+                    nodeTrackersUrl.append_child(pugi::node_pcdata).set_value(gk_torrent_info.trackers.at(i).second.c_str());
+                }
+
+                bool saveSucceed = doc.save_file(xmlCfgFile_loc.string().c_str(), PUGIXML_TEXT("    "));
+                if (!saveSucceed) {
+                    throw std::runtime_error(tr("Error with saving XML config file!").toStdString());
+                }
+
+                return true;
+            }
+        } else {
+            throw std::invalid_argument(tr("Internal error: no path has been given for the XML "
+                                                   "configuration file!").toStdString());
+        }
+    }
+
+    return false;
+}
+
+std::vector<GekkoFyre::GkTorrent::TorrentInfo> GekkoFyre::CmnRoutines::readTorrentInfo(const std::string &xmlCfgFile)
+{
+    fs::path xmlCfgFile_loc = findCfgFile(xmlCfgFile);
+    sys::error_code ec;
+    if (fs::exists(xmlCfgFile_loc, ec) && fs::is_regular_file(xmlCfgFile_loc)) {
+        std::vector<GekkoFyre::GkTorrent::TorrentInfo> gk_torrent_info_list;
+
+        pugi::xml_document doc;
+        mutex.lock();
+        pugi::xml_parse_result result = doc.load_file(xmlCfgFile_loc.string().c_str(),
+                                                      pugi::parse_default | pugi::parse_declaration);
+        mutex.unlock();
+        if (!result) {
+            throw std::invalid_argument(tr("XML parse error: %1, character pos= %2")
+                                                .arg(result.description(),
+                                                     QString::number(result.offset)).toStdString());
+        }
+
+        pugi::xml_node items = doc.child(XML_PARENT_NODE);
+        for (const auto& file: items.children(XML_CHILD_NODE_TORRENT)) {
+            for (const auto &item: file.children(XML_CHILD_ITEM_TORRENT)) {
+                GekkoFyre::GkTorrent::TorrentInfo i;
+                i.cId = item.attribute(XML_ITEM_ATTR_TORRENT_CID).as_uint();
+                i.down_dest = item.attribute(XML_ITEM_ATTR_TORRENT_FLOC).as_string();
+                i.insert_timestamp = item.attribute(XML_ITEM_ATTR_TORRENT_INSERT_DATE).as_llong();
+                i.complt_timestamp = item.attribute(XML_ITEM_ATTR_TORRENT_COMPLT_DATE).as_llong();
+                i.creatn_timestamp = item.attribute(XML_ITEM_ATTR_TORRENT_CREATN_DATE).as_llong();
+                i.dlStatus = convDlStat_IntToEnum(item.attribute(XML_ITEM_ATTR_TORRENT_DLSTATUS).as_int());
+                i.comment = item.attribute(XML_ITEM_ATTR_TORRENT_TORRNT_COMMENT).as_string();
+                i.creator = item.attribute(XML_ITEM_ATTR_TORRENT_TORRNT_CREATOR).as_string();
+                i.magnet_uri = item.attribute(XML_ITEM_ATTR_TORRENT_MAGNET_URI).as_string();
+                i.torrent_name = item.attribute(XML_ITEM_ATTR_TORRENT_TORRNT_NAME).as_string();
+                i.num_files = item.attribute(XML_ITEM_ATTR_TORRENT_NUM_FILES).as_int();
+                i.num_pieces = item.attribute(XML_ITEM_ATTR_TORRENT_TORRNT_PIECES).as_int();
+                i.piece_length = item.attribute(XML_ITEM_ATTR_TORRENT_TORRNT_PIECE_LENGTH).as_int();
+                gk_torrent_info_list.push_back(i);
+            }
+        }
+
+        return gk_torrent_info_list;
+    }
+
+    return std::vector<GekkoFyre::GkTorrent::TorrentInfo>();
 }
 
 int GekkoFyre::CmnRoutines::convDlStat_toInt(const GekkoFyre::DownloadStatus &status)

@@ -354,7 +354,7 @@ void MainWindow::initCharts(const QString &file_dest, const GekkoFyre::DownloadT
         graph.down_info.dl_type = download_type;
         graph_init.push_back(graph);
     } else {
-        throw std::invalid_argument(tr("'file_dest' is empty!").toStdString());
+        throw std::invalid_argument(tr("Unable to initialize charts! 'file_dest' is empty!").toStdString());
     }
 
     return;
@@ -1308,20 +1308,23 @@ void MainWindow::sendDetails(const std::string &fileName, const double &fileSize
 
     insertNewRow(fileName, fileSize, downloaded, progress, upSpeed, downSpeed, status, url, destination, down_type);
 
-    // Write the output to an XML file, with file-name 'CFG_HISTORY_FILE'
-    GekkoFyre::GkCurl::CurlDlInfo dl_info;
-    dl_info.dlStatus = status;
-    dl_info.file_loc = destination;
-    dl_info.ext_info.content_length = fileSize;
-    dl_info.ext_info.effective_url = url;
-    dl_info.ext_info.response_code = resp_code;
-    dl_info.ext_info.status_ok = stat_ok;
-    dl_info.ext_info.status_msg = stat_msg;
-    dl_info.cId = 0;
-    dl_info.insert_timestamp = 0;
-    dl_info.hash_type = hash_type;
-    dl_info.hash_val_given = hash_val;
-    routines->writeDownloadItem(dl_info);
+    if (down_type == GekkoFyre::DownloadType::HTTP || down_type == GekkoFyre::DownloadType::FTP) {
+        // Write the output to an XML file, with file-name 'CFG_HISTORY_FILE'
+        GekkoFyre::GkCurl::CurlDlInfo dl_info;
+        dl_info.dlStatus = status;
+        dl_info.file_loc = destination;
+        dl_info.ext_info.content_length = fileSize;
+        dl_info.ext_info.effective_url = url;
+        dl_info.ext_info.response_code = resp_code;
+        dl_info.ext_info.status_ok = stat_ok;
+        dl_info.ext_info.status_msg = stat_msg;
+        dl_info.cId = 0;
+        dl_info.insert_timestamp = 0;
+        dl_info.hash_type = hash_type;
+        dl_info.hash_val_given = hash_val;
+        routines->writeDownloadItem(dl_info);
+    }
+
     return;
 }
 

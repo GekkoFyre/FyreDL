@@ -103,8 +103,6 @@ public:
     unsigned long int freeDiskSpace(const QString &path = QDir::rootPath());
     GekkoFyre::GkFile::FileHash cryptoFileHash(const QString &file_dest, const GekkoFyre::HashType &hash_type,
                                                const QString &given_hash_val);
-    int load_file(const std::string &filename, std::vector<char> &v,
-                  libtorrent::error_code &ec, int limit = 8000000);
     GekkoFyre::GkTorrent::TorrentInfo torrentFileInfo(const std::string &file_dest,
                                                       const int &item_limit = 1000000,
                                                       const int &depth_limit = 1000);
@@ -122,6 +120,10 @@ public:
                        const long long &complt_timestamp = 0,
                        const std::string &xmlCfgFile = CFG_HISTORY_FILE);
 
+    bool writeTorrentItem(GekkoFyre::GkTorrent::TorrentInfo &gk_torrent_info,
+                          const std::string &xmlCfgFile = CFG_HISTORY_FILE);
+    std::vector<GekkoFyre::GkTorrent::TorrentInfo> readTorrentInfo(const std::string &xmlCfgFile = CFG_HISTORY_FILE);
+
     short writeXmlSettings(const GekkoFyre::GkSettings::FyreDL &settings,
                            const std::string &xmlCfgFile = CFG_SETTINGS_FILE);
     GekkoFyre::GkSettings::FyreDL readXmlSettings(const std::string &xmlCfgFile = CFG_SETTINGS_FILE);
@@ -129,6 +131,9 @@ public:
                            const std::string &xmlCfgFile = CFG_SETTINGS_FILE);
 
 private:
+    int load_file(const std::string &filename, std::vector<char> &v,
+                  libtorrent::error_code &ec, int limit = 8000000);
+
     QMutex mutex;
 };
 }
