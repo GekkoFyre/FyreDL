@@ -51,6 +51,7 @@
 #include <libtorrent/hex.hpp>
 #include <cmath>
 #include <iostream>
+#include <cstdlib>
 #include <QUrl>
 #include <QDir>
 #include <QFile>
@@ -66,6 +67,10 @@
 #define _WIN32_WINNT 0x06000100
 #include <SDKDDKVer.h>
 #include <Windows.h>
+
+extern "C" {
+#include <stdlib.h>
+}
 
 #elif __linux__
 #ifndef _GNU_SOURCE
@@ -1080,7 +1085,7 @@ std::vector<GekkoFyre::GkTorrent::TorrentInfo> GekkoFyre::CmnRoutines::readTorre
         }
 
         pugi::xml_node items = doc.child(XML_PARENT_NODE);
-        for (const auto& file: items.children(XML_CHILD_NODE_TORRENT)) {
+        for (const auto &file: items.children(XML_CHILD_NODE_TORRENT)) {
             for (const auto &item: file.children(XML_CHILD_ITEM_TORRENT)) {
                 GekkoFyre::GkTorrent::TorrentInfo i;
                 i.cId = item.attribute(XML_ITEM_ATTR_TORRENT_CID).as_uint();
@@ -1096,6 +1101,47 @@ std::vector<GekkoFyre::GkTorrent::TorrentInfo> GekkoFyre::CmnRoutines::readTorre
                 i.num_files = item.attribute(XML_ITEM_ATTR_TORRENT_NUM_FILES).as_int();
                 i.num_pieces = item.attribute(XML_ITEM_ATTR_TORRENT_TORRNT_PIECES).as_int();
                 i.piece_length = item.attribute(XML_ITEM_ATTR_TORRENT_TORRNT_PIECE_LENGTH).as_int();
+
+                std::vector<GekkoFyre::GkTorrent::TorrentFile> files_vec;
+                std::string tmp_str = "";
+                int tmp_int = 0;
+
+                // http://pugixml.org/docs/manual.html#access.nodedata
+                std::vector<std::pair<std::string, int>> nodes;
+                pugi::xml_node nodes_node = item.child(XML_CHILD_NODE_TORRENT_NODES);
+                for (pugi::xml_node node_node = nodes_node.child(XML_CHILD_NODES_NAMES_TORRENT); node_node;
+                     node_node = node_node.next_sibling(XML_CHILD_NODES_NAMES_TORRENT)) {
+                    pugi::xml_node number_node = node_node.child(XML_CHILD_NODES_NUMBR_TORRENT);
+
+                    tmp_str = node_node.child_value();
+                    tmp_int = atoi(number_node.child_value());
+                    nodes.push_back(std::make_pair(tmp_str, tmp_int));
+                }
+
+                pugi::xml_node files_node = item.child(XML_CHILD_NODE_TORRENT_FILES);
+                for (pugi::xml_node file_node = files_node.child(XML_CHILD_FILES_PATH_TORRENT); file_node;
+                     file_node = file_node.next_sibling(XML_CHILD_FILES_PATH_TORRENT)) {
+                    pugi::xml_node hash_node = file_node.child(XML_CHILD_FILES_HASH_TORRENT);
+
+                    GekkoFyre::GkTorrent::TorrentFile torr_file;
+                    torr_file.file_path = file_node.child_value();
+                    torr_file.sha1_hash_hex = hash_node.child_value();
+                    files_vec.push_back(torr_file);
+                }
+
+                std::vector<std::pair<int, std::string>> trackers;
+                pugi::xml_node trackers_node = item.child(XML_CHILD_NODE_TORRENT_TRACKERS);
+                for (pugi::xml_node tracker_node = trackers_node.child(XML_CHILD_TRACKERS_TIER_TORRENT); tracker_node;
+                     tracker_node = tracker_node.next_sibling(XML_CHILD_TRACKERS_TIER_TORRENT)) {
+                    pugi::xml_node url_node = tracker_node.child(XML_CHILD_TRACKERS_URL_TORRENT);
+                    tmp_int = atoi(tracker_node.child_value());
+                    tmp_str = url_node.child_value();
+                    trackers.push_back(std::make_pair(tmp_int, tmp_str));
+                }
+
+                i.nodes = nodes;
+                i.files_vec = files_vec;
+                i.trackers = trackers;
                 gk_torrent_info_list.push_back(i);
             }
         }

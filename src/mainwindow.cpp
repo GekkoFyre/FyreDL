@@ -177,10 +177,12 @@ void MainWindow::addDownload()
 void MainWindow::readFromHistoryFile()
 {
     std::vector<GekkoFyre::GkCurl::CurlDlInfo> dl_history;
+    std::vector<GekkoFyre::GkTorrent::TorrentInfo> gk_torrent_history;
     if (fs::exists(routines->findCfgFile(CFG_HISTORY_FILE)) &&
             fs::is_regular_file(routines->findCfgFile(CFG_HISTORY_FILE))) {
         try {
             dl_history = routines->readDownloadInfo(CFG_HISTORY_FILE);
+            gk_torrent_history = routines->readTorrentInfo(CFG_HISTORY_FILE);
         } catch (const std::exception &e) {
             QMessageBox::warning(this, tr("Error!"), QString("%1").arg(e.what()), QMessageBox::Ok);
         }
@@ -190,7 +192,7 @@ void MainWindow::readFromHistoryFile()
 
     dlModel->removeRows(0, (int)dl_history.size(), QModelIndex());
     for (size_t i = 0; i < dl_history.size(); ++i) {
-        if (!dl_history.at(i).file_loc.empty() || dl_history.at(i).ext_info.status_ok) {
+        if (!dl_history.at(i).file_loc.empty()) {
             if (dl_history.at(i).ext_info.content_length > 0) {
                 insertNewRow(dl_history.at(i).ext_info.effective_url,
                              dl_history.at(i).ext_info.content_length, 0, 0, 0, 0,
@@ -200,8 +202,32 @@ void MainWindow::readFromHistoryFile()
                 QMessageBox::information(this, tr("Problem!"), tr("The size of the download could not be "
                                                                   "determined. Please try again."),
                                          QMessageBox::Ok);
-                return;
             }
+        } else {
+            QMessageBox::warning(this, tr("Error!"), tr("The item below has no download destination! FyreDL cannot "
+                                                                "proceed with insertion of said item.\n\n\"%1\"")
+                    .arg(QUrl(QString::fromStdString(dl_history.at(i).ext_info.effective_url)).fileName()), QMessageBox::Ok);
+        }
+    }
+
+    for (size_t i = 0; i < gk_torrent_history.size(); ++i) {
+        if (!gk_torrent_history.at(i).down_dest.empty()) {
+            GekkoFyre::GkTorrent::TorrentInfo gk_torrent_element = gk_torrent_history.at(i);
+            double content_length = ((double)gk_torrent_element.num_pieces * (double)gk_torrent_element.piece_length);
+            if (content_length > 0) {
+                insertNewRow(gk_torrent_element.torrent_name, content_length, 0, 0, 0, 0,
+                             gk_torrent_element.dlStatus, gk_torrent_element.magnet_uri,
+                             gk_torrent_element.down_dest, GekkoFyre::DownloadType::Torrent);
+            } else {
+                QMessageBox::warning(this, tr("Error!"), tr("Content length for the below torrent is either zero or "
+                                                                    "negative! FyreDL cannot proceed with insertion "
+                                                                    "of said torrent.\n\n%1")
+                        .arg(QString::fromStdString(gk_torrent_element.torrent_name)), QMessageBox::Ok);
+            }
+        } else {
+            QMessageBox::warning(this, tr("Error!"), tr("The torrent below has no download destination! FyreDL cannot "
+                                                                "proceed with insertion of said torrent.\n\n\"%1\"")
+                    .arg(QString::fromStdString(gk_torrent_history.at(i).torrent_name)), QMessageBox::Ok);
         }
     }
 
