@@ -83,10 +83,10 @@ extern "C" {
 #define FYREDL_EST_WAIT_TIME_PRECISION 3        // The significant digit precision of the estimated wait time counter for each active transfer
 
 //
-// ###################################
-//   DO NOT MODIFY BELOW THIS LINE!
-// Unless you know what you are doing
-// ###################################
+// ######################################
+// #   DO NOT MODIFY BELOW THIS LINE!   #
+// # Unless you know what you are doing #
+// ######################################
 //
 
 // Download and File I/O
@@ -121,11 +121,19 @@ extern "C" {
 #define XML_CHILD_ITEM_TORRENT "item"
 #define XML_CHILD_NODE_TORRENT_NODES "nodes"
 #define XML_CHILD_NODE_TORRENT_FILES "files"
+#define XML_CHILD_NODE_TORRENT_FILES_MAPFLEPCE "map-file-piece"
 #define XML_CHILD_NODE_TORRENT_TRACKERS "trackers"
 #define XML_CHILD_NODES_NAMES_TORRENT "name"
 #define XML_CHILD_NODES_NUMBR_TORRENT "number"
 #define XML_CHILD_FILES_PATH_TORRENT "path"
 #define XML_CHILD_FILES_HASH_TORRENT "hash"
+#define XML_CHILD_FILES_FLAGS_TORRENT "flags"
+#define XML_CHILD_FILES_MTIME_TORRENT "mtime"
+#define XML_CHILD_FILES_MAPFLEPCE_1_TORRENT "first"
+#define XML_CHILD_FILES_MAPFLEPCE_2_TORRENT "second"
+#define XML_CHILD_FILES_CONTLNGTH_TORRENT "content-length"
+#define XML_CHILD_FILES_FILEOFFST_TORRENT "file-offset"
+#define XML_CHILD_FILES_DOWNBOOL_TORRENT "down-bool"
 #define XML_CHILD_TRACKERS_URL_TORRENT "url"
 #define XML_CHILD_TRACKERS_TIER_TORRENT "tier"
 #define XML_ITEM_ATTR_TORRENT_CID "cid"
@@ -242,8 +250,14 @@ namespace GekkoFyre {
 
     namespace GkTorrent {
         struct TorrentFile {
-            std::string sha1_hash_hex;
-            std::string file_path;
+            std::string file_path;              // The internal path of the file within the torrent
+            std::string sha1_hash_hex;          // The SHA-1 hash of the file, if available, in hexadecimal
+            int flags;
+            int64_t content_length;             // The content length of this particular file
+            int64_t file_offset;                // The internal offset of the file within the torrent
+            uint32_t mtime;                     // Modification time? Not sure...
+            std::pair<int, int> map_file_piece; // <first, last> How the pieces are mapped within the torrent for this particular file
+            bool downloaded;                    // Whether this particular file is downloaded or not
         };
 
         struct TorrentInfo {
