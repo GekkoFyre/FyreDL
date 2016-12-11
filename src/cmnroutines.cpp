@@ -1152,6 +1152,47 @@ std::vector<GekkoFyre::GkTorrent::TorrentInfo> GekkoFyre::CmnRoutines::readTorre
     return std::vector<GekkoFyre::GkTorrent::TorrentInfo>();
 }
 
+bool GekkoFyre::CmnRoutines::delTorrentItem(const std::string &magnet_uri, const std::string &xmlCfgFile)
+{
+    fs::path xmlCfgFile_loc = findCfgFile(xmlCfgFile);
+    sys::error_code ec;
+    if (fs::exists(xmlCfgFile_loc, ec) && fs::is_regular_file(xmlCfgFile_loc)) {
+        std::vector<GekkoFyre::GkTorrent::TorrentInfo> gk_torrent_info;
+        gk_torrent_info = readTorrentInfo(xmlCfgFile);
+
+        pugi::xml_document doc;
+
+        // Load XML into memory
+        // Remark: to fully read declaration entries you have to specify, "pugi::parse_declaration"
+        pugi::xml_parse_result result = doc.load_file(xmlCfgFile_loc.string().c_str(),
+                                                      pugi::parse_default | pugi::parse_declaration);
+        if (!result) {
+            throw std::invalid_argument(tr("XML parse error: %1, character pos= %2")
+                                                .arg(result.description(),
+                                                     QString::number(result.offset)).toStdString());
+        }
+
+        pugi::xml_node items = doc.child(XML_PARENT_NODE);
+        for (const auto &file: items.children(XML_CHILD_NODE_TORRENT)) {
+            for (const auto &item: file.children(XML_CHILD_ITEM_TORRENT)) {
+                if (file.find_child_by_attribute(XML_ITEM_ATTR_TORRENT_MAGNET_URI, magnet_uri.c_str())) {
+                    item.parent().remove_child(item);
+                }
+            }
+        }
+
+        bool saveSucceed = doc.save_file(xmlCfgFile_loc.string().c_str(), PUGIXML_TEXT("    "));
+        if (!saveSucceed) {
+            throw std::runtime_error(tr("Error with saving XML config file!").toStdString());
+        }
+
+        return true;
+    } else {
+        throw std::invalid_argument(tr("XML config file does not exist! Location attempt: "
+                                               "%1").arg(xmlCfgFile_loc.string().c_str()).toStdString());
+    }
+}
+
 int GekkoFyre::CmnRoutines::convDlStat_toInt(const GekkoFyre::DownloadStatus &status)
 {
     switch (status) {

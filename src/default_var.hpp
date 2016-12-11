@@ -118,10 +118,10 @@ extern "C" {
 #define XML_ITEM_ATTR_FILE_HASH_SUCC_TYPE "hash-succ-type" // Whether the calculated hash of the download matched the given hash or not
 
 #define XML_CHILD_NODE_TORRENT "torrent"
+#define XML_CHILD_ITEM_TORRENT "item"
 #define XML_CHILD_NODE_TORRENT_NODES "nodes"
 #define XML_CHILD_NODE_TORRENT_FILES "files"
 #define XML_CHILD_NODE_TORRENT_TRACKERS "trackers"
-#define XML_CHILD_ITEM_TORRENT "item"
 #define XML_CHILD_NODES_NAMES_TORRENT "name"
 #define XML_CHILD_NODES_NUMBR_TORRENT "number"
 #define XML_CHILD_FILES_PATH_TORRENT "path"

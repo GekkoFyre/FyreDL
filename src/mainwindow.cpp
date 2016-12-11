@@ -313,19 +313,29 @@ void MainWindow::removeSelRows()
 {
     // Be sure not to delete items from within slots connected to signals that have the item (or its
     // index) as their parameter.
-    QModelIndexList indexes = ui->downloadView->selectionModel()->selectedRows();
-    int countRow = indexes.count();
+    const QModelIndexList indexes = ui->downloadView->selectionModel()->selectedRows();
+    const int countRow = indexes.count();
 
     if (indexes.size() > 0) {
         if (indexes.at(0).isValid()) {
             try {
-                QString file_dest = ui->downloadView->model()->data(ui->downloadView->model()->index(indexes.at(0).row(), MN_DESTINATION_COL)).toString();
+                const QString file_dest = ui->downloadView->model()->data(ui->downloadView->model()->index(indexes.at(0).row(), MN_DESTINATION_COL)).toString();
+                const fs::path boost_file_dest(file_dest.toStdString());
+                if (!fs::is_directory(boost_file_dest) && fs::is_regular_file(boost_file_dest)) {
+                    // Now remove the row from the XML file...
+                    routines->delDownloadItem(file_dest);
 
-                // Now remove the row from the XML file...
-                routines->delDownloadItem(file_dest);
+                    // Remove the associated graph(s) from memory
+                    delCharts(file_dest.toStdString());
+                } else {
+                    const std::string url_col = ui->downloadView->model()->data(ui->downloadView->model()->index(indexes.at(0).row(), MN_URL_COL)).toString().toStdString();
 
-                // Remove the associated graph(s) from memory
-                delCharts(file_dest.toStdString());
+                    // Now remove the row from the XML file...
+                    routines->delTorrentItem(url_col);
+
+                    // Remove the associated graph(s) from memory
+                    delCharts(url_col);
+                }
 
                 // ...and then the GUI
                 dlModel->removeRows(indexes.at(0).row(), countRow, QModelIndex());
@@ -480,9 +490,9 @@ void MainWindow::delCharts(const std::string &file_dest)
     /*
     if (!graph_init.empty()) {
         for (size_t i = 0; i < graph_init.size(); ++i) {
-            if (!graph_init.at(i).file_dest.empty() &&
-                    graph_init.at(i).down_speed->down_speed_series != nullptr) {
-                if (graph_init.at(i).file_dest == file_dest) {
+            if (!graph_init.at(i).file_dest.isEmpty() &&
+                    graph_init.at(i).down_speed.down_speed_series != nullptr) {
+                if (graph_init.at(i).file_dest.toStdString() == file_dest) {
                     graph_init.erase(graph_init.begin() + (long)i);
                     return;
                 }
@@ -1035,10 +1045,18 @@ void MainWindow::on_clearhistoryToolBtn_clicked()
                 indexes.push_back(find_index);
                 QModelIndex file_dest_index = dlModel->index(i, MN_DESTINATION_COL);
                 const QString file_dest_string = ui->downloadView->model()->data(file_dest_index).toString();
+                const fs::path boost_file_dest(file_dest_string.toStdString());
 
                 try {
-                    delCharts(file_dest_string.toStdString());
-                    routines->delDownloadItem(file_dest_string);
+                    if (!fs::is_directory(boost_file_dest) && fs::is_regular_file(boost_file_dest)) {
+                        delCharts(file_dest_string.toStdString());
+                        routines->delDownloadItem(file_dest_string);
+                    } else {
+                        QModelIndex url_col_index = dlModel->index(i, MN_URL_COL);
+                        const std::string url_col_string = ui->downloadView->model()->data(url_col_index).toString().toStdString();
+                        delCharts(url_col_string);
+                        routines->delTorrentItem(url_col_string);
+                    }
                 } catch (const std::exception &e) {
                     QMessageBox::warning(this, tr("Error!"), QString("%1").arg(e.what()), QMessageBox::Ok);
                     return;

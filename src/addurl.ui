@@ -251,7 +251,7 @@
            <item row="2" column="1">
             <widget class="QLabel" name="file_import_desc_label">
              <property name="text">
-              <string>( e.g. download.torrent, download.nzb, urls.csv )</string>
+              <string>( e.g. download.torrent, urls.csv )</string>
              </property>
             </widget>
            </item>

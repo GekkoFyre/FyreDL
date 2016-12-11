@@ -123,6 +123,7 @@ public:
     bool writeTorrentItem(GekkoFyre::GkTorrent::TorrentInfo &gk_torrent_info,
                           const std::string &xmlCfgFile = CFG_HISTORY_FILE);
     std::vector<GekkoFyre::GkTorrent::TorrentInfo> readTorrentInfo(const std::string &xmlCfgFile = CFG_HISTORY_FILE);
+    bool delTorrentItem(const std::string &magnet_uri, const std::string &xmlCfgFile = CFG_HISTORY_FILE);
 
     short writeXmlSettings(const GekkoFyre::GkSettings::FyreDL &settings,
                            const std::string &xmlCfgFile = CFG_SETTINGS_FILE);
