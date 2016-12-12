@@ -182,7 +182,7 @@ void MainWindow::readFromHistoryFile()
             fs::is_regular_file(routines->findCfgFile(CFG_HISTORY_FILE))) {
         try {
             dl_history = routines->readDownloadInfo(CFG_HISTORY_FILE);
-            gk_torrent_history = routines->readTorrentInfo(CFG_HISTORY_FILE);
+            gk_torrent_history = routines->readTorrentInfo(true, CFG_HISTORY_FILE);
         } catch (const std::exception &e) {
             QMessageBox::warning(this, tr("Error!"), QString("%1").arg(e.what()), QMessageBox::Ok);
         }
@@ -1366,6 +1366,7 @@ void MainWindow::sendDetails(const std::string &fileName, const double &fileSize
         dl_info.insert_timestamp = 0;
         dl_info.hash_type = hash_type;
         dl_info.hash_val_given = hash_val;
+        dl_info.unique_id = routines->createId(32);
         routines->writeDownloadItem(dl_info);
     }
 

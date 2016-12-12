@@ -112,6 +112,7 @@ extern "C" {
 #define XML_ITEM_ATTR_FILE_EFFEC_URL "effec-url"           // Given, proper URL returned from the (source) web-server
 #define XML_ITEM_ATTR_FILE_RESP_CODE "resp-code"           // Given return-code returned from the (source) web-server
 #define XML_ITEM_ATTR_FILE_CONT_LNGTH "content-length"     // The size of the download returned from the (source) web-server
+#define XML_ITEM_ATTR_FILE_UNIQUE_ID "unique-id"
 #define XML_ITEM_ATTR_FILE_HASH_TYPE "hash-type"           // The type of hash employed (i.e, SHA1, SHA3-256/512, MD5, etc.)
 #define XML_ITEM_ATTR_FILE_HASH_VAL_GIVEN "hash-val-given" // The hash-value that was given by the user
 #define XML_ITEM_ATTR_FILE_HASH_VAL_RTRND "hash-val-rtrnd" // The hash-value that was calculated after the download (presumably) succeeded
@@ -133,11 +134,13 @@ extern "C" {
 #define XML_CHILD_FILES_MAPFLEPCE_2_TORRENT "second"
 #define XML_CHILD_FILES_CONTLNGTH_TORRENT "content-length"
 #define XML_CHILD_FILES_FILEOFFST_TORRENT "file-offset"
-#define XML_CHILD_FILES_DOWNBOOL_TORRENT "down-bool"
+#define XML_CHILD_FILES_DOWNBOOL_TORRENT "downloaded"
 #define XML_CHILD_TRACKERS_URL_TORRENT "url"
+#define XML_CHILD_TRACKERS_AVAILABLE_TORRENT "enabled"
 #define XML_CHILD_TRACKERS_TIER_TORRENT "tier"
 #define XML_ITEM_ATTR_TORRENT_CID "cid"
 #define XML_ITEM_ATTR_TORRENT_FLOC "destination"
+#define XML_ITEM_ATTR_TORRENT_UNIQUE_ID "unique-id"
 #define XML_ITEM_ATTR_TORRENT_INSERT_DATE "insert-date"
 #define XML_ITEM_ATTR_TORRENT_COMPLT_DATE "complt-date"
 #define XML_ITEM_ATTR_TORRENT_CREATN_DATE "creatn-date"
@@ -260,6 +263,12 @@ namespace GekkoFyre {
             bool downloaded;                    // Whether this particular file is downloaded or not
         };
 
+        struct TorrentTrackers {
+            int tier;                               // The tier number of the tracker in question
+            std::string url;                        // The <URL:port> of the tracker in question
+            bool enabled;                           // Whether this tracker is active for transfers or not
+        };
+
         struct TorrentInfo {
             std::string down_dest;                  // The location of where the download is being streamed towards
             unsigned int cId;                       // Automatically incremented Content ID for each download/file
@@ -274,7 +283,18 @@ namespace GekkoFyre {
             int num_files;                          // How many files are contained within this torrent
             int num_pieces;                         // How many pieces are contained within this torrent
             int piece_length;                       // The length of each piece
+            std::string unique_id;                  // A unique identifier for this torrent
             std::vector<std::pair<std::string, int>> nodes;
+            std::vector<TorrentTrackers> trackers;
+            std::vector<TorrentFile> files_vec;
+        };
+
+        struct ModifyTorrentInfo {
+            std::string down_dest;                  // The location of where the download is being streamed towards
+            std::string magnet_uri;                 // The 'BitTorrent Magnet Link' URI
+            long long complt_timestamp;             // The date/time of the download/file having completed transfer
+            GekkoFyre::DownloadStatus dlStatus;     // Status of the downloading file(s) in question
+            std::string comment;                    // Any comments left by the author of the torrent file in question
             std::vector<std::pair<int, std::string>> trackers;
             std::vector<TorrentFile> files_vec;
         };
@@ -364,6 +384,7 @@ namespace GekkoFyre {
             long long complt_timestamp;          // The date/time of the download/file having completed transfer
             GekkoFyre::DownloadStatus dlStatus;  // Status of the downloading file(s) in question
             CurlInfoExt ext_info;                // Extended info about the file(s) themselves
+            std::string unique_id;               // A unique identifier for this download
             GekkoFyre::HashType hash_type;       // The actual type of hash used (e.g., CRC32/MD5/SHA1/SHA256/SHA512)
             std::string hash_val_given;          // The value of the hash, if a type is specified in 'CurlDlInfo::hash_type', given by the user
             std::string hash_val_rtrnd;          // Same as above, but calculated from the local file when, presumably, successfully downloaded

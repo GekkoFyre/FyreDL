@@ -784,7 +784,7 @@ std::string GekkoFyre::CurlMulti::createId()
     std::uniform_int_distribution<std::mt19937::result_type> dist10(0,9);
     std::ostringstream oss;
 
-    for (size_t i = 0; i < 11; ++i) {
+    for (size_t i = 0; i < 23; ++i) {
         oss << dist10(rng);
     }
 

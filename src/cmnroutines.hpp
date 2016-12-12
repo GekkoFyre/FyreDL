@@ -83,6 +83,7 @@ public:
 
     void print_exception(const std::exception &e, int level = 0);
     bool singleAppInstance_Win32();
+    static std::string createId(const size_t &id_length);
 
     int convDlStat_toInt(const GekkoFyre::DownloadStatus &status);
     int convHashType_toInt(const GekkoFyre::HashType &hash_type);
@@ -121,9 +122,11 @@ public:
                        const std::string &xmlCfgFile = CFG_HISTORY_FILE);
 
     bool writeTorrentItem(GekkoFyre::GkTorrent::TorrentInfo &gk_ti, const std::string &xmlCfgFile = CFG_HISTORY_FILE);
-    std::vector<GekkoFyre::GkTorrent::TorrentInfo> readTorrentInfo(const std::string &xmlCfgFile = CFG_HISTORY_FILE);
+    std::vector<GekkoFyre::GkTorrent::TorrentInfo> readTorrentInfo(const bool &minimal_readout = false,
+                                                                   const std::string &xmlCfgFile = CFG_HISTORY_FILE);
     bool delTorrentItem(const std::string &magnet_uri, const std::string &xmlCfgFile = CFG_HISTORY_FILE);
-    bool modifyTorrentItem(const std::string &xmlCfgFile = CFG_HISTORY_FILE);
+    bool modifyTorrentItem(const GekkoFyre::GkTorrent::ModifyTorrentInfo &gk_mt,
+                           const std::string &xmlCfgFile = CFG_HISTORY_FILE);
 
     short writeXmlSettings(const GekkoFyre::GkSettings::FyreDL &settings,
                            const std::string &xmlCfgFile = CFG_SETTINGS_FILE);
