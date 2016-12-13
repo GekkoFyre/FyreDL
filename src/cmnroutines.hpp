@@ -124,7 +124,7 @@ public:
     bool writeTorrentItem(GekkoFyre::GkTorrent::TorrentInfo &gk_ti, const std::string &xmlCfgFile = CFG_HISTORY_FILE);
     std::vector<GekkoFyre::GkTorrent::TorrentInfo> readTorrentInfo(const bool &minimal_readout = false,
                                                                    const std::string &xmlCfgFile = CFG_HISTORY_FILE);
-    bool delTorrentItem(const std::string &magnet_uri, const std::string &xmlCfgFile = CFG_HISTORY_FILE);
+    bool delTorrentItem(const std::string &unique_id, const std::string &xmlCfgFile = CFG_HISTORY_FILE);
     bool modifyTorrentItem(const GekkoFyre::GkTorrent::ModifyTorrentInfo &gk_mt,
                            const std::string &xmlCfgFile = CFG_HISTORY_FILE);
 

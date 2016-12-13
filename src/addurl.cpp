@@ -138,6 +138,7 @@ void AddURL::on_buttonBox_accepted()
                             dl_info.ext_info.status_ok = info_ext.status_ok;
                             dl_info.cId = 0;
                             dl_info.insert_timestamp = 0;
+                            dl_info.unique_id = routines->createId(FYREDL_UNIQUE_ID_DIGIT_COUNT);
 
                             // Set default values for the hash(es) if none specified by the user
                             if (hash_plaintext.isEmpty()) {
@@ -153,7 +154,7 @@ void AddURL::on_buttonBox_accepted()
                             emit sendDetails(dl_info.ext_info.effective_url, dl_info.ext_info.content_length, 0, 0, 0,
                                              0, dl_info.dlStatus, dl_info.ext_info.effective_url, dl_info.file_loc,
                                              dl_info.hash_type, dl_info.hash_val_given, dl_info.ext_info.response_code,
-                                             dl_info.ext_info.status_ok, info_ext.status_msg, url_type_enum);
+                                             dl_info.ext_info.status_ok, info_ext.status_msg, dl_info.unique_id, url_type_enum);
                             return AddURL::done(QDialog::Accepted);
                         } else {
                             // We received something other than a '200' response code, so either the URL does not exist or
@@ -206,7 +207,7 @@ void AddURL::on_buttonBox_accepted()
                     routines->writeTorrentItem(gk_torrent_data);
                     emit sendDetails(gk_torrent_data.torrent_name, ((double)gk_torrent_data.num_pieces * (double)gk_torrent_data.piece_length),
                                      0, 0, 0, 0, GekkoFyre::DownloadStatus::Stopped, gk_torrent_data.magnet_uri, gk_torrent_data.down_dest,
-                                     GekkoFyre::HashType::None, "", 0, true, "", GekkoFyre::DownloadType::Torrent);
+                                     GekkoFyre::HashType::None, "", 0, true, "", gk_torrent_data.unique_id, GekkoFyre::DownloadType::Torrent);
                     return AddURL::done(QDialog::Accepted);
                 } else {
                     // ########################
@@ -265,6 +266,7 @@ void AddURL::on_buttonBox_accepted()
                             // Now check it for more detailed information
                             info_ext = GekkoFyre::CurlEasy::curlGrabInfo(QString::fromStdString(csv_vec.at(i).url));
 
+                            dl_info.unique_id = routines->createId(FYREDL_UNIQUE_ID_DIGIT_COUNT);
                             dl_info.dlStatus = GekkoFyre::DownloadStatus::Stopped;
 
                             // Make one final check and assign the appropriate values
@@ -301,6 +303,7 @@ void AddURL::on_buttonBox_accepted()
                             // The URL does not exist! It's invalid.
                             // #####################################
                             dl_info.dlStatus = GekkoFyre::DownloadStatus::Invalid;
+                            dl_info.unique_id = routines->createId(FYREDL_UNIQUE_ID_DIGIT_COUNT);
 
                             if (!csv_file_dest.isEmpty()) {
                                 std::ostringstream oss_path;
@@ -332,7 +335,7 @@ void AddURL::on_buttonBox_accepted()
                         emit sendDetails(dl_info.ext_info.effective_url, dl_info.ext_info.content_length, 0, 0, 0,
                                          0, dl_info.dlStatus, dl_info.ext_info.effective_url, dl_info.file_loc,
                                          dl_info.hash_type, dl_info.hash_val_given, dl_info.ext_info.response_code,
-                                         dl_info.ext_info.status_ok, "", GekkoFyre::DownloadType::HTTP);
+                                         dl_info.ext_info.status_ok, "", dl_info.unique_id, GekkoFyre::DownloadType::HTTP);
                     }
 
                     // Clear the 'temporary' struct-holding std::vector<CsvImport>()

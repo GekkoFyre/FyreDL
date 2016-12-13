@@ -601,7 +601,7 @@ GekkoFyre::GkTorrent::TorrentInfo GekkoFyre::CmnRoutines::torrentFileInfo(const 
     // gk_torrent_struct.creatn_timestamp = t.creation_date().get();
     gk_torrent_struct.creatn_timestamp = 0;
     gk_torrent_struct.torrent_name = t.name();
-    gk_torrent_struct.unique_id = createId(32);
+    gk_torrent_struct.unique_id = createId(FYREDL_UNIQUE_ID_DIGIT_COUNT);
 
     const file_storage &st = t.files();
     for (int i = 0; i < st.num_files(); ++i) {
@@ -1250,7 +1250,7 @@ std::vector<GekkoFyre::GkTorrent::TorrentInfo> GekkoFyre::CmnRoutines::readTorre
     return std::vector<GekkoFyre::GkTorrent::TorrentInfo>();
 }
 
-bool GekkoFyre::CmnRoutines::delTorrentItem(const std::string &magnet_uri, const std::string &xmlCfgFile)
+bool GekkoFyre::CmnRoutines::delTorrentItem(const std::string &unique_id, const std::string &xmlCfgFile)
 {
     fs::path xmlCfgFile_loc = findCfgFile(xmlCfgFile);
     sys::error_code ec;
@@ -1273,7 +1273,7 @@ bool GekkoFyre::CmnRoutines::delTorrentItem(const std::string &magnet_uri, const
         pugi::xml_node items = doc.child(XML_PARENT_NODE);
         for (const auto &file: items.children(XML_CHILD_NODE_TORRENT)) {
             for (const auto &item: file.children(XML_CHILD_ITEM_TORRENT)) {
-                if (file.find_child_by_attribute(XML_ITEM_ATTR_TORRENT_MAGNET_URI, magnet_uri.c_str())) {
+                if (file.find_child_by_attribute(XML_ITEM_ATTR_TORRENT_UNIQUE_ID, unique_id.c_str())) {
                     item.parent().remove_child(item);
                 }
             }
@@ -1294,6 +1294,33 @@ bool GekkoFyre::CmnRoutines::delTorrentItem(const std::string &magnet_uri, const
 bool GekkoFyre::CmnRoutines::modifyTorrentItem(const GekkoFyre::GkTorrent::ModifyTorrentInfo &gk_mt,
                                                const std::string &xmlCfgFile)
 {
+    fs::path xmlCfgFile_loc = findCfgFile(xmlCfgFile);
+    sys::error_code ec;
+    if (fs::exists(xmlCfgFile_loc, ec) && fs::is_regular_file(xmlCfgFile_loc)) {
+        pugi::xml_document doc;
+
+        // Load XML into memory
+        // Remark: to fully read declaration entries you have to specify, "pugi::parse_declaration"
+        pugi::xml_parse_result result = doc.load_file(xmlCfgFile_loc.string().c_str(),
+                                                      pugi::parse_default | pugi::parse_declaration);
+        if (!result) {
+            throw std::invalid_argument(tr("XML parse error: %1, character pos= %2")
+                                                .arg(result.description(),
+                                                     QString::number(result.offset)).toStdString());
+        }
+
+        /*
+        pugi::xml_node items = doc.child(XML_PARENT_NODE);
+        for (const auto& file: items.children(XML_CHILD_NODE_TORRENT)) {
+            for (const auto &item: file.children(XML_CHILD_ITEM_TORRENT)) {
+                if (file.find_child_by_attribute(XML_ITEM_ATTR_TORRENT_UNIQUE_ID, gk_mt.unique_id.c_str())) {
+
+                }
+            }
+        }
+         */
+    }
+
     return false;
 }
 

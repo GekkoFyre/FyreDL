@@ -72,7 +72,8 @@ signals:
                      const GekkoFyre::DownloadStatus &status, const std::string &url,
                      const std::string &destination, const GekkoFyre::HashType &hash_type,
                      const std::string &hash_val, const long long &resp_code, const bool &stat_ok,
-                     const std::string &stat_msg, const GekkoFyre::DownloadType &down_type);
+                     const std::string &stat_msg, const std::string &unique_id,
+                     const GekkoFyre::DownloadType &down_type);
 
 private:
     Ui::AddURL *ui;

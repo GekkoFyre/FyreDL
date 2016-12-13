@@ -81,6 +81,7 @@ extern "C" {
 #define FYREDL_CONN_LOW_SPEED_CUTOUT 512L       // The average transfer speed in bytes per second to be considered below before connection cut-off.
 #define FYREDL_CONN_LOW_SPEED_TIME 10L          // The number of seconds that the transfer speed should be below 'FYREDL_CONN_LOW_SPEED_CUTOUT' before connection cut-off.
 #define FYREDL_EST_WAIT_TIME_PRECISION 3        // The significant digit precision of the estimated wait time counter for each active transfer
+#define FYREDL_UNIQUE_ID_DIGIT_COUNT 32         // The 'unique identifier' serial number that is given to each download item. This determines how many digits are allocated to this identifier and thus, how much RAM is used for storage thereof.
 
 //
 // ######################################
@@ -159,15 +160,18 @@ extern "C" {
 #define XML_ITEM_ATTR_SETTINGS_WIN_X "main-win-x"
 
 // These determine the columns used in QTableView
-#define MN_FILENAME_COL 0
-#define MN_FILESIZE_COL 1
-#define MN_DOWNLOADED_COL 2
-#define MN_PROGRESS_COL 3
-#define MN_UPSPEED_COL 4
-#define MN_DOWNSPEED_COL 5
-#define MN_STATUS_COL 6
-#define MN_DESTINATION_COL 7
-#define MN_URL_COL 8
+#define MN_COL_COUNT 10
+
+#define MN_FILENAME_COL 0       // The name of just the file or torrent being downloaded
+#define MN_FILESIZE_COL 1       // The content-length of the download, in kilobytes/megabytes/gigabytes/etc.
+#define MN_DOWNLOADED_COL 2     // How much has been downloaded, in kilobytes/megabytes/gigabytes/etc.
+#define MN_PROGRESS_COL 3       // The progress towards completion on the download, on a scale of 0-100 percent
+#define MN_UPSPEED_COL 4        // The upward transfer speed
+#define MN_DOWNSPEED_COL 5      // The downward transfer speed
+#define MN_STATUS_COL 6         // Whether the download is paused, stopped, actively transferring, etc.
+#define MN_DESTINATION_COL 7    // The destination of the download on local storage
+#define MN_URL_COL 8            // The URL column
+#define MN_HIDDEN_UNIQUE_ID 9   // Stores the 'unique identifier' serial number for each download. Kind of a hack/cheat :)
 
 // This determines the currently selected tab at the bottom of the main window
 #define TAB_INDEX_GENERAL 0
@@ -293,6 +297,7 @@ namespace GekkoFyre {
             std::string down_dest;                  // The location of where the download is being streamed towards
             std::string magnet_uri;                 // The 'BitTorrent Magnet Link' URI
             long long complt_timestamp;             // The date/time of the download/file having completed transfer
+            std::string unique_id;                  // A unique identifier for this torrent
             GekkoFyre::DownloadStatus dlStatus;     // Status of the downloading file(s) in question
             std::string comment;                    // Any comments left by the author of the torrent file in question
             std::vector<std::pair<int, std::string>> trackers;
@@ -410,7 +415,7 @@ namespace GekkoFyre {
         struct GraphInit {
             GekkoFyre::Global::DownloadInfo down_info; // Hijacking 'GraphInit' for the purpose of using this
             DownSpeedGraph down_speed;                 // The 'download speed' graph
-            QString file_dest;                         // File destination of the download on user's local storage
+            QString unique_id;                         // File destination of the download on user's local storage
             bool currShown;                            // Whether the graph for the given 'file_dest' is actually displayed or not
         };
     }

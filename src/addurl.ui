@@ -170,12 +170,7 @@
              </item>
              <item>
               <property name="text">
-               <string>.torrent</string>
-              </property>
-             </item>
-             <item>
-              <property name="text">
-               <string>Magnet link (torrent)</string>
+               <string>Magnet link (BitTorrent)</string>
               </property>
              </item>
             </widget>

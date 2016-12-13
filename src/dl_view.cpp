@@ -79,7 +79,7 @@ int downloadModel::rowCount(const QModelIndex &parent) const
 int downloadModel::columnCount(const QModelIndex &parent) const
 {
     Q_UNUSED(parent);
-    return 9;
+    return MN_COL_COUNT;
 }
 
 /**
@@ -104,7 +104,7 @@ QVariant downloadModel::data(const QModelIndex &index, int role) const
     if (role == Qt::DisplayRole) {
         std::vector<QString> vector = vectorList.at(index.row());
 
-        for(int i = 0; i <= 8; ++i) {
+        for(int i = 0; i <= (MN_COL_COUNT - 1); ++i) {
             if (index.column() == i) {
                 return vector.at((size_t)i);
             }
@@ -148,6 +148,8 @@ QVariant downloadModel::headerData(int section, Qt::Orientation orientation, int
             return tr("Destination");
         case MN_URL_COL:
             return tr("URL");
+        case MN_HIDDEN_UNIQUE_ID:
+            return tr("Hidden-Unique-ID");
         }
     }
 
@@ -204,6 +206,8 @@ bool downloadModel::setData(const QModelIndex &index, const QVariant &value, int
             v.insert((v.begin() + MN_DESTINATION_COL), value.toString());
         } else if (index.column() == MN_URL_COL) {
             v.insert((v.begin() + MN_URL_COL), value.toString());
+        } else if (index.column() == MN_HIDDEN_UNIQUE_ID) {
+            v.insert((v.begin() + MN_HIDDEN_UNIQUE_ID), value.toString());
         } else {
             return false;
         }
