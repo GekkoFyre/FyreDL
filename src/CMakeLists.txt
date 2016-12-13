@@ -94,7 +94,9 @@ set(SOURCE_FILES
     settings.hpp
     settings.cpp
     singleton_emit.hpp
-    singleton_proc.hpp)
+    singleton_proc.hpp
+    torrent_client.hpp
+    torrent_client.cpp)
 
 set(EXTERNAL_SOURCE_FILES
     ./../utils/fast-cpp-csv-parser/csv.h)

@@ -87,6 +87,15 @@ private:
     bool askDeleteFile(const QString &file_dest, const bool &noRestart = false);
     void startDownload(const QString &file_dest, const bool &resumeDl = true);
 
+    // Immediately below are actions that the user may take on a single downloadable item, such as by pausing,
+    // restarting, or halting it, for example. That is not a complete list.
+    void haltDownload();
+    void resumeDownload();
+    void pauseDownload();
+    void restartDownload();
+    void clearOldHistory();
+    void removeDlItem();
+
     void general_extraDetails();
     void transfer_extraDetails();
 
