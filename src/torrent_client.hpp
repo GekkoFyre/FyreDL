@@ -34,52 +34,26 @@
  ********************************************************************************/
 
 /**
- * @file addurl.hpp
+ * @file torrent_client.hpp
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
- * @date 2016-10
- * @brief A Qt QDialog class that handles the adding of downloads to the application.
+ * @date 2016-12-13
+ * @brief Contains the routines for downloading (and directly managing therof) any torrents, asynchronously.
  */
 
-#ifndef ADDURL_HPP
-#define ADDURL_HPP
+#ifndef FYREDL_TORRENT_CLIENT_HPP
+#define FYREDL_TORRENT_CLIENT_HPP
 
-#include "cmnroutines.hpp"
-#include <QDialog>
-#include <QString>
+#include "default_var.hpp"
+#include <QObject>
 
-namespace Ui {
-class AddURL;
-}
-
-class AddURL : public QDialog
-{
+namespace GekkoFyre {
+class GkTorrentClient: public QObject {
     Q_OBJECT
 
 public:
-    explicit AddURL(QWidget *parent = 0);
-    ~AddURL();
-
-private slots:
-    void on_buttonBox_accepted();
-    void on_buttonBox_rejected();
-    void on_file_dest_toolButton_clicked();
-    void on_file_import_toolButton_clicked();
-    void on_url_dest_toolButton_clicked();
-
-signals:
-    void sendDetails(const std::string &fileName, const double &fileSize, const int &downloaded,
-                     const double &progress, const int &upSpeed, const int &downSpeed,
-                     const GekkoFyre::DownloadStatus &status, const std::string &url,
-                     const std::string &destination, const GekkoFyre::HashType &hash_type,
-                     const std::string &hash_val, const long long &resp_code, const bool &stat_ok,
-                     const std::string &stat_msg, const std::string &unique_id,
-                     const GekkoFyre::DownloadType &down_type);
-
-private:
-    Ui::AddURL *ui;
-    GekkoFyre::CmnRoutines *routines;
-
-    QString browseForDir();
+    GkTorrentClient();
+    ~GkTorrentClient();
 };
+}
 
-#endif // ADDURL_HPP
+#endif // FYREDL_TORRENT_CLIENT_HPP

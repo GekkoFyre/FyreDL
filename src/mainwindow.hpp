@@ -74,17 +74,27 @@ private:
     void insertNewRow(const std::string &fileName, const double &fileSize, const int &downloaded,
                       const double &progress, const int &upSpeed, const int &downSpeed,
                       const GekkoFyre::DownloadStatus &status, const std::string &url,
-                      const std::string &destination);
+                      const std::string &destination, const std::string &unique_id,
+                      const GekkoFyre::DownloadType &download_type);
     void removeSelRows();
     void resetDlStateStartup();
 
-    void initCharts(const QString &file_dest);
-    void displayCharts(const QString &file_dest);
+    void initCharts(const QString &unique_id, const GekkoFyre::DownloadType &download_type);
+    void displayCharts(const QString &unique_id);
     void delCharts(const std::string &file_dest);
     void updateChart();
 
     bool askDeleteFile(const QString &file_dest, const bool &noRestart = false);
     void startDownload(const QString &file_dest, const bool &resumeDl = true);
+
+    // Immediately below are actions that the user may take on a single downloadable item, such as by pausing,
+    // restarting, or halting it, for example. That is not a complete list.
+    void haltDownload();
+    void resumeDownload();
+    void pauseDownload();
+    void restartDownload();
+    void clearOldHistory();
+    void removeDlItem();
 
     void general_extraDetails();
     void transfer_extraDetails();
@@ -144,7 +154,8 @@ private slots:
                      const GekkoFyre::DownloadStatus &status, const std::string &url,
                      const std::string &destination, const GekkoFyre::HashType &hash_type,
                      const std::string &hash_val, const long long &resp_code, const bool &stat_ok,
-                     const std::string &stat_msg);
+                     const std::string &stat_msg, const std::string &unique_id,
+                     const GekkoFyre::DownloadType &down_type);
     void recvXferStats(const GekkoFyre::GkCurl::CurlProgressPtr &info);
     void manageDlStats();
     void recvDlFinished(const GekkoFyre::GkCurl::DlStatusMsg &status);

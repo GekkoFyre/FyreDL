@@ -94,7 +94,9 @@ set(SOURCE_FILES
     settings.hpp
     settings.cpp
     singleton_emit.hpp
-    singleton_proc.hpp)
+    singleton_proc.hpp
+    torrent_client.hpp
+    torrent_client.cpp)
 
 set(EXTERNAL_SOURCE_FILES
     ./../utils/fast-cpp-csv-parser/csv.h)
@@ -180,6 +182,14 @@ find_package(Threads REQUIRED)
 if (Threads_FOUND)
     set(LIBS ${LIBS} ${CMAKE_THREAD_LIBS_INIT})
 endif(Threads_FOUND)
+
+#
+# Find 'libtorrent'
+#
+find_package(LibtorrentRasterbar REQUIRED)
+if (LibtorrentRasterbar_FOUND)
+    set(LIBS ${LIBS} ${LibtorrentRasterbar_LIBRARIES})
+endif(LibtorrentRasterbar_FOUND)
 
 #
 # Find 'libcurl'

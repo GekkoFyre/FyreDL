@@ -43,6 +43,7 @@
 #ifndef DEFVAR_HPP
 #define DEFVAR_HPP
 
+#include <boost/optional.hpp>
 #include <locale>
 #include <string>
 #include <iostream>
@@ -70,20 +71,23 @@ extern "C" {
 #error "Platform not supported!"
 #endif
 
-#define FYREDL_PROG_VERS "0.0.1"          // The application version
-#define FYREDL_USER_AGENT "FyreDL/0.0.1"  // The user-agent displayed externally by FyreDL, along with the application version.
-#define CFG_HISTORY_FILE "fyredl.xml"     // The configuration/history file-name used by FyreDL. Location is set within the application's GUI.
-#define ENBL_GUI_CHARTS false             // Whether to enable charts/graphs within the GUI, to chart the progress of downloads.
-#define FYREDL_LIBCURL_VERBOSE 1L         // Set to '1L' if you want libcurl to tell you what it's up to!
-#define FYREDL_CONN_TIMEOUT 60L           // The duration, in seconds, until a timeout occurs when attempting to make a connection.
-#define FYREDL_CONN_LOW_SPEED_CUTOUT 512L // The average transfer speed in bytes per second to be considered below before connection cut-off.
-#define FYREDL_CONN_LOW_SPEED_TIME 10L    // The number of seconds that the transfer speed should be below 'FYREDL_CONN_LOW_SPEED_CUTOUT' before connection cut-off.
+#define FYREDL_PROG_VERS "0.0.1"                // The application version
+#define FYREDL_USER_AGENT "FyreDL/0.0.1"        // The user-agent displayed externally by FyreDL, along with the application version.
+#define CFG_HISTORY_FILE "fyredl_history.xml"   // The history file-name used by FyreDL. Location is also set within the application's GUI.
+#define CFG_SETTINGS_FILE "fyredl_settings.xml" // The configuration file-name used by FyreDL. Location is also set within the application's GUI.
+#define ENBL_GUI_CHARTS false                   // Whether to enable charts/graphs within the GUI, to chart the progress of downloads.
+#define FYREDL_LIBCURL_VERBOSE 1L               // Set to '1L' if you want libcurl to tell you what it's up to!
+#define FYREDL_CONN_TIMEOUT 60L                 // The duration, in seconds, until a timeout occurs when attempting to make a connection.
+#define FYREDL_CONN_LOW_SPEED_CUTOUT 512L       // The average transfer speed in bytes per second to be considered below before connection cut-off.
+#define FYREDL_CONN_LOW_SPEED_TIME 10L          // The number of seconds that the transfer speed should be below 'FYREDL_CONN_LOW_SPEED_CUTOUT' before connection cut-off.
+#define FYREDL_EST_WAIT_TIME_PRECISION 3        // The significant digit precision of the estimated wait time counter for each active transfer
+#define FYREDL_UNIQUE_ID_DIGIT_COUNT 32         // The 'unique identifier' serial number that is given to each download item. This determines how many digits are allocated to this identifier and thus, how much RAM is used for storage thereof.
 
 //
-// ###################################
-//   DO NOT MODIFY BELOW THIS LINE!
-// Unless you know what you are doing
-// ###################################
+// ######################################
+// #   DO NOT MODIFY BELOW THIS LINE!   #
+// # Unless you know what you are doing #
+// ######################################
 //
 
 // Download and File I/O
@@ -93,7 +97,12 @@ extern "C" {
 
 // XML configuration
 #define XML_PARENT_NODE "fyredl-db"
-#define XML_CHILD_NODE_FILE "file"
+
+#define XML_CHILD_NODE_VERS "fyredl-xml"
+#define XML_CHILD_ITEM_VERS "version"
+#define XML_ITEM_ATTR_VERS_NO "supported"                 // The supported XML file version for this particular FyreDL build
+
+#define XML_CHILD_NODE_FILE "http"
 #define XML_CHILD_ITEM_FILE "item"
 #define XML_ITEM_ATTR_FILE_CID "content-id"                // The unique, content integer ID of the download in the XML history file
 #define XML_ITEM_ATTR_FILE_FLOC "file-loc"                 // Location of the file on user's storage disk
@@ -104,21 +113,65 @@ extern "C" {
 #define XML_ITEM_ATTR_FILE_EFFEC_URL "effec-url"           // Given, proper URL returned from the (source) web-server
 #define XML_ITEM_ATTR_FILE_RESP_CODE "resp-code"           // Given return-code returned from the (source) web-server
 #define XML_ITEM_ATTR_FILE_CONT_LNGTH "content-length"     // The size of the download returned from the (source) web-server
+#define XML_ITEM_ATTR_FILE_UNIQUE_ID "unique-id"
 #define XML_ITEM_ATTR_FILE_HASH_TYPE "hash-type"           // The type of hash employed (i.e, SHA1, SHA3-256/512, MD5, etc.)
 #define XML_ITEM_ATTR_FILE_HASH_VAL_GIVEN "hash-val-given" // The hash-value that was given by the user
 #define XML_ITEM_ATTR_FILE_HASH_VAL_RTRND "hash-val-rtrnd" // The hash-value that was calculated after the download (presumably) succeeded
 #define XML_ITEM_ATTR_FILE_HASH_SUCC_TYPE "hash-succ-type" // Whether the calculated hash of the download matched the given hash or not
 
+#define XML_CHILD_NODE_TORRENT "torrent"
+#define XML_CHILD_ITEM_TORRENT "item"
+#define XML_CHILD_NODE_TORRENT_NODES "nodes"
+#define XML_CHILD_NODE_TORRENT_FILES "files"
+#define XML_CHILD_NODE_TORRENT_FILES_MAPFLEPCE "map-file-piece"
+#define XML_CHILD_NODE_TORRENT_TRACKERS "trackers"
+#define XML_CHILD_NODES_NAMES_TORRENT "name"
+#define XML_CHILD_NODES_NUMBR_TORRENT "number"
+#define XML_CHILD_FILES_PATH_TORRENT "path"
+#define XML_CHILD_FILES_HASH_TORRENT "hash"
+#define XML_CHILD_FILES_FLAGS_TORRENT "flags"
+#define XML_CHILD_FILES_MTIME_TORRENT "mtime"
+#define XML_CHILD_FILES_MAPFLEPCE_1_TORRENT "first"
+#define XML_CHILD_FILES_MAPFLEPCE_2_TORRENT "second"
+#define XML_CHILD_FILES_CONTLNGTH_TORRENT "content-length"
+#define XML_CHILD_FILES_FILEOFFST_TORRENT "file-offset"
+#define XML_CHILD_FILES_DOWNBOOL_TORRENT "downloaded"
+#define XML_CHILD_TRACKERS_URL_TORRENT "url"
+#define XML_CHILD_TRACKERS_AVAILABLE_TORRENT "enabled"
+#define XML_CHILD_TRACKERS_TIER_TORRENT "tier"
+#define XML_ITEM_ATTR_TORRENT_CID "cid"
+#define XML_ITEM_ATTR_TORRENT_FLOC "destination"
+#define XML_ITEM_ATTR_TORRENT_UNIQUE_ID "unique-id"
+#define XML_ITEM_ATTR_TORRENT_INSERT_DATE "insert-date"
+#define XML_ITEM_ATTR_TORRENT_COMPLT_DATE "complt-date"
+#define XML_ITEM_ATTR_TORRENT_CREATN_DATE "creatn-date"
+#define XML_ITEM_ATTR_TORRENT_DLSTATUS "dl-status"
+#define XML_ITEM_ATTR_TORRENT_TORRNT_COMMENT "torrnt-comment"
+#define XML_ITEM_ATTR_TORRENT_TORRNT_CREATOR "torrnt-creator"
+#define XML_ITEM_ATTR_TORRENT_MAGNET_URI "magnet-uri"
+#define XML_ITEM_ATTR_TORRENT_TORRNT_NAME "torrnt-name"
+#define XML_ITEM_ATTR_TORRENT_NUM_FILES "num-files"
+#define XML_ITEM_ATTR_TORRENT_TORRNT_PIECES "torrnt-pieces"
+#define XML_ITEM_ATTR_TORRENT_TORRNT_PIECE_LENGTH "torrnt-piece-length"
+
+#define XML_CHILD_NODE_SETTINGS "settings"
+#define XML_CHILD_ITEM_SETTINGS "user"
+#define XML_ITEM_ATTR_SETTINGS_WIN_Y "main-win-y"
+#define XML_ITEM_ATTR_SETTINGS_WIN_X "main-win-x"
+
 // These determine the columns used in QTableView
-#define MN_FILENAME_COL 0
-#define MN_FILESIZE_COL 1
-#define MN_DOWNLOADED_COL 2
-#define MN_PROGRESS_COL 3
-#define MN_UPSPEED_COL 4
-#define MN_DOWNSPEED_COL 5
-#define MN_STATUS_COL 6
-#define MN_DESTINATION_COL 7
-#define MN_URL_COL 8
+#define MN_COL_COUNT 10
+
+#define MN_FILENAME_COL 0       // The name of just the file or torrent being downloaded
+#define MN_FILESIZE_COL 1       // The content-length of the download, in kilobytes/megabytes/gigabytes/etc.
+#define MN_DOWNLOADED_COL 2     // How much has been downloaded, in kilobytes/megabytes/gigabytes/etc.
+#define MN_PROGRESS_COL 3       // The progress towards completion on the download, on a scale of 0-100 percent
+#define MN_UPSPEED_COL 4        // The upward transfer speed
+#define MN_DOWNSPEED_COL 5      // The downward transfer speed
+#define MN_STATUS_COL 6         // Whether the download is paused, stopped, actively transferring, etc.
+#define MN_DESTINATION_COL 7    // The destination of the download on local storage
+#define MN_URL_COL 8            // The URL column
+#define MN_HIDDEN_UNIQUE_ID 9   // Stores the 'unique identifier' serial number for each download. Kind of a hack/cheat :)
 
 // This determines the currently selected tab at the bottom of the main window
 #define TAB_INDEX_GENERAL 0
@@ -132,6 +185,19 @@ extern "C" {
 #define CSV_FIELD_URL "url"
 #define CSV_FIELD_DEST "destination"
 #define CSV_FIELD_HASH "hash"
+
+// [ Enum values ]
+// Download Types
+#define ENUM_GEKKOFYRE_DOWN_TYPE_HTTP 0
+#define ENUM_GEKKOFYRE_DOWN_TYPE_FTP 1
+#define ENUM_GEKKOFYRE_DOWN_TYPE_TORRENT 2
+#define ENUM_GEKKOFYRE_DOWN_TYPE_MAGNET_LINK 3
+
+// Hash verification
+#define ENUM_GEKKOFYRE_HASH_VERIF_ANALYZING 1
+#define ENUM_GEKKOFYRE_HASH_VERIF_NOT_APPLIC 0
+#define ENUM_GEKKOFYRE_HASH_VERIF_VERIFIED 2
+#define ENUM_GEKKOFYRE_HASH_VERIF_CORRUPT -1
 
 namespace GekkoFyre {
     // * If status is paused, and paused is unclicked, or start is clicked, then the download resumes.
@@ -153,8 +219,9 @@ namespace GekkoFyre {
 
     enum DownloadType {
         HTTP,
-        FTP,    // Separate handler needed for if there are authentication issues
-        Torrent
+        FTP,              // Separate handler needed for if there are authentication issues
+        Torrent,
+        TorrentMagnetLink
     };
 
     enum CurlGrabMethod {
@@ -185,6 +252,62 @@ namespace GekkoFyre {
             GekkoFyre::HashType hash_type;
             GekkoFyre::HashVerif hash_verif;
             QString checksum;
+        };
+    }
+
+    namespace GkTorrent {
+        struct TorrentFile {
+            std::string file_path;              // The internal path of the file within the torrent
+            std::string sha1_hash_hex;          // The SHA-1 hash of the file, if available, in hexadecimal
+            int flags;
+            int64_t content_length;             // The content length of this particular file
+            int64_t file_offset;                // The internal offset of the file within the torrent
+            uint32_t mtime;                     // Modification time? Not sure...
+            std::pair<int, int> map_file_piece; // <first, last> How the pieces are mapped within the torrent for this particular file
+            bool downloaded;                    // Whether this particular file is downloaded or not
+        };
+
+        struct TorrentTrackers {
+            int tier;                               // The tier number of the tracker in question
+            std::string url;                        // The <URL:port> of the tracker in question
+            bool enabled;                           // Whether this tracker is active for transfers or not
+        };
+
+        struct TorrentInfo {
+            std::string down_dest;                  // The location of where the download is being streamed towards
+            unsigned int cId;                       // Automatically incremented Content ID for each download/file
+            long long insert_timestamp;             // The date/time of the download/file having been inserted into the history file
+            long long complt_timestamp;             // The date/time of the download/file having completed transfer
+            long creatn_timestamp; // The date/time that the torrent file was authored
+            GekkoFyre::DownloadStatus dlStatus;     // Status of the downloading file(s) in question
+            std::string comment;                    // Any comments left by the author of the torrent file in question
+            std::string creator;                    // The author of the torrent file in question
+            std::string magnet_uri;                 // The 'BitTorrent Magnet Link' URI
+            std::string torrent_name;               // Name of the torrent
+            int num_files;                          // How many files are contained within this torrent
+            int num_pieces;                         // How many pieces are contained within this torrent
+            int piece_length;                       // The length of each piece
+            std::string unique_id;                  // A unique identifier for this torrent
+            std::vector<std::pair<std::string, int>> nodes;
+            std::vector<TorrentTrackers> trackers;
+            std::vector<TorrentFile> files_vec;
+        };
+
+        struct ModifyTorrentInfo {
+            std::string down_dest;                  // The location of where the download is being streamed towards
+            std::string magnet_uri;                 // The 'BitTorrent Magnet Link' URI
+            long long complt_timestamp;             // The date/time of the download/file having completed transfer
+            std::string unique_id;                  // A unique identifier for this torrent
+            GekkoFyre::DownloadStatus dlStatus;     // Status of the downloading file(s) in question
+            std::string comment;                    // Any comments left by the author of the torrent file in question
+            std::vector<std::pair<int, std::string>> trackers;
+            std::vector<TorrentFile> files_vec;
+        };
+    }
+
+    namespace Global {
+        struct DownloadInfo {
+            GekkoFyre::DownloadType dl_type;
         };
     }
 
@@ -266,6 +389,7 @@ namespace GekkoFyre {
             long long complt_timestamp;          // The date/time of the download/file having completed transfer
             GekkoFyre::DownloadStatus dlStatus;  // Status of the downloading file(s) in question
             CurlInfoExt ext_info;                // Extended info about the file(s) themselves
+            std::string unique_id;               // A unique identifier for this download
             GekkoFyre::HashType hash_type;       // The actual type of hash used (e.g., CRC32/MD5/SHA1/SHA256/SHA512)
             std::string hash_val_given;          // The value of the hash, if a type is specified in 'CurlDlInfo::hash_type', given by the user
             std::string hash_val_rtrnd;          // Same as above, but calculated from the local file when, presumably, successfully downloaded
@@ -289,9 +413,17 @@ namespace GekkoFyre {
         };
 
         struct GraphInit {
-            DownSpeedGraph down_speed;
-            QString file_dest;
-            bool currShown;
+            GekkoFyre::Global::DownloadInfo down_info; // Hijacking 'GraphInit' for the purpose of using this
+            DownSpeedGraph down_speed;                 // The 'download speed' graph
+            QString unique_id;                         // File destination of the download on user's local storage
+            bool currShown;                            // Whether the graph for the given 'file_dest' is actually displayed or not
+        };
+    }
+
+    namespace GkSettings {
+        struct FyreDL {
+            int main_win_x;
+            int main_win_y;
         };
     }
 }
