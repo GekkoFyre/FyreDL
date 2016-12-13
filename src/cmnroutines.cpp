@@ -525,6 +525,7 @@ GekkoFyre::GkTorrent::TorrentInfo GekkoFyre::CmnRoutines::torrentFileInfo(const 
     gk_torrent_struct.cId = 0;
     gk_torrent_struct.comment = "";
     gk_torrent_struct.complt_timestamp = 0;
+    gk_torrent_struct.creatn_timestamp = 0;
     gk_torrent_struct.creator = "";
     gk_torrent_struct.dlStatus = GekkoFyre::DownloadStatus::Failed;
     gk_torrent_struct.down_dest = "";
@@ -599,7 +600,6 @@ GekkoFyre::GkTorrent::TorrentInfo GekkoFyre::CmnRoutines::torrentFileInfo(const 
     gk_torrent_struct.magnet_uri = make_magnet_uri(t);
     gk_torrent_struct.num_files = t.num_files();
     // gk_torrent_struct.creatn_timestamp = t.creation_date().get();
-    gk_torrent_struct.creatn_timestamp = 0;
     gk_torrent_struct.torrent_name = t.name();
     gk_torrent_struct.unique_id = createId(FYREDL_UNIQUE_ID_DIGIT_COUNT);
 
