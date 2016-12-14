@@ -46,6 +46,7 @@
 #include "singleton_proc.hpp"
 #include "curl_easy.hpp"
 #include "about.hpp"
+#include "contents_view.hpp"
 #include <boost/filesystem.hpp>
 #include <boost/exception/all.hpp>
 #include <boost/system/error_code.hpp>

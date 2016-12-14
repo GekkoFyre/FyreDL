@@ -48,6 +48,7 @@
 #include "cmnroutines.hpp"
 #include "curl_multi.hpp"
 #include "addurl.hpp"
+#include "torrent_client.hpp"
 #include <vector>
 #include <string>
 #include <QMainWindow>

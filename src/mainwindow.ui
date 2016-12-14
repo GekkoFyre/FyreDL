@@ -592,9 +592,24 @@
              </attribute>
              <layout class="QVBoxLayout" name="verticalLayout_4">
               <item>
-               <widget class="QTreeView" name="treeView">
+               <widget class="QTreeView" name="contentsView">
                 <property name="verticalScrollBarPolicy">
                  <enum>Qt::ScrollBarAlwaysOn</enum>
+                </property>
+                <property name="editTriggers">
+                 <set>QAbstractItemView::NoEditTriggers</set>
+                </property>
+                <property name="showDropIndicator" stdset="0">
+                 <bool>false</bool>
+                </property>
+                <property name="alternatingRowColors">
+                 <bool>true</bool>
+                </property>
+                <property name="uniformRowHeights">
+                 <bool>true</bool>
+                </property>
+                <property name="animated">
+                 <bool>true</bool>
                 </property>
                </widget>
               </item>
@@ -602,7 +617,7 @@
             </widget>
             <widget class="QWidget" name="tabGraph">
              <attribute name="title">
-              <string>Graph</string>
+              <string>Charts</string>
              </attribute>
              <layout class="QVBoxLayout" name="verticalLayout_10">
               <item>
