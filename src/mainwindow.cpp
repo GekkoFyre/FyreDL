@@ -46,7 +46,6 @@
 #include "singleton_proc.hpp"
 #include "curl_easy.hpp"
 #include "about.hpp"
-#include "contents_view.hpp"
 #include <boost/filesystem.hpp>
 #include <boost/exception/all.hpp>
 #include <boost/system/error_code.hpp>
@@ -123,13 +122,17 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
         QMessageBox::warning(this, tr("Error!"), QString("%1").arg(e.what()), QMessageBox::Ok);
     }
 
-    QShortcut *upKeyOverride = new QShortcut(QKeySequence(Qt::Key_Up), ui->downloadView);
-    QShortcut *downKeyOverride = new QShortcut(QKeySequence(Qt::Key_Down), ui->downloadView);
-    QObject::connect(upKeyOverride, SIGNAL(activated()), this, SLOT(keyUpDlModelSlot()));
-    QObject::connect(downKeyOverride, SIGNAL(activated()), this, SLOT(keyDownDlModelSlot()));
+    // QShortcut *upKeyOverride = new QShortcut(QKeySequence(Qt::Key_Up), ui->downloadView);
+    // QShortcut *downKeyOverride = new QShortcut(QKeySequence(Qt::Key_Down), ui->downloadView);
+    // QObject::connect(upKeyOverride, SIGNAL(activated()), this, SLOT(keyUpDlModelSlot()));
+    // QObject::connect(downKeyOverride, SIGNAL(activated()), this, SLOT(keyDownDlModelSlot()));
 
     curr_shown_graphs = "";
     resetDlStateStartup();
+
+    gk_treeModel = new GekkoFyre::GkTreeModel("1138496019951289570345947609577");
+    ui->contentsView->setModel(gk_treeModel);
+    ui->contentsView->setWindowTitle(tr("Contents View"));
 }
 
 MainWindow::~MainWindow()

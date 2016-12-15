@@ -34,9 +34,11 @@
  ********************************************************************************/
 
 /**
- * @file contents_view.hpp
+ * @file contents_view.cpp
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
  * @date 2016-12-13
+ * @note <http://doc.qt.io/qt-5/qtwidgets-itemviews-simpledommodel-example.html>
+ *       <http://doc.qt.io/qt-5/qtwidgets-itemviews-simpletreemodel-example.html>
  * @brief The model definition for the object, 'contentsView', within the 'mainwindow.ui' designer file.
  */
 
@@ -44,6 +46,7 @@
 #define FYREDL_CONTENTS_VIEW_HPP
 
 #include "default_var.hpp"
+#include <sstream>
 #include <QObject>
 #include <QList>
 #include <QVariant>
@@ -78,7 +81,7 @@ class GkTreeModel: public QAbstractItemModel {
     Q_OBJECT
 
 public:
-    explicit GkTreeModel(const QString &data, QObject *parent = 0);
+    explicit GkTreeModel(const QString &unique_id, QObject *parent = 0);
     ~GkTreeModel();
 
     QVariant data(const QModelIndex &index, int role) const Q_DECL_OVERRIDE;
@@ -92,8 +95,7 @@ public:
     int columnCount(const QModelIndex &parent = QModelIndex()) const Q_DECL_OVERRIDE;
 
 private:
-    void setupModelData(const QStringList &lines, GkTreeItem *parent);
-
+    void setupModelData(const QString &unique_id, GkTreeItem *parent);
     GkTreeItem *rootItem;
 };
 }

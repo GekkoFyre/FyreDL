@@ -48,6 +48,7 @@
 #include "cmnroutines.hpp"
 #include "curl_multi.hpp"
 #include "addurl.hpp"
+#include "contents_view.hpp"
 #include "torrent_client.hpp"
 #include <vector>
 #include <string>
@@ -101,6 +102,7 @@ private:
     void transfer_extraDetails();
 
     downloadModel *dlModel;
+    GekkoFyre::GkTreeModel *gk_treeModel;
     GekkoFyre::CmnRoutines *routines;
     GekkoFyre::CurlMulti *curl_multi;
     std::vector<GekkoFyre::GkCurl::CurlProgressPtr> dl_stat;

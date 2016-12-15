@@ -37,11 +37,19 @@
  * @file contents_view.cpp
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
  * @date 2016-12-13
- * @note <http://doc.qt.io/qt-5/qtwidgets-itemviews-simpletreemodel-example.html>
+ * @note <http://doc.qt.io/qt-5/qtwidgets-itemviews-simpledommodel-example.html>
+ *       <http://doc.qt.io/qt-5/qtwidgets-itemviews-simpletreemodel-example.html>
  * @brief The model definition for the object, 'contentsView', within the 'mainwindow.ui' designer file.
  */
 
 #include "contents_view.hpp"
+#include "cmnroutines.hpp"
+#include <boost/filesystem.hpp>
+#include <boost/exception/all.hpp>
+#include <QHash>
+
+namespace sys = boost::system;
+namespace fs = boost::filesystem;
 
 /**
  * @brief GekkoFyre::GkTreeItem::GkTreeItem
@@ -137,12 +145,12 @@ GekkoFyre::GkTreeItem *GekkoFyre::GkTreeItem::parentItem()
  * @param data
  * @param parent
  */
-GekkoFyre::GkTreeModel::GkTreeModel(const QString &data, QObject *parent): QAbstractItemModel(parent)
+GekkoFyre::GkTreeModel::GkTreeModel(const QString &unique_id, QObject *parent): QAbstractItemModel(parent)
 {
     QList<QVariant> rootData;
-    rootData << tr("Title") << tr("Hash");
+    rootData << tr("Title");
     rootItem = new GkTreeItem(rootData);
-    setupModelData(data.split(QString("\n")), rootItem);
+    setupModelData(unique_id, rootItem);
 }
 
 /**
@@ -294,8 +302,189 @@ int GekkoFyre::GkTreeModel::columnCount(const QModelIndex &parent) const
 /**
  * @brief GekkoFyre::GkTreeModel::setupModelData populates the model's internal data structure.
  * @note <http://doc.qt.io/qt-5/qtwidgets-itemviews-simpletreemodel-treemodel-cpp.html>
- * @param lines
- * @param parent
+ *       <http://www.boost.org/doc/libs/1_62_0/libs/filesystem/doc/reference.html#class-path>
+ * @param lines provides the data to be read and dissected.
+ * @param parent is the parent item to all children in the QTreeView.
  */
-void GekkoFyre::GkTreeModel::setupModelData(const QStringList &lines, GekkoFyre::GkTreeItem *parent)
-{}
+void GekkoFyre::GkTreeModel::setupModelData(const QString &unique_id, GekkoFyre::GkTreeItem *parent)
+{
+    /**
+ * 1. Load XML history file into memory.
+ * 2. Separate out the individual elements of 'GekkoFyre::GkTorrent::TorrentFile'.
+ * 3. Break down each file-path by individual directory and then finally, file-name.
+ * 4. Calculate the 'column number' for each individual directory and ultimately, file.
+ * 5. Add all this data to a 'std::ostringstream' which is then processed by the text interpreter below
+ * the routines explained above.
+ */
+
+    /**
+     * #######################
+     * # Directory processor #
+     * #######################
+     */
+
+     /*
+    std::vector<GekkoFyre::GkTorrent::TorrentInfo> gk_ti = GekkoFyre::CmnRoutines::readTorrentInfo(false);
+    std::ostringstream oss_data;
+    for (size_t i = 0; i < gk_ti.size(); ++i) {
+        if (gk_ti.at(i).unique_id == unique_id.toStdString()) {
+            int column = 0;
+            QList<GekkoFyre::GkTorrent::ContentsView> columnData; // <col, data>
+            std::vector<GekkoFyre::GkTorrent::TorrentFile> gk_tf_vec = gk_ti.at(i).files_vec;
+
+            for (size_t j = 0; j < gk_tf_vec.size(); ++j) {
+                GekkoFyre::GkTorrent::TorrentFile gk_tf_element = gk_tf_vec.at(j);
+
+                fs::path boost_path(gk_tf_element.file_path);
+                for (auto &indice: boost_path) {
+                    GekkoFyre::GkTorrent::ContentsView cv;
+                    ++column;
+                    cv.column = column;
+                    cv.name = QString::fromStdString(indice.string());
+                    cv.root = QString::fromStdString(boost_path.parent_path().string());
+                    columnData.push_back(cv);
+                }
+
+                column = 0;
+            }
+            */
+
+            /**
+             * 1. Check if the root-directory for a path has already been added and if not, add it.
+             *      1a. You can detect a root-directory by its column number being '1'.
+             * 2. Check if the first sub-directory has already been added.
+             *      2a. If not, add the directory with appropriate tabbing and a newline.
+             *      2b. If end of the path has been reached and there's no filename, check to see if there are
+             *      any files in this directory.
+             *      2c. Add the files as children, whilst checking to see if they have already been added.
+             * 3. Check to see if there are any other root-directories left and if so, go back to (1).
+             *      3a. When there are no more root-directories remaining, break out of the loops.
+             */
+
+            /*
+            int repetition = 0;
+            QList<QString> root_alreadyProc;
+            QList<QString> child_alreadyProc;
+            QHash<QString, QString> child_toBeAdded; // <key, value>
+            QString curr_root;
+            gk_repeat:;
+            for (int j = 0; j < columnData.size(); ++j) {
+                QString root = columnData.at(j).root.toString();
+                QString child = columnData.at(j).name.toString();
+                if (columnData.at(j).column == (1 + repetition)) {
+                    if (!root_alreadyProc.contains(root)) {
+                        oss_data << root.toStdString() << std::endl;
+
+                        root_alreadyProc.push_back(root);
+                        child_alreadyProc.push_back(root);
+                        curr_root = root;
+                        break;
+                    }
+                }
+            }
+
+            if (!curr_root.isEmpty()) {
+                for (int j = 0; j < columnData.size(); ++j) {
+                    QString child = columnData.at(j).name.toString();
+                    if (curr_root == columnData.at(j).root) {
+                        QString root = columnData.at(j).root.toString();
+                        if (!child_alreadyProc.contains(child)) {
+                            child_toBeAdded.insertMulti(root, child);
+                            child_alreadyProc.push_back(child);
+                        }
+                    }
+                }
+            }
+
+            if (!curr_root.isEmpty()) {
+                QList<QString> children = child_toBeAdded.values(curr_root);
+                for (int j = 0; j < children.size(); ++j) {
+                    for (int k = 0; k < columnData.size(); ++k) {
+                        if (columnData.at(k).root == curr_root && children.at(j) == columnData.at(k).name) {
+                            for (int o = 1; o <= (columnData.at(k).column - 1); ++o) {
+                                oss_data << "\t";
+                            }
+                        }
+                    }
+
+                    oss_data << children.at(j).toStdString() << std::endl;
+                }
+            }
+
+            int roots_left = 0;
+            for (int j = 0; j < columnData.size(); ++j) {
+                QString root = columnData.at(j).root.toString();
+                if (columnData.at(j).column > (repetition + 1)) {
+                    if (!root_alreadyProc.contains(root)) {
+                        ++roots_left;
+                    }
+                }
+            }
+
+            if (roots_left > 0) {
+                ++repetition;
+                goto gk_repeat;
+            }
+
+            break;
+        }
+    }
+    */
+
+    /**
+     * ####################
+     * # Text interpreter #
+     * ####################
+     */
+
+    /*
+    QList<GkTreeItem *> parents;
+    QList<int> indentations;
+    parents << parent;
+    indentations << 0;
+
+    QString data = QString::fromStdString(oss_data.str());
+    QStringList lines = data.split(QString("\n"));
+    int number = 0;
+
+    while (number < lines.count()) {
+        int position = 0;
+        while (position < lines[number].length()) {
+            if (lines[number].at(position) != ' ') {
+                break;
+            }
+
+            position++;
+        }
+
+        QString lineData = lines[number].mid(position).trimmed();
+
+        if (!lineData.isEmpty()) {
+            // Read the column data from the rest of the line.
+            QStringList columnStrings = lineData.split("\t", QString::SkipEmptyParts);
+            QList<QVariant> columnData;
+            for (int column = 0; column < columnStrings.count(); ++column) {
+                columnData << columnStrings[column];
+            }
+
+            if (position > indentations.last()) {
+                // The last child of the current parent is now the new parent unless the current parent has no children.
+                if (parents.last()->childCount() > 0) {
+                    parents << parents.last()->child(parents.last()->childCount() - 1);
+                    indentations << position;
+                }
+            } else {
+                while (position < indentations.last() && parents.count() > 0) {
+                    parents.pop_back();
+                    indentations.pop_back();
+                }
+            }
+
+            // Append a new item to the current parent's list of children.
+            parents.last()->appendChild(new GkTreeItem(columnData, parents.last()));
+        }
+
+        ++number;
+    }
+     */
+}
