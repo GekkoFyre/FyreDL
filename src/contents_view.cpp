@@ -323,7 +323,6 @@ void GekkoFyre::GkTreeModel::setupModelData(const QString &unique_id, GekkoFyre:
      * #######################
      */
 
-     /*
     std::vector<GekkoFyre::GkTorrent::TorrentInfo> gk_ti = GekkoFyre::CmnRoutines::readTorrentInfo(false);
     std::ostringstream oss_data;
     for (size_t i = 0; i < gk_ti.size(); ++i) {
@@ -347,7 +346,6 @@ void GekkoFyre::GkTreeModel::setupModelData(const QString &unique_id, GekkoFyre:
 
                 column = 0;
             }
-            */
 
             /**
              * 1. Check if the root-directory for a path has already been added and if not, add it.
@@ -361,7 +359,6 @@ void GekkoFyre::GkTreeModel::setupModelData(const QString &unique_id, GekkoFyre:
              *      3a. When there are no more root-directories remaining, break out of the loops.
              */
 
-            /*
             int repetition = 0;
             QList<QString> root_alreadyProc;
             QList<QString> child_alreadyProc;
@@ -371,9 +368,14 @@ void GekkoFyre::GkTreeModel::setupModelData(const QString &unique_id, GekkoFyre:
             for (int j = 0; j < columnData.size(); ++j) {
                 QString root = columnData.at(j).root.toString();
                 QString child = columnData.at(j).name.toString();
+                QString leaf = QDir(root).dirName();
                 if (columnData.at(j).column == (1 + repetition)) {
                     if (!root_alreadyProc.contains(root)) {
-                        oss_data << root.toStdString() << std::endl;
+                        for (int k = 0; k < ((columnData.at(j).column - 1) + repetition); ++k) {
+                            oss_data << "    ";
+                        }
+
+                        oss_data << leaf.toStdString() << std::endl;
 
                         root_alreadyProc.push_back(root);
                         child_alreadyProc.push_back(root);
@@ -399,15 +401,19 @@ void GekkoFyre::GkTreeModel::setupModelData(const QString &unique_id, GekkoFyre:
             if (!curr_root.isEmpty()) {
                 QList<QString> children = child_toBeAdded.values(curr_root);
                 for (int j = 0; j < children.size(); ++j) {
+                    fs::path boost_path(children.at(j).toStdString());
                     for (int k = 0; k < columnData.size(); ++k) {
-                        if (columnData.at(k).root == curr_root && children.at(j) == columnData.at(k).name) {
-                            for (int o = 1; o <= (columnData.at(k).column - 1); ++o) {
-                                oss_data << "\t";
+                        if (columnData.at(k).root == curr_root && children.at(j) == columnData.at(k).name &&
+                            boost_path.has_extension()) {
+                            for (int o = 1; o <= ((columnData.at(k).column - 1) + repetition); ++o) {
+                                oss_data << "    ";
                             }
                         }
                     }
 
-                    oss_data << children.at(j).toStdString() << std::endl;
+                    if (boost_path.has_extension()) {
+                        oss_data << children.at(j).toStdString() << std::endl;
+                    }
                 }
             }
 
@@ -429,7 +435,6 @@ void GekkoFyre::GkTreeModel::setupModelData(const QString &unique_id, GekkoFyre:
             break;
         }
     }
-    */
 
     /**
      * ####################
@@ -437,7 +442,6 @@ void GekkoFyre::GkTreeModel::setupModelData(const QString &unique_id, GekkoFyre:
      * ####################
      */
 
-    /*
     QList<GkTreeItem *> parents;
     QList<int> indentations;
     parents << parent;
@@ -486,5 +490,4 @@ void GekkoFyre::GkTreeModel::setupModelData(const QString &unique_id, GekkoFyre:
 
         ++number;
     }
-     */
 }
