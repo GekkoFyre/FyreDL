@@ -122,10 +122,10 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
         QMessageBox::warning(this, tr("Error!"), QString("%1").arg(e.what()), QMessageBox::Ok);
     }
 
-    QShortcut *upKeyOverride = new QShortcut(QKeySequence(Qt::Key_Up), ui->downloadView);
-    QShortcut *downKeyOverride = new QShortcut(QKeySequence(Qt::Key_Down), ui->downloadView);
-    QObject::connect(upKeyOverride, SIGNAL(activated()), this, SLOT(keyUpDlModelSlot()));
-    QObject::connect(downKeyOverride, SIGNAL(activated()), this, SLOT(keyDownDlModelSlot()));
+    // QShortcut *upKeyOverride = new QShortcut(QKeySequence(Qt::Key_Up), ui->downloadView);
+    // QShortcut *downKeyOverride = new QShortcut(QKeySequence(Qt::Key_Down), ui->downloadView);
+    // QObject::connect(upKeyOverride, SIGNAL(activated()), this, SLOT(keyUpDlModelSlot()));
+    // QObject::connect(downKeyOverride, SIGNAL(activated()), this, SLOT(keyDownDlModelSlot()));
 
     curr_shown_graphs = "";
     resetDlStateStartup();
@@ -538,6 +538,30 @@ void MainWindow::updateChart()
     }
 
     return;
+}
+
+void MainWindow::contentsView_update()
+{
+    QModelIndexList indexes = ui->downloadView->selectionModel()->selectedRows();
+    if (indexes.size() > 0) {
+        if (indexes.at(0).isValid()) {
+            const QString unique_id = ui->downloadView->model()->data(
+                    ui->downloadView->model()->index(indexes.at(0).row(), MN_HIDDEN_UNIQUE_ID)).toString();
+            for (size_t k = 0; k < graph_init.size(); ++k) {
+                if (graph_init.at(k).unique_id == unique_id) {
+                    if (graph_init.at(k).down_info.dl_type == GekkoFyre::DownloadType::Torrent ||
+                            graph_init.at(k).down_info.dl_type == GekkoFyre::DownloadType::TorrentMagnetLink) {
+                        gk_treeModel = std::make_unique<GekkoFyre::GkTreeModel>(unique_id);
+                        ui->contentsView->setModel(gk_treeModel.get());
+                        ui->contentsView->setWindowTitle(tr("Contents View"));
+                    } else {
+                        ui->contentsView->setModel(nullptr);
+                        ui->contentsView->setWindowTitle(tr("Contents View"));
+                    }
+                }
+            }
+        }
+    }
 }
 
 /**
@@ -1060,7 +1084,7 @@ void MainWindow::general_extraDetails()
                 for (size_t i = 0; i < dl_stat.size(); ++i) {
                     if (dl_stat.at(i).file_dest == dest_string.toStdString()) {
                         if (dl_stat.at(i).stat.size() > 0) {
-                            curr_dl_amount = dl_stat.at(i).stat.back().dltotal;
+                            curr_dl_amount = (double)dl_stat.at(i).stat.back().dltotal;
                             curr_dl_speed = dl_stat.at(i).stat.back().dlnow;
                             break;
                         }
@@ -1358,8 +1382,10 @@ void MainWindow::on_downloadView_customContextMenuRequested(const QPoint &pos)
  */
 void MainWindow::on_downloadView_activated(const QModelIndex &index)
 {
+    Q_UNUSED(index);
     general_extraDetails();
     transfer_extraDetails();
+    contentsView_update();
 }
 
 /**
@@ -1370,8 +1396,10 @@ void MainWindow::on_downloadView_activated(const QModelIndex &index)
  */
 void MainWindow::on_downloadView_clicked(const QModelIndex &index)
 {
+    Q_UNUSED(index);
     general_extraDetails();
     transfer_extraDetails();
+    contentsView_update();
 }
 
 /**
@@ -1391,6 +1419,7 @@ void MainWindow::keyUpDlModelSlot()
             updateChart();
             general_extraDetails();
             transfer_extraDetails();
+            contentsView_update();
         }
     }
 }
@@ -1412,6 +1441,7 @@ void MainWindow::keyDownDlModelSlot()
             updateChart();
             general_extraDetails();
             transfer_extraDetails();
+            contentsView_update();
         }
     }
 }
@@ -1548,8 +1578,8 @@ void MainWindow::manageDlStats()
                     long cur_file_size = GekkoFyre::CmnRoutines::getFileSize(dl_stat.at(j).file_dest);
 
                     dlModel->updateCol(dlModel->index(i, MN_DOWNSPEED_COL), QString::fromStdString(oss_dlnow.str()), MN_DOWNSPEED_COL);
-                    dlModel->updateCol(dlModel->index(i, MN_DOWNLOADED_COL), routines->numberConverter(cur_file_size), MN_DOWNLOADED_COL);
-                    dlModel->updateCol(dlModel->index(i, MN_PROGRESS_COL), routines->percentDownloaded(dl_stat.at(j).content_length, cur_file_size), MN_PROGRESS_COL);
+                    dlModel->updateCol(dlModel->index(i, MN_DOWNLOADED_COL), routines->numberConverter((double)cur_file_size), MN_DOWNLOADED_COL);
+                    dlModel->updateCol(dlModel->index(i, MN_PROGRESS_COL), routines->percentDownloaded(dl_stat.at(j).content_length, (double)cur_file_size), MN_PROGRESS_COL);
 
                     // Update the 'download speed' spline-graph, via the file location
                     // Append our statistics to the 'graph_init' struct and thus, the graph in question

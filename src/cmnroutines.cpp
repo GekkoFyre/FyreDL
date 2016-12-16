@@ -525,6 +525,7 @@ GekkoFyre::GkTorrent::TorrentInfo GekkoFyre::CmnRoutines::torrentFileInfo(const 
     gk_torrent_struct.cId = 0;
     gk_torrent_struct.comment = "";
     gk_torrent_struct.complt_timestamp = 0;
+    gk_torrent_struct.creatn_timestamp = 0;
     gk_torrent_struct.creator = "";
     gk_torrent_struct.dlStatus = GekkoFyre::DownloadStatus::Failed;
     gk_torrent_struct.down_dest = "";
@@ -599,7 +600,6 @@ GekkoFyre::GkTorrent::TorrentInfo GekkoFyre::CmnRoutines::torrentFileInfo(const 
     gk_torrent_struct.magnet_uri = make_magnet_uri(t);
     gk_torrent_struct.num_files = t.num_files();
     // gk_torrent_struct.creatn_timestamp = t.creation_date().get();
-    gk_torrent_struct.creatn_timestamp = 0;
     gk_torrent_struct.torrent_name = t.name();
     gk_torrent_struct.unique_id = createId(FYREDL_UNIQUE_ID_DIGIT_COUNT);
 
@@ -1152,10 +1152,8 @@ std::vector<GekkoFyre::GkTorrent::TorrentInfo> GekkoFyre::CmnRoutines::readTorre
         std::vector<GekkoFyre::GkTorrent::TorrentInfo> gk_torrent_info_list;
 
         pugi::xml_document doc;
-        mutex.lock();
         pugi::xml_parse_result result = doc.load_file(xmlCfgFile_loc.string().c_str(),
                                                       pugi::parse_default | pugi::parse_declaration);
-        mutex.unlock();
         if (!result) {
             throw std::invalid_argument(tr("XML parse error: %1, character pos= %2")
                                                 .arg(result.description(),
@@ -1186,6 +1184,11 @@ std::vector<GekkoFyre::GkTorrent::TorrentInfo> GekkoFyre::CmnRoutines::readTorre
                     std::string tmp_str = "";
                     int tmp_int = 0;
 
+                    /**
+                     * #########
+                     * # Nodes #
+                     * #########
+                     */
                     // http://pugixml.org/docs/manual.html#access.nodedata
                     std::vector<std::pair<std::string, int>> nodes;
                     pugi::xml_node nodes_node = item.child(XML_CHILD_NODE_TORRENT_NODES);
@@ -1198,12 +1201,17 @@ std::vector<GekkoFyre::GkTorrent::TorrentInfo> GekkoFyre::CmnRoutines::readTorre
                         nodes.push_back(std::make_pair(tmp_str, tmp_int));
                     }
 
+                    /**
+                     * #########
+                     * # Files #
+                     * #########
+                     */
                     pugi::xml_node files_node = item.child(XML_CHILD_NODE_TORRENT_FILES);
                     for (pugi::xml_node file_node = files_node.child(XML_CHILD_FILES_PATH_TORRENT); file_node;
                          file_node = file_node.next_sibling(XML_CHILD_FILES_PATH_TORRENT)) {
 
                         GekkoFyre::GkTorrent::TorrentFile tf;
-                        tf.file_path = file_node.child_value(XML_CHILD_FILES_PATH_TORRENT);
+                        tf.file_path = file_node.child_value();
                         tf.sha1_hash_hex = file_node.child_value(XML_CHILD_FILES_HASH_TORRENT);
                         tf.mtime = strtoul(file_node.child_value(XML_CHILD_FILES_MTIME_TORRENT), nullptr, 10);
                         tf.file_offset = atol(file_node.child_value(XML_CHILD_FILES_FILEOFFST_TORRENT));
@@ -1221,6 +1229,11 @@ std::vector<GekkoFyre::GkTorrent::TorrentInfo> GekkoFyre::CmnRoutines::readTorre
                         files_vec.push_back(tf);
                     }
 
+                    /**
+                     * ############
+                     * # Trackers #
+                     * ############
+                     */
                     std::vector<GekkoFyre::GkTorrent::TorrentTrackers> trackers;
                     pugi::xml_node trackers_node = item.child(XML_CHILD_NODE_TORRENT_TRACKERS);
                     for (pugi::xml_node tracker_node = trackers_node.child(XML_CHILD_TRACKERS_TIER_TORRENT); tracker_node;

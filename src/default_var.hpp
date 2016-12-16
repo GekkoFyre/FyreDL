@@ -53,6 +53,7 @@
 #include <QString>
 #include <QtCharts>
 #include <QLineSeries>
+#include <QVariant>
 
 extern "C" {
 #include <curl/curl.h>
@@ -256,6 +257,12 @@ namespace GekkoFyre {
     }
 
     namespace GkTorrent {
+        struct ContentsView {
+            QVariant root;
+            QVariant name;
+            int column;
+        };
+
         struct TorrentFile {
             std::string file_path;              // The internal path of the file within the torrent
             std::string sha1_hash_hex;          // The SHA-1 hash of the file, if available, in hexadecimal

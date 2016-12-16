@@ -92,14 +92,14 @@ public:
     GekkoFyre::HashType convHashType_IntToEnum(const int &t);
     GekkoFyre::HashVerif convHashVerif_IntToEnum(const int &v);
     QCryptographicHash::Algorithm convHashType_toAlgo(const GekkoFyre::HashType &hash_type);
-    GekkoFyre::DownloadStatus convDlStat_IntToEnum(const int &s);
+    static GekkoFyre::DownloadStatus convDlStat_IntToEnum(const int &s);
     QString convDlStat_toString(const GekkoFyre::DownloadStatus &status);
     GekkoFyre::DownloadStatus convDlStat_StringToEnum(const QString &status);
     GekkoFyre::HashType convHashType_StringToEnum(const QString &hashType);
     QString convHashType_toString(const GekkoFyre::HashType &hash_type);
     GekkoFyre::DownloadType convDownType_StringToEnum(const QString &down_type);
 
-    std::string findCfgFile(const std::string &cfgFileName);
+    static std::string findCfgFile(const std::string &cfgFileName);
     static long getFileSize(const std::string &file_name);
     unsigned long int freeDiskSpace(const QString &path = QDir::rootPath());
     GekkoFyre::GkFile::FileHash cryptoFileHash(const QString &file_dest, const GekkoFyre::HashType &hash_type,
@@ -122,8 +122,8 @@ public:
                        const std::string &xmlCfgFile = CFG_HISTORY_FILE);
 
     bool writeTorrentItem(GekkoFyre::GkTorrent::TorrentInfo &gk_ti, const std::string &xmlCfgFile = CFG_HISTORY_FILE);
-    std::vector<GekkoFyre::GkTorrent::TorrentInfo> readTorrentInfo(const bool &minimal_readout = false,
-                                                                   const std::string &xmlCfgFile = CFG_HISTORY_FILE);
+    static std::vector<GekkoFyre::GkTorrent::TorrentInfo> readTorrentInfo(const bool &minimal_readout = false,
+                                                                          const std::string &xmlCfgFile = CFG_HISTORY_FILE);
     bool delTorrentItem(const std::string &unique_id, const std::string &xmlCfgFile = CFG_HISTORY_FILE);
     bool modifyTorrentItem(const GekkoFyre::GkTorrent::ModifyTorrentInfo &gk_mt,
                            const std::string &xmlCfgFile = CFG_HISTORY_FILE);
