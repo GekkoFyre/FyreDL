@@ -350,13 +350,17 @@ void GekkoFyre::GkTreeModel::setupModelData(const QString &unique_id, GekkoFyre:
             /**
              * 1. Check if the root-directory for a path has already been added and if not, add it.
              *      1a. You can detect a root-directory by its column number being '1'.
-             * 2. Check if the first sub-directory has already been added.
-             *      2a. If not, add the directory with appropriate tabbing and a newline.
-             *      2b. If end of the path has been reached and there's no filename, check to see if there are
-             *      any files in this directory.
-             *      2c. Add the files as children, whilst checking to see if they have already been added.
+             * 2. Add the files contained under that directory and then see if there's any sub-directories, whilst
+             * inserting the files into the list of already added children.
+             *      2a. If a sub-directory is detected, add it with the appropriate tabbing and insert it into the list
+             *      of already added children.
+             *      2b. Go back to (2).
+             *      2c. When there's no more sub-directories, go to (3).
              * 3. Check to see if there are any other root-directories left and if so, go back to (1).
-             *      3a. When there are no more root-directories remaining, break out of the loops.
+             *      3a. When there are no more root-directories remaining, break out of the loops and proceed
+             *      to the text processor. I've written the code in this fashion because I literally could not
+             *      understand the example code in its entirety. You, dear reader, are invited to improve upon
+             *      this.
              */
 
             int repetition = 0;
