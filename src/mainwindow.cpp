@@ -122,10 +122,10 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
         QMessageBox::warning(this, tr("Error!"), QString("%1").arg(e.what()), QMessageBox::Ok);
     }
 
-    // QShortcut *upKeyOverride = new QShortcut(QKeySequence(Qt::Key_Up), ui->downloadView);
-    // QShortcut *downKeyOverride = new QShortcut(QKeySequence(Qt::Key_Down), ui->downloadView);
-    // QObject::connect(upKeyOverride, SIGNAL(activated()), this, SLOT(keyUpDlModelSlot()));
-    // QObject::connect(downKeyOverride, SIGNAL(activated()), this, SLOT(keyDownDlModelSlot()));
+    QShortcut *upKeyOverride = new QShortcut(QKeySequence(Qt::Key_Up), ui->downloadView);
+    QShortcut *downKeyOverride = new QShortcut(QKeySequence(Qt::Key_Down), ui->downloadView);
+    QObject::connect(upKeyOverride, SIGNAL(activated()), this, SLOT(keyUpDlModelSlot()));
+    QObject::connect(downKeyOverride, SIGNAL(activated()), this, SLOT(keyDownDlModelSlot()));
 
     curr_shown_graphs = "";
     resetDlStateStartup();
@@ -1458,11 +1458,20 @@ void MainWindow::sendDetails(const std::string &fileName, const double &fileSize
 
     for (int i = 0; i < list.size(); ++i) {
         for (size_t j = 0; j < list.at(i).size(); ++j) {
-            if (list.at(i).at(j) == QString::fromStdString(destination)) {
-                QMessageBox::information(this, tr("Duplicate entry..."), tr("There has been an attempt at a duplicate "
-                                                                                 "entry!\n\n%1")
-                        .arg(QString::fromStdString(destination)), QMessageBox::Ok);
-                return;
+            if (down_type == GekkoFyre::DownloadType::HTTP || down_type == GekkoFyre::DownloadType::FTP) {
+                if (list.at(i).at(j) == QString::fromStdString(destination)) {
+                    QMessageBox::information(this, tr("Duplicate entry..."), tr("There has been an attempt at a duplicate "
+                                                                                        "entry!\n\n%1")
+                            .arg(QString::fromStdString(destination)), QMessageBox::Ok);
+                    return;
+                }
+            } else {
+                if (list.at(i).at(j) == QString::fromStdString(url)) {
+                    QMessageBox::information(this, tr("Duplicate entry..."), tr("There has been an attempt at a duplicate "
+                                                                                        "entry!\n\n%1")
+                            .arg(QString::fromStdString(destination)), QMessageBox::Ok);
+                    return;
+                }
             }
         }
     }
