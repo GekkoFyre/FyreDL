@@ -328,7 +328,7 @@ void GekkoFyre::GkTreeModel::setupModelData(const QString &unique_id, GekkoFyre:
     for (size_t i = 0; i < gk_ti.size(); ++i) {
         if (gk_ti.at(i).unique_id == unique_id.toStdString()) {
             int column = 0;
-            QList<GekkoFyre::GkTorrent::ContentsView> columnData; // <col, data>
+            QHash<QString, GekkoFyre::GkTorrent::ContentsView> columnData; // <root, data>
             std::vector<GekkoFyre::GkTorrent::TorrentFile> gk_tf_vec = gk_ti.at(i).files_vec;
 
             for (size_t j = 0; j < gk_tf_vec.size(); ++j) {
@@ -337,11 +337,12 @@ void GekkoFyre::GkTreeModel::setupModelData(const QString &unique_id, GekkoFyre:
                 fs::path boost_path(gk_tf_element.file_path);
                 for (auto &indice: boost_path) {
                     GekkoFyre::GkTorrent::ContentsView cv;
+                    QString cv_root = QString::fromStdString(boost_path.parent_path().string());
                     ++column;
                     cv.column = column;
                     cv.name = QString::fromStdString(indice.string());
-                    cv.root = QString::fromStdString(boost_path.parent_path().string());
-                    columnData.push_back(cv);
+                    cv.root = cv_root;
+                    columnData.insertMulti(cv_root, cv);
                 }
 
                 column = 0;
@@ -364,18 +365,17 @@ void GekkoFyre::GkTreeModel::setupModelData(const QString &unique_id, GekkoFyre:
              */
 
             int repetition = 0;
-            QList<QString> root_alreadyProc;
-            QList<QString> child_alreadyProc;
-            QHash<QString, QString> child_toBeAdded; // <key, value>
+            QVector<QString> root_alreadyProc;
+            QVector<QString> child_alreadyProc;
             QString curr_root;
-            gk_repeat:;
-            for (int j = 0; j < columnData.size(); ++j) {
-                QString root = columnData.at(j).root.toString();
-                QString child = columnData.at(j).name.toString();
+            gk_repeat: ;
+            for (auto const &entry: columnData) {
+                QString root = entry.root.toString();
+                QString child = entry.name.toString();
                 QString leaf = QDir(root).dirName();
-                if (columnData.at(j).column == (1 + repetition)) {
+                if (entry.column == (1 + repetition)) {
                     if (!root_alreadyProc.contains(root)) {
-                        for (int k = 1; k < ((columnData.at(j).column - 1) + repetition); ++k) {
+                        for (int k = 1; k < ((entry.column - 1) + repetition); ++k) {
                             oss_data << "    ";
                         }
 
@@ -390,9 +390,9 @@ void GekkoFyre::GkTreeModel::setupModelData(const QString &unique_id, GekkoFyre:
             }
 
             int roots_left = 0;
-            for (int j = 0; j < columnData.size(); ++j) {
-                QString root = columnData.at(j).root.toString();
-                if (columnData.at(j).column > (repetition + 1)) {
+            for (auto const &entry: columnData) {
+                QString root = entry.root.toString();
+                if (entry.column == (repetition + 1)) {
                     if (!root_alreadyProc.contains(root)) {
                         ++roots_left;
                     }
@@ -405,15 +405,15 @@ void GekkoFyre::GkTreeModel::setupModelData(const QString &unique_id, GekkoFyre:
             }
 
             // Children to be processed
+            QVector<QString> children_toBeAdded;
             if (!curr_root.isEmpty()) {
-                for (int j = 0; j < columnData.size(); ++j) {
-                    QString child = columnData.at(j).name.toString();
-                    if (curr_root == columnData.at(j).root) {
-                        QString root = columnData.at(j).root.toString();
-                        if (!child_alreadyProc.contains(child)) {
-                            child_toBeAdded.insertMulti(root, child);
-                            child_alreadyProc.push_back(child);
-                        }
+                QList<GekkoFyre::GkTorrent::ContentsView> values = columnData.values(curr_root);
+                for (int j = 0; j < values.size(); ++j) {
+                    QString child = values.at(j).name.toString();
+                    QString root = values.at(j).root.toString();
+                    if (!child_alreadyProc.contains(child)) {
+                        children_toBeAdded.push_back(child);
+                        child_alreadyProc.push_back(child);
                     }
                 }
             }
@@ -421,20 +421,22 @@ void GekkoFyre::GkTreeModel::setupModelData(const QString &unique_id, GekkoFyre:
             // Process the children
             children_proc: ;
             if (!curr_root.isEmpty()) {
-                QList<QString> children = child_toBeAdded.values(curr_root);
-                for (int j = 0; j < children.size(); ++j) {
-                    fs::path boost_path(children.at(j).toStdString());
-                    for (int k = 0; k < columnData.size(); ++k) {
-                        if (columnData.at(k).root == curr_root && children.at(j) == columnData.at(k).name &&
-                            boost_path.has_extension()) {
-                            for (int o = 1; o <= ((columnData.at(k).column - 2) + repetition); ++o) {
-                                oss_data << "    ";
+                if (columnData.contains(curr_root)) {
+                    QList<GekkoFyre::GkTorrent::ContentsView> children = columnData.values(curr_root);
+                    if (!children.isEmpty()) {
+                        for (int j = 0; j < children.size(); ++j) {
+                            QString child = children.at(j).name.toString();
+                            fs::path boost_child_path(child.toStdString());
+                            if (boost_child_path.has_extension()) {
+                                for (int k = 1; k <= ((children.at(j).column - 2) + repetition); ++k) {
+                                    oss_data << "    ";
+                                }
+                            }
+
+                            if (boost_child_path.has_extension()) {
+                                oss_data << child.toStdString() << std::endl;
                             }
                         }
-                    }
-
-                    if (boost_path.has_extension()) {
-                        oss_data << children.at(j).toStdString() << std::endl;
                     }
                 }
             }
@@ -442,14 +444,18 @@ void GekkoFyre::GkTreeModel::setupModelData(const QString &unique_id, GekkoFyre:
             QString parent_root = QString::fromStdString(fs::path(curr_root.toStdString()).parent_path().string());
             if (!parent_root.isEmpty()) {
                 // See if there's any un-processed children
-                child_toBeAdded.clear();
-                for (int j = 0; j < columnData.size(); ++j) {
-                    QString child = columnData.at(j).name.toString();
-                    if (parent_root == columnData.at(j).root) {
-                        if (!child_alreadyProc.contains(child)) {
-                            child_toBeAdded.insertMulti(parent_root, child);
-                            child_alreadyProc.push_back(child);
-                            curr_root = parent_root;
+                if (columnData.contains(parent_root)) {
+                    QList<GekkoFyre::GkTorrent::ContentsView> children = columnData.values(parent_root);
+                    if (!children.isEmpty()) {
+                        for (int j = 0; j < children.size(); ++j) {
+                            QString child = children.at(j).name.toString();
+                            QString root = children.at(j).root.toString();
+                            if (parent_root == root) {
+                                if (!child_alreadyProc.contains(child)) {
+                                    child_alreadyProc.push_back(child);
+                                    curr_root = parent_root;
+                                }
+                            }
                         }
                     }
                 }
