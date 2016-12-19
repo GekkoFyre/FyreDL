@@ -77,6 +77,7 @@ extern "C" {
 #define CFG_HISTORY_FILE "fyredl_history.xml"   // The history file-name used by FyreDL. Location is also set within the application's GUI.
 #define CFG_SETTINGS_FILE "fyredl_settings.xml" // The configuration file-name used by FyreDL. Location is also set within the application's GUI.
 #define ENBL_GUI_CHARTS false                   // Whether to enable charts/graphs within the GUI, to chart the progress of downloads.
+#define ENBL_GUI_CONTENTS_VIEW false            // Whether to enable the contents view of inside BitTorrents (located at the bottom) within the GUI.
 #define FYREDL_LIBCURL_VERBOSE 1L               // Set to '1L' if you want libcurl to tell you what it's up to!
 #define FYREDL_CONN_TIMEOUT 60L                 // The duration, in seconds, until a timeout occurs when attempting to make a connection.
 #define FYREDL_CONN_LOW_SPEED_CUTOUT 512L       // The average transfer speed in bytes per second to be considered below before connection cut-off.
@@ -258,7 +259,7 @@ namespace GekkoFyre {
 
     namespace GkTorrent {
         struct ContentsView {
-            QVariant root;
+            QVariant under_path;
             QVariant name;
             int column;
         };

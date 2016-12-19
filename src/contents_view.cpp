@@ -47,6 +47,8 @@
 #include <boost/filesystem.hpp>
 #include <boost/exception/all.hpp>
 #include <QHash>
+#include <QSet>
+#include <QStringList>
 
 namespace sys = boost::system;
 namespace fs = boost::filesystem;
@@ -303,6 +305,7 @@ int GekkoFyre::GkTreeModel::columnCount(const QModelIndex &parent) const
  * @brief GekkoFyre::GkTreeModel::setupModelData populates the model's internal data structure.
  * @note <http://doc.qt.io/qt-5/qtwidgets-itemviews-simpletreemodel-treemodel-cpp.html>
  *       <http://www.boost.org/doc/libs/1_62_0/libs/filesystem/doc/reference.html#class-path>
+ *       <https://theboostcpplibraries.com/boost.filesystem-paths>
  * @param lines provides the data to be read and dissected.
  * @param parent is the parent item to all children in the QTreeView.
  */
@@ -341,7 +344,7 @@ void GekkoFyre::GkTreeModel::setupModelData(const QString &unique_id, GekkoFyre:
                     ++column;
                     cv.column = column;
                     cv.name = QString::fromStdString(indice.string());
-                    cv.root = cv_root;
+                    cv.under_path = cv_root;
                     columnData.insertMulti(cv_root, cv);
                 }
 
@@ -364,103 +367,80 @@ void GekkoFyre::GkTreeModel::setupModelData(const QString &unique_id, GekkoFyre:
              *      this.
              */
 
-            int repetition = 0;
-            QVector<QString> root_alreadyProc;
-            QVector<QString> child_alreadyProc;
-            QString curr_root;
-            gk_repeat: ;
+            QSet<QPair<int, QString>> dirs_toProc; // <column, value>, directories ready to be processed.
+            QSet<QPair<int, QString>> dirs_alreadyProc; // <column, value>, directories that have already been processed.
+            QSet<QString> roots_toProc;
             for (auto const &entry: columnData) {
-                QString root = entry.root.toString();
+                // This will find all the directories and the appropriate column number for each directory.
+                QString under_path = entry.under_path.toString();
                 QString child = entry.name.toString();
-                QString leaf = QDir(root).dirName();
-                if (entry.column == (1 + repetition)) {
-                    if (!root_alreadyProc.contains(root)) {
-                        for (int k = 1; k < ((entry.column - 1) + repetition); ++k) {
-                            oss_data << "    ";
-                        }
+                int child_col = entry.column;
 
-                        oss_data << leaf.toStdString() << std::endl;
+                fs::path boost_child_path(child.toStdString());
+                QString dir_name = QDir(under_path).dirName();
 
-                        root_alreadyProc.push_back(root);
-                        child_alreadyProc.push_back(root);
-                        curr_root = root;
+                if (!boost_child_path.has_extension() && dir_name == child) {
+                    dirs_toProc.insert(qMakePair(child_col, under_path));
+                }
+            }
+
+            QList<QPair<int, QString>> dirs_pair = dirs_toProc.values();
+            qSort(dirs_pair.begin(), dirs_pair.end());
+
+            for (int j = 0; j < dirs_pair.size(); ++j) {
+                // We need to find all the root directories now
+                QString potential_root = dirs_pair.at(j).second;
+                fs::path parse_root(potential_root.toStdString());
+                fs::path test(potential_root.toStdString());
+
+                while (parse_root.has_parent_path()) {
+                    if (!parse_root.has_parent_path()) {
                         break;
                     }
+
+                    QStringList list = potential_root.split(fs::path::preferred_separator);
+                    parse_root = list.at(0).toStdString();
                 }
+
+                roots_toProc.insert(QString::fromStdString(parse_root.string()));
             }
 
-            int roots_left = 0;
-            for (auto const &entry: columnData) {
-                QString root = entry.root.toString();
-                if (entry.column == (repetition + 1)) {
-                    if (!root_alreadyProc.contains(root)) {
-                        ++roots_left;
+            for (int j = 0; j < dirs_pair.size(); ++j) {
+                QString dir = dirs_pair.at(j).second;
+                int dir_col = dirs_pair.at(j).first;
+                QStringList dir_chunks = dir.split(fs::path::preferred_separator);
+                fs::path parent(dir.toStdString());
+
+                // Must find whether there are sub-directories in the current directory and thus, build upon them
+                if (dir_col > 1 && dir_chunks.at(dir_col - 2) == QString::fromStdString(parent.parent_path().string())) {
+                    for (int k = 1; k < (dir_col); ++k) {
+                        oss_data << "    ";
                     }
-                }
-            }
 
-            if (roots_left > 0) {
-                ++repetition;
-                goto gk_repeat;
-            }
-
-            // Children to be processed
-            QVector<QString> children_toBeAdded;
-            if (!curr_root.isEmpty()) {
-                QList<GekkoFyre::GkTorrent::ContentsView> values = columnData.values(curr_root);
-                for (int j = 0; j < values.size(); ++j) {
-                    QString child = values.at(j).name.toString();
-                    QString root = values.at(j).root.toString();
-                    if (!child_alreadyProc.contains(child)) {
-                        children_toBeAdded.push_back(child);
-                        child_alreadyProc.push_back(child);
+                    for (int k = 0; k < (dir_col); ++k) {
+                        if (!dirs_alreadyProc.contains(qMakePair(dir_col, dir))) {
+                            oss_data << dir.toStdString() << std::endl;
+                            dirs_alreadyProc.insert(qMakePair(dir_col, dir));
+                        }
                     }
-                }
-            }
+                } else {
+                    for (int k = 1; k < (dir_col); ++k) {
+                        oss_data << "    ";
+                    }
 
-            // Process the children
-            children_proc: ;
-            if (!curr_root.isEmpty()) {
-                if (columnData.contains(curr_root)) {
-                    QList<GekkoFyre::GkTorrent::ContentsView> children = columnData.values(curr_root);
-                    if (!children.isEmpty()) {
-                        for (int j = 0; j < children.size(); ++j) {
-                            QString child = children.at(j).name.toString();
-                            fs::path boost_child_path(child.toStdString());
-                            if (boost_child_path.has_extension()) {
-                                for (int k = 1; k <= ((children.at(j).column - 2) + repetition); ++k) {
-                                    oss_data << "    ";
-                                }
-                            }
-
-                            if (boost_child_path.has_extension()) {
-                                oss_data << child.toStdString() << std::endl;
-                            }
+                    for (int k = 0; k < (dir_col); ++k) {
+                        if (!dirs_alreadyProc.contains(qMakePair(dir_col, dir))) {
+                            oss_data << dir.toStdString() << std::endl;
+                            dirs_alreadyProc.insert(qMakePair(dir_col, dir));
                         }
                     }
                 }
             }
 
-            QString parent_root = QString::fromStdString(fs::path(curr_root.toStdString()).parent_path().string());
-            if (!parent_root.isEmpty()) {
-                // See if there's any un-processed children
-                if (columnData.contains(parent_root)) {
-                    QList<GekkoFyre::GkTorrent::ContentsView> children = columnData.values(parent_root);
-                    if (!children.isEmpty()) {
-                        for (int j = 0; j < children.size(); ++j) {
-                            QString child = children.at(j).name.toString();
-                            QString root = children.at(j).root.toString();
-                            if (parent_root == root) {
-                                if (!child_alreadyProc.contains(child)) {
-                                    child_alreadyProc.push_back(child);
-                                    curr_root = parent_root;
-                                }
-                            }
-                        }
-                    }
-                }
-
-                goto children_proc;
+            QFile data("/home/phobos/test.txt");
+            if (data.open(QFile::WriteOnly | QFile::Truncate)) {
+                QTextStream out(&data);
+                out << QString::fromStdString(oss_data.str());
             }
 
             break;
