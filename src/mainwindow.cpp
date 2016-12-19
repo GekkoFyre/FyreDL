@@ -122,10 +122,10 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
         QMessageBox::warning(this, tr("Error!"), QString("%1").arg(e.what()), QMessageBox::Ok);
     }
 
-    // QShortcut *upKeyOverride = new QShortcut(QKeySequence(Qt::Key_Up), ui->downloadView);
-    // QShortcut *downKeyOverride = new QShortcut(QKeySequence(Qt::Key_Down), ui->downloadView);
-    // QObject::connect(upKeyOverride, SIGNAL(activated()), this, SLOT(keyUpDlModelSlot()));
-    // QObject::connect(downKeyOverride, SIGNAL(activated()), this, SLOT(keyDownDlModelSlot()));
+    QShortcut *upKeyOverride = new QShortcut(QKeySequence(Qt::Key_Up), ui->downloadView);
+    QShortcut *downKeyOverride = new QShortcut(QKeySequence(Qt::Key_Down), ui->downloadView);
+    QObject::connect(upKeyOverride, SIGNAL(activated()), this, SLOT(keyUpDlModelSlot()));
+    QObject::connect(downKeyOverride, SIGNAL(activated()), this, SLOT(keyDownDlModelSlot()));
 
     curr_shown_graphs = "";
     resetDlStateStartup();
@@ -542,26 +542,30 @@ void MainWindow::updateChart()
 
 void MainWindow::contentsView_update()
 {
-    QModelIndexList indexes = ui->downloadView->selectionModel()->selectedRows();
-    if (indexes.size() > 0) {
-        if (indexes.at(0).isValid()) {
-            const QString unique_id = ui->downloadView->model()->data(
-                    ui->downloadView->model()->index(indexes.at(0).row(), MN_HIDDEN_UNIQUE_ID)).toString();
-            for (size_t k = 0; k < graph_init.size(); ++k) {
-                if (graph_init.at(k).unique_id == unique_id) {
-                    if (graph_init.at(k).down_info.dl_type == GekkoFyre::DownloadType::Torrent ||
+    if (ENBL_GUI_CONTENTS_VIEW) {
+        QModelIndexList indexes = ui->downloadView->selectionModel()->selectedRows();
+        if (indexes.size() > 0) {
+            if (indexes.at(0).isValid()) {
+                const QString unique_id = ui->downloadView->model()->data(
+                        ui->downloadView->model()->index(indexes.at(0).row(), MN_HIDDEN_UNIQUE_ID)).toString();
+                for (size_t k = 0; k < graph_init.size(); ++k) {
+                    if (graph_init.at(k).unique_id == unique_id) {
+                        if (graph_init.at(k).down_info.dl_type == GekkoFyre::DownloadType::Torrent ||
                             graph_init.at(k).down_info.dl_type == GekkoFyre::DownloadType::TorrentMagnetLink) {
-                        gk_treeModel = std::make_unique<GekkoFyre::GkTreeModel>(unique_id);
-                        ui->contentsView->setModel(gk_treeModel.get());
-                        ui->contentsView->setWindowTitle(tr("Contents View"));
-                    } else {
-                        ui->contentsView->setModel(nullptr);
-                        ui->contentsView->setWindowTitle(tr("Contents View"));
+                            gk_treeModel = std::make_unique<GekkoFyre::GkTreeModel>(unique_id);
+                            ui->contentsView->setModel(gk_treeModel.get());
+                            ui->contentsView->setWindowTitle(tr("Contents View"));
+                        } else {
+                            ui->contentsView->setModel(nullptr);
+                            ui->contentsView->setWindowTitle(tr("Contents View"));
+                        }
                     }
                 }
             }
         }
     }
+
+    return;
 }
 
 /**
@@ -1458,11 +1462,20 @@ void MainWindow::sendDetails(const std::string &fileName, const double &fileSize
 
     for (int i = 0; i < list.size(); ++i) {
         for (size_t j = 0; j < list.at(i).size(); ++j) {
-            if (list.at(i).at(j) == QString::fromStdString(destination)) {
-                QMessageBox::information(this, tr("Duplicate entry..."), tr("There has been an attempt at a duplicate "
-                                                                                 "entry!\n\n%1")
-                        .arg(QString::fromStdString(destination)), QMessageBox::Ok);
-                return;
+            if (down_type == GekkoFyre::DownloadType::HTTP || down_type == GekkoFyre::DownloadType::FTP) {
+                if (list.at(i).at(j) == QString::fromStdString(destination)) {
+                    QMessageBox::information(this, tr("Duplicate entry..."), tr("There has been an attempt at a duplicate "
+                                                                                        "entry!\n\n%1")
+                            .arg(QString::fromStdString(destination)), QMessageBox::Ok);
+                    return;
+                }
+            } else {
+                if (list.at(i).at(j) == QString::fromStdString(url)) {
+                    QMessageBox::information(this, tr("Duplicate entry..."), tr("There has been an attempt at a duplicate "
+                                                                                        "entry!\n\n%1")
+                            .arg(QString::fromStdString(destination)), QMessageBox::Ok);
+                    return;
+                }
             }
         }
     }

@@ -53,7 +53,6 @@
 #include <QAbstractItemModel>
 #include <QModelIndex>
 #include <QString>
-#include <QStringList>
 
 namespace GekkoFyre {
 class GkTreeItem {
