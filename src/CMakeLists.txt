@@ -81,8 +81,6 @@ set(SOURCE_FILES
     addurl.cpp
     cmnroutines.hpp
     cmnroutines.cpp
-    contents_view.hpp
-    contents_view.cpp
     curl_easy.hpp
     curl_easy.cpp
     curl_multi.hpp

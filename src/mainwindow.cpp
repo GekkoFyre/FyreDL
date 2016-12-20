@@ -63,6 +63,8 @@
 #include <QDir>
 #include <QDateTime>
 #include <QDate>
+#include <QHash>
+#include <QStandardItemModel>
 
 namespace sys = boost::system;
 namespace fs = boost::filesystem;
@@ -540,6 +542,15 @@ void MainWindow::updateChart()
     return;
 }
 
+/**
+ * @brief The model definition for the object, 'contentsView', within the 'mainwindow.ui' designer file.
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @date 2016-12-21
+ * @note <http://doc.qt.io/qt-5/qtwidgets-itemviews-simpledommodel-example.html>
+ *       <http://doc.qt.io/qt-5/qtwidgets-itemviews-simpletreemodel-example.html>
+ *       <http://stackoverflow.com/questions/28997619/populating-qtreeview-from-list-of-file-paths>
+ *       <http://stackoverflow.com/questions/27585077/create-qtreewidget-directories-based-on-file-paths-names>
+ */
 void MainWindow::contentsView_update()
 {
     if (ENBL_GUI_CONTENTS_VIEW) {
@@ -549,16 +560,89 @@ void MainWindow::contentsView_update()
                 const QString unique_id = ui->downloadView->model()->data(
                         ui->downloadView->model()->index(indexes.at(0).row(), MN_HIDDEN_UNIQUE_ID)).toString();
                 for (size_t k = 0; k < graph_init.size(); ++k) {
-                    if (graph_init.at(k).unique_id == unique_id) {
-                        if (graph_init.at(k).down_info.dl_type == GekkoFyre::DownloadType::Torrent ||
-                            graph_init.at(k).down_info.dl_type == GekkoFyre::DownloadType::TorrentMagnetLink) {
-                            gk_treeModel = std::make_unique<GekkoFyre::GkTreeModel>(unique_id);
-                            ui->contentsView->setModel(gk_treeModel.get());
-                            ui->contentsView->setWindowTitle(tr("Contents View"));
-                        } else {
-                            ui->contentsView->setModel(nullptr);
-                            ui->contentsView->setWindowTitle(tr("Contents View"));
+                    try {
+                        if (graph_init.at(k).unique_id == unique_id) {
+                            if (graph_init.at(k).down_info.dl_type == GekkoFyre::DownloadType::Torrent ||
+                                graph_init.at(k).down_info.dl_type == GekkoFyre::DownloadType::TorrentMagnetLink) {
+                                std::vector<GekkoFyre::GkTorrent::TorrentInfo> gk_ti = GekkoFyre::CmnRoutines::readTorrentInfo(false);
+                                std::ostringstream oss_data;
+                                for (size_t i = 0; i < gk_ti.size(); ++i) {
+                                    if (gk_ti.at(i).unique_id == unique_id.toStdString()) {
+                                        int column = 0;
+                                        QHash <QString, GekkoFyre::GkTorrent::ContentsView> columnData; // <root, data>
+                                        std::vector<GekkoFyre::GkTorrent::TorrentFile> gk_tf_vec = gk_ti.at(i).files_vec;
+
+                                        for (size_t j = 0; j < gk_tf_vec.size(); ++j) {
+                                            GekkoFyre::GkTorrent::TorrentFile gk_tf_element = gk_tf_vec.at(j);
+
+                                            fs::path boost_path(gk_tf_element.file_path);
+                                            for (auto &indice: boost_path) {
+                                                GekkoFyre::GkTorrent::ContentsView cv;
+                                                QString cv_root = QString::fromStdString(boost_path.parent_path().string());
+                                                ++column;
+                                                cv.column = column;
+                                                cv.name = QString::fromStdString(indice.string());
+                                                cv.under_path = cv_root;
+                                                columnData.insertMulti(cv_root, cv);
+                                            }
+
+                                            column = 0;
+                                        }
+
+                                        QSet<QPair<int, QString>> dirs_toProc; // <column, value>, directories ready to be processed.
+                                        QSet<QPair<int, QString>> dirs_alreadyProc; // <column, value>, directories that have already been processed.
+                                        QSet<QString> roots_toProc;
+                                        for (auto const &entry: columnData) {
+                                            // This will find all the directories and the appropriate column number for each directory.
+                                            QString under_path = entry.under_path.toString();
+                                            QString child = entry.name.toString();
+                                            int child_col = entry.column;
+
+                                            fs::path boost_child_path(child.toStdString());
+                                            QString dir_name = QDir(under_path).dirName();
+
+                                            if (!boost_child_path.has_extension() && dir_name == child) {
+                                                dirs_toProc.insert(qMakePair(child_col, under_path));
+                                            }
+                                        }
+
+                                        QList<QPair<int, QString>> dirs_pair = dirs_toProc.values();
+
+                                        cV_model = new QStandardItemModel;
+                                        QStandardItem *topLevelItem = cV_model->invisibleRootItem();
+
+                                        // Iterate over each directory string
+                                        QStringList dir_list;
+                                        for (int j = 0; j < dirs_pair.size(); ++j) {
+                                            dir_list << dirs_pair.at(j).second;
+                                        }
+
+                                        qSort(dir_list.begin(), dir_list.end());
+                                        for (auto const &item: dir_list) {
+                                            QStringList splitName = item.split(fs::path::preferred_separator);
+
+                                            // First part of the string is defo parent item
+                                            // Check to make sure not to add duplicate
+                                            if (cV_model->findItems(splitName[0], Qt::MatchFixedString).size() == 0) {
+                                                QStandardItem *parentItem = new QStandardItem();
+                                                parentItem->setData(splitName[0]);
+                                                topLevelItem->appendRow(parentItem);
+                                            }
+
+                                            cV_addItems(topLevelItem, splitName);
+                                        }
+
+                                        QStringList headers;
+                                        headers << tr("Dir/File");
+                                        cV_model->setHorizontalHeaderLabels(headers);
+                                        ui->contentsView->setModel(cV_model);
+                                    }
+                                }
+                            }
                         }
+                    } catch (const std::exception &e) {
+                        QMessageBox::warning(this, tr("Error!"), tr("%1\n\nAborting...").arg(e.what()), QMessageBox::Ok);
+                        QCoreApplication::exit(-1); // Terminate application with return code '-1'.
                     }
                 }
             }
@@ -566,6 +650,79 @@ void MainWindow::contentsView_update()
     }
 
     return;
+}
+
+void MainWindow::cV_addItems(QStandardItem *parent, const QStringList &elements)
+{
+    for (auto const &element: elements) {
+        // First check if this element already exists in the hierarchy
+        int noOfChildren = parent->rowCount();
+
+        // If there are child objects under specified parent
+        if (noOfChildren > 0) {
+            // Create dict to store all child objects under parent for test
+            QHash<QString, QStandardItem*> childObjsList;
+
+            // Iterate over indexes and get names of all child objects
+            for (int i = 0; i < noOfChildren; ++i) {
+                QStandardItem *childObj(parent->child(i));
+
+                if (childObj != nullptr) {
+                    childObjsList[childObj->text()] = childObj;
+                } else {
+                    throw std::runtime_error(tr("'childObj' is null within 'contentView'!").toStdString());
+                }
+            }
+
+            if (childObjsList.contains(element)) {
+                // Only run recursive function if there are still elements to work on
+                if (elements.size() > 0) {
+                    QStringList split_elements;
+                    for (int i = 1; i < elements.size(); ++i) {
+                        split_elements << elements.at(i);
+                    }
+
+                    cV_addItems(childObjsList[element], split_elements);
+                }
+
+                return;
+            } else {
+                // Item does not exist yet, create it and parent
+                QStandardItem *newObj = new QStandardItem(element);
+                parent->appendRow(newObj);
+
+                // Only run recursive function if there are still elements
+                if (elements.size() > 0) {
+                    QStringList split_elements;
+                    for (int i = 1; i < elements.size(); ++i) {
+                        split_elements << elements.at(i);
+                    }
+
+                    cV_addItems(newObj, split_elements);
+                }
+
+                return;
+            }
+        } else {
+            // If there are no existing child objects, it's safe to create the item and parent it
+            QStandardItem *newObj = new QStandardItem(element);
+            parent->appendRow(newObj);
+
+            // Only run recursive function if there are still elements to work on
+            if (elements.size() > 0) {
+                // Now run the recursive function again with the latest object as the parent and the rest of the
+                // elements as children.
+                QStringList split_elements;
+                for (int i = 1; i < elements.size(); ++i) {
+                    split_elements << elements.at(i);
+                }
+
+                cV_addItems(newObj, split_elements);
+            }
+
+            return;
+        }
+    }
 }
 
 /**
