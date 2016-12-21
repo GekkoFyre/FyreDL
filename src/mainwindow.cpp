@@ -588,7 +588,7 @@ void MainWindow::contentsView_update()
                                             }
                                         }
 
-                                        QSet<QPair<QString, QString>> dirs_toProc; // <child, parent>, directories ready to be processed.
+                                        QSet<QString> files_toProc; // <child, parent>, directories ready to be processed.
                                         for (auto const &entry: columnData) {
                                             // This will find all the directories and the appropriate column number for each directory.
                                             QString child = entry.first;
@@ -597,12 +597,14 @@ void MainWindow::contentsView_update()
                                             fs::path boost_child_path(child.toStdString());
                                             QString dir_name = QDir(parent).dirName();
 
-                                            if (!boost_child_path.has_extension() && dir_name == child) {
-                                                dirs_toProc.insert(qMakePair(child, parent));
+                                            if (boost_child_path.has_extension() && dir_name != child) {
+                                                // We are quite likely to have a file, and not a (sub-)directory
+                                                QString full_path = parent + fs::path::preferred_separator + child;
+                                                files_toProc.insert(full_path);
                                             }
                                         }
 
-                                        QList<QPair<QString, QString>> dirs_pair = dirs_toProc.values();
+                                        QList<QString> dirs_pair = files_toProc.values();
 
                                         cV_model = std::make_unique<QStandardItemModel>();
                                         QStandardItem *topLevelItem = cV_model->invisibleRootItem();
@@ -610,7 +612,7 @@ void MainWindow::contentsView_update()
                                         // Iterate over each directory string
                                         QStringList dir_list;
                                         for (int j = 0; j < dirs_pair.size(); ++j) {
-                                            dir_list << dirs_pair.at(j).second;
+                                            dir_list << dirs_pair.at(j);
                                         }
 
                                         qSort(dir_list.begin(), dir_list.end());
@@ -633,6 +635,8 @@ void MainWindow::contentsView_update()
                                         ui->contentsView->setModel(cV_model.get());
                                     }
                                 }
+                            } else {
+                                ui->contentsView->setModel(nullptr);
                             }
                         }
                     } catch (const std::exception &e) {
