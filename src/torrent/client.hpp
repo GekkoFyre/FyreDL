@@ -34,16 +34,19 @@
  ********************************************************************************/
 
 /**
- * @file torrent_client.hpp
+ * @file client.hpp
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
  * @date 2016-12-13
+ * @note <http://www.rasterbar.com/products/libtorrent/reference.html>
+ *       <http://www.rasterbar.com/products/libtorrent/manual.html>
+ *       <http://stackoverflow.com/questions/13953086/download-specific-piece-using-libtorrent>
  * @brief Contains the routines for downloading (and directly managing therof) any torrents, asynchronously.
  */
 
 #ifndef FYREDL_TORRENT_CLIENT_HPP
 #define FYREDL_TORRENT_CLIENT_HPP
 
-#include "default_var.hpp"
+#include "./../default_var.hpp"
 #include <QObject>
 
 namespace GekkoFyre {
