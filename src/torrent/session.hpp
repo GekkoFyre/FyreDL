@@ -58,10 +58,11 @@ public:
     ~GkTorrentSession();
 
     QString state(lt::torrent_status::state_t s);
-    void startTorrentDl(const std::string &unique_id, const std::string &xmlHistoryFile = CFG_HISTORY_FILE);
+    void init_session(const std::string &magnet_uri, const std::string &unique_id,
+                      const std::string &destination);
 
-private:
-    void init_session(const std::string &magnet_uri, const std::string &destination);
+signals:
+    void sendStats(const std::string &unique_id, const lt::torrent_status &stats);
 };
 }
 

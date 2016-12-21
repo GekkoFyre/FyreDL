@@ -47,6 +47,9 @@
 #define FYREDL_TORRENT_CLIENT_HPP
 
 #include "./../default_var.hpp"
+#include "./../cmnroutines.hpp"
+#include "session.hpp"
+#include <libtorrent/torrent_status.hpp>
 #include <QObject>
 
 namespace GekkoFyre {
@@ -56,7 +59,22 @@ class GkTorrentClient: public QObject {
 public:
     GkTorrentClient();
     ~GkTorrentClient();
+
+    void startTorrentDl(const std::string &unique_id, const std::string &xmlHistoryFile = CFG_HISTORY_FILE);
+
+private:
+    GekkoFyre::CmnRoutines *routines;
+    GekkoFyre::GkTorrentSession *gk_torrent_session;
+
+private slots:
+    void recvRawStats(const std::string &unique_id, const lt::torrent_status &stats);
+
+signals:
+    void sendProcTorrentStats(const GekkoFyre::GkTorrent::TorrentXferStats &gk_xfer_stats);
 };
 }
+
+// This is required for signaling, otherwise QVariant does not know the type.
+Q_DECLARE_METATYPE(GekkoFyre::GkTorrent::TorrentXferStats);
 
 #endif // FYREDL_TORRENT_CLIENT_HPP

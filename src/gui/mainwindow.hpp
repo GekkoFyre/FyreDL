@@ -109,6 +109,7 @@ private:
     downloadModel *dlModel;
     GekkoFyre::CmnRoutines *routines;
     GekkoFyre::CurlMulti *curl_multi;
+    GekkoFyre::GkTorrentClient *gk_torrent_client;
     std::vector<GekkoFyre::GkCurl::CurlProgressPtr> dl_stat;
     std::vector<GekkoFyre::GkGraph::GraphInit> graph_init;
     QString curr_shown_graphs;
@@ -117,6 +118,7 @@ private:
     QThread *curl_multi_thread;
 
 signals:
+    // Libcurl specific signals
     void updateDlStats();
     void sendStopDownload(const QString &fileLoc);
     void sendStartDownload(const QString &url, const QString &file_loc, const bool &resumeDl);
@@ -163,9 +165,14 @@ private slots:
                      const std::string &hash_val, const long long &resp_code, const bool &stat_ok,
                      const std::string &stat_msg, const std::string &unique_id,
                      const GekkoFyre::DownloadType &down_type);
+
+    // Libcurl specific slots
     void recvXferStats(const GekkoFyre::GkCurl::CurlProgressPtr &info);
     void manageDlStats();
     void recvDlFinished(const GekkoFyre::GkCurl::DlStatusMsg &status);
+
+    // Libtorrent specific slots
+    void recvBitTorrent_XferStats(const GekkoFyre::GkTorrent::TorrentXferStats &gk_xfer_stats);
 
 private:
     Ui::MainWindow *ui;

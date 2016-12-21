@@ -43,6 +43,7 @@
 #ifndef DEFVAR_HPP
 #define DEFVAR_HPP
 
+#include <boost/cstdint.hpp>
 #include <boost/optional.hpp>
 #include <locale>
 #include <string>
@@ -259,6 +260,14 @@ namespace GekkoFyre {
     }
 
     namespace GkTorrent {
+        struct TorrentXferStats {
+            std::string unique_id;
+            QString dl_state;
+            int dl_payload_rate;
+            boost::int64_t total_done;
+            int progress_ppm;
+        };
+
         struct TorrentFile {
             std::string file_path;              // The internal path of the file within the torrent
             std::string sha1_hash_hex;          // The SHA-1 hash of the file, if available, in hexadecimal

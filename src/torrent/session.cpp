@@ -41,9 +41,6 @@
  */
 
 #include "session.hpp"
-#include "./../cmnroutines.hpp"
-#include <boost/filesystem.hpp>
-#include <boost/exception/all.hpp>
 #include <libtorrent/session.hpp>
 #include <libtorrent/add_torrent_params.hpp>
 #include <libtorrent/torrent_handle.hpp>
@@ -55,8 +52,6 @@
 #include <iostream>
 
 using clk = std::chrono::steady_clock;
-namespace sys = boost::system;
-namespace fs = boost::filesystem;
 GekkoFyre::GkTorrentSession::GkTorrentSession()
 {}
 
@@ -93,41 +88,13 @@ QString GekkoFyre::GkTorrentSession::state(lt::torrent_status::state_t s)
 }
 
 /**
- * @brief GekkoFyre::GkTorrentSession::startTorrentDl reads the download item's Unique ID from the XML history file
- * and initiates the BitTorrent session with the appropriate parameters.
- * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
- * @date 2016-12-22
- * @param unique_id The Unique ID relating to the download item in question.
- */
-void GekkoFyre::GkTorrentSession::startTorrentDl(const std::string &unique_id, const std::string &xmlHistoryFile)
-{
-    QString torrent_error_name = tr("<N/A>");
-    try {
-        std::unique_ptr<GekkoFyre::CmnRoutines> routines;
-        routines = std::make_unique<GekkoFyre::CmnRoutines>();
-        std::vector<GekkoFyre::GkTorrent::TorrentInfo> gk_ti = routines->readTorrentInfo(false, xmlHistoryFile);
-
-        for (size_t i = 0; i < gk_ti.size(); ++i) {
-            GekkoFyre::GkTorrent::TorrentInfo indice = gk_ti.at(i);
-            if (unique_id == indice.unique_id) {
-                torrent_error_name = QString::fromStdString(indice.torrent_name);
-                std::string full_path = (indice.down_dest + fs::path::preferred_separator + indice.torrent_name);
-                init_session(indice.magnet_uri, full_path);
-            }
-        }
-    } catch (const std::exception &e) {
-        QMessageBox::warning(nullptr, tr("Error!"), tr("An issue has occured with torrent, \"%1\".\n\n%2")
-                .arg(torrent_error_name).arg(e.what()), QMessageBox::Ok);
-    }
-}
-
-/**
  * @brief GekkoFyre::GkTorrentSession::init_session initiates a BitTorrent session with all the required parameters.
  * @date 2016-12-22
  * @note <http://libtorrent.org/tutorial.html>
  * @param magnet_uri is the 'Magnet URL' of the BitTorrent in question that's being downloaded.
  */
-void GekkoFyre::GkTorrentSession::init_session(const std::string &magnet_uri, const std::string &destination)
+void GekkoFyre::GkTorrentSession::init_session(const std::string &magnet_uri, const std::string &unique_id,
+                                               const std::string &destination)
 {
     lt::settings_pack pack;
     pack.set_int(lt::settings_pack::alert_mask, lt::alert::error_notification | lt::alert::storage_notification |
@@ -178,7 +145,8 @@ void GekkoFyre::GkTorrentSession::init_session(const std::string &magnet_uri, co
                 if (st->status.empty()) continue;
 
                 // We only have a single torrent, so we know which one the status is for
-                // TODO: Enter status code here
+                const lt::torrent_status &s = st->status[0];
+                emit sendStats(unique_id, s);
             }
         }
 

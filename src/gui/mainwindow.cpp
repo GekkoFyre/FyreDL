@@ -95,6 +95,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
 
     routines = new GekkoFyre::CmnRoutines();
     curl_multi = new GekkoFyre::CurlMulti();
+    gk_torrent_client = new GekkoFyre::GkTorrentClient();
 
     // http://wiki.qt.io/QThreads_general_usage
     // https://mayaposch.wordpress.com/2011/11/01/how-to-really-truly-use-qthreads-the-full-explanation/
@@ -117,6 +118,9 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
 
     QObject::connect(ui->downloadView, SIGNAL(customContextMenuRequested(QPoint)), this, SLOT(on_downloadView_customContextMenuRequested(QPoint)));
     QObject::connect(this, SIGNAL(updateDlStats()), this, SLOT(manageDlStats()));
+
+    QObject::connect(gk_torrent_client, SIGNAL(sendProcTorrentStats(GekkoFyre::GkTorrent::TorrentXferStats)), this,
+                     SLOT(recvBitTorrent_XferStats(GekkoFyre::GkTorrent::TorrentXferStats)));
 
     try {
         readFromHistoryFile();
@@ -149,6 +153,7 @@ MainWindow::~MainWindow()
     delete ui;
     emit finish_curl_multi_thread();
     delete routines;
+    delete gk_torrent_client;
     dl_stat.clear();
     graph_init.clear();
 }
@@ -1843,3 +1848,12 @@ void MainWindow::recvDlFinished(const GekkoFyre::GkCurl::DlStatusMsg &status)
 
     return;
 }
+
+/**
+ * @brief MainWindow::recvBitTorrent_XferStats receives the processed statistics from the built-in BitTorrent client.
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @date 2016-12-22
+ * @param gk_xfer_stats is the statistics in question, in the form of a struct.
+ */
+void MainWindow::recvBitTorrent_XferStats(const GekkoFyre::GkTorrent::TorrentXferStats &gk_xfer_stats)
+{}
