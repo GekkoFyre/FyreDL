@@ -87,7 +87,7 @@ private:
     void delCharts(const std::string &file_dest);
     void updateChart();
 
-    QStandardItemModel *cV_model;
+    std::unique_ptr<QStandardItemModel> cV_model;
     void contentsView_update();
     void cV_addItems(QStandardItem *parent, const QStringList &elements);
 

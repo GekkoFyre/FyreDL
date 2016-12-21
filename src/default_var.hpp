@@ -258,12 +258,6 @@ namespace GekkoFyre {
     }
 
     namespace GkTorrent {
-        struct ContentsView {
-            QVariant under_path;
-            QVariant name;
-            int column;
-        };
-
         struct TorrentFile {
             std::string file_path;              // The internal path of the file within the torrent
             std::string sha1_hash_hex;          // The SHA-1 hash of the file, if available, in hexadecimal

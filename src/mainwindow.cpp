@@ -561,54 +561,50 @@ void MainWindow::contentsView_update()
                         ui->downloadView->model()->index(indexes.at(0).row(), MN_HIDDEN_UNIQUE_ID)).toString();
                 for (size_t k = 0; k < graph_init.size(); ++k) {
                     try {
+
+                        // Verify that we have the right download item
                         if (graph_init.at(k).unique_id == unique_id) {
+
+                            // Verify that this download is of the type 'BitTorrent'
                             if (graph_init.at(k).down_info.dl_type == GekkoFyre::DownloadType::Torrent ||
                                 graph_init.at(k).down_info.dl_type == GekkoFyre::DownloadType::TorrentMagnetLink) {
+
+                                // Read the XML data into memory
                                 std::vector<GekkoFyre::GkTorrent::TorrentInfo> gk_ti = GekkoFyre::CmnRoutines::readTorrentInfo(false);
                                 std::ostringstream oss_data;
                                 for (size_t i = 0; i < gk_ti.size(); ++i) {
                                     if (gk_ti.at(i).unique_id == unique_id.toStdString()) {
-                                        int column = 0;
-                                        QHash <QString, GekkoFyre::GkTorrent::ContentsView> columnData; // <root, data>
+                                        QHash <QString, QPair<QString, QString>> columnData; // <root, <child, parent>>
                                         std::vector<GekkoFyre::GkTorrent::TorrentFile> gk_tf_vec = gk_ti.at(i).files_vec;
 
                                         for (size_t j = 0; j < gk_tf_vec.size(); ++j) {
                                             GekkoFyre::GkTorrent::TorrentFile gk_tf_element = gk_tf_vec.at(j);
-
                                             fs::path boost_path(gk_tf_element.file_path);
-                                            for (auto &indice: boost_path) {
-                                                GekkoFyre::GkTorrent::ContentsView cv;
-                                                QString cv_root = QString::fromStdString(boost_path.parent_path().string());
-                                                ++column;
-                                                cv.column = column;
-                                                cv.name = QString::fromStdString(indice.string());
-                                                cv.under_path = cv_root;
-                                                columnData.insertMulti(cv_root, cv);
-                                            }
 
-                                            column = 0;
+                                            // Process the XML data
+                                            for (auto &indice: boost_path) {
+                                                QString cv_root = QString::fromStdString(boost_path.parent_path().string());
+                                                columnData.insertMulti(cv_root, qMakePair(QString::fromStdString(indice.string()), cv_root));
+                                            }
                                         }
 
-                                        QSet<QPair<int, QString>> dirs_toProc; // <column, value>, directories ready to be processed.
-                                        QSet<QPair<int, QString>> dirs_alreadyProc; // <column, value>, directories that have already been processed.
-                                        QSet<QString> roots_toProc;
+                                        QSet<QPair<QString, QString>> dirs_toProc; // <child, parent>, directories ready to be processed.
                                         for (auto const &entry: columnData) {
                                             // This will find all the directories and the appropriate column number for each directory.
-                                            QString under_path = entry.under_path.toString();
-                                            QString child = entry.name.toString();
-                                            int child_col = entry.column;
+                                            QString child = entry.first;
+                                            QString parent = entry.second;
 
                                             fs::path boost_child_path(child.toStdString());
-                                            QString dir_name = QDir(under_path).dirName();
+                                            QString dir_name = QDir(parent).dirName();
 
                                             if (!boost_child_path.has_extension() && dir_name == child) {
-                                                dirs_toProc.insert(qMakePair(child_col, under_path));
+                                                dirs_toProc.insert(qMakePair(child, parent));
                                             }
                                         }
 
-                                        QList<QPair<int, QString>> dirs_pair = dirs_toProc.values();
+                                        QList<QPair<QString, QString>> dirs_pair = dirs_toProc.values();
 
-                                        cV_model = new QStandardItemModel;
+                                        cV_model = std::make_unique<QStandardItemModel>();
                                         QStandardItem *topLevelItem = cV_model->invisibleRootItem();
 
                                         // Iterate over each directory string
@@ -624,8 +620,7 @@ void MainWindow::contentsView_update()
                                             // First part of the string is defo parent item
                                             // Check to make sure not to add duplicate
                                             if (cV_model->findItems(splitName[0], Qt::MatchFixedString).size() == 0) {
-                                                QStandardItem *parentItem = new QStandardItem();
-                                                parentItem->setData(splitName[0]);
+                                                QStandardItem *parentItem = new QStandardItem(splitName[0]);
                                                 topLevelItem->appendRow(parentItem);
                                             }
 
@@ -635,7 +630,7 @@ void MainWindow::contentsView_update()
                                         QStringList headers;
                                         headers << tr("Dir/File");
                                         cV_model->setHorizontalHeaderLabels(headers);
-                                        ui->contentsView->setModel(cV_model);
+                                        ui->contentsView->setModel(cV_model.get());
                                     }
                                 }
                             }
