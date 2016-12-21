@@ -43,7 +43,7 @@
 #ifndef ADDURL_HPP
 #define ADDURL_HPP
 
-#include "cmnroutines.hpp"
+#include "./../cmnroutines.hpp"
 #include <QDialog>
 #include <QString>
 

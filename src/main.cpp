@@ -40,7 +40,7 @@
  * @brief This file is self-explanatory.
  */
 
-#include "mainwindow.hpp"
+#include "gui/mainwindow.hpp"
 #include <QApplication>
 
 #define BOOST_FILESYSTEM_NO_DEPRECATED
