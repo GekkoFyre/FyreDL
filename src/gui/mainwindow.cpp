@@ -43,8 +43,8 @@
 #include "mainwindow.hpp"
 #include "ui_mainwindow.h"
 #include "settings.hpp"
-#include "singleton_proc.hpp"
-#include "curl_easy.hpp"
+#include "./../singleton_proc.hpp"
+#include "./../curl_easy.hpp"
 #include "about.hpp"
 #include <boost/filesystem.hpp>
 #include <boost/exception/all.hpp>

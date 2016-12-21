@@ -42,10 +42,10 @@
 
 #include "addurl.hpp"
 #include "ui_addurl.h"
-#include "default_var.hpp"
-#include "curl_multi.hpp"
-#include "curl_easy.hpp"
-#include "./../utils/fast-cpp-csv-parser/csv.h"
+#include "./../default_var.hpp"
+#include "./../curl_multi.hpp"
+#include "./../curl_easy.hpp"
+#include "./../../utils/fast-cpp-csv-parser/csv.h"
 #include <boost/filesystem.hpp>
 #include <boost/exception/all.hpp>
 #include <exception>

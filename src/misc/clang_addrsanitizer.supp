@@ -1,0 +1,10 @@
+# http://clang.llvm.org/docs/AddressSanitizer.html#suppressing-reports-in-external-libraries
+
+# src:moc_addurl.cpp
+# src:moc_cmnroutines.cpp
+# src:moc_curl_easy.cpp
+# src:moc_curl_multi.cpp
+# src:moc_dl_view.cpp
+# src:moc_mainwindow.cpp
+# src:moc_settings.cpp
+# src:fyredl_automoc.cpp

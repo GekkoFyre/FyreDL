@@ -75,38 +75,38 @@ endif(Qt5Widgets_FOUND)
 set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/Modules/")
 
 set(SOURCE_FILES
-    about.hpp
-    about.cpp
-    addurl.hpp
-    addurl.cpp
-    cmnroutines.hpp
-    cmnroutines.cpp
-    curl_easy.hpp
-    curl_easy.cpp
-    curl_multi.hpp
-    curl_multi.cpp
-    default_var.hpp
-    dl_view.hpp
-    dl_view.cpp
-    main.cpp
-    mainwindow.hpp
-    mainwindow.cpp
-    settings.hpp
-    settings.cpp
-    singleton_emit.hpp
-    singleton_proc.hpp
-    torrent_client.hpp
-    torrent_client.cpp)
+        gui/about.hpp
+        gui/about.cpp
+        gui/addurl.hpp
+        gui/addurl.cpp
+        cmnroutines.hpp
+        cmnroutines.cpp
+        curl_easy.hpp
+        curl_easy.cpp
+        curl_multi.hpp
+        curl_multi.cpp
+        default_var.hpp
+        dl_view.hpp
+        dl_view.cpp
+        main.cpp
+        gui/mainwindow.hpp
+        gui/mainwindow.cpp
+        gui/settings.hpp
+        gui/settings.cpp
+        singleton_emit.hpp
+        singleton_proc.hpp
+        torrent_client.hpp
+        torrent_client.cpp)
 
 set(EXTERNAL_SOURCE_FILES
     ./../utils/fast-cpp-csv-parser/csv.h)
 
 # http://www.executionunit.com/blog/2014/01/22/moving-from-qmake-to-cmake/
 qt5_wrap_ui(UI_HEADERS
-            about.ui
-            mainwindow.ui
-            addurl.ui
-            settings.ui)
+                gui/about.ui
+                gui/mainwindow.ui
+                gui/addurl.ui
+                gui/settings.ui)
 
 qt5_add_resources(UI_RESOURCES assets.qrc)
 

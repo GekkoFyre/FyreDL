@@ -43,12 +43,12 @@
 #ifndef MAINWINDOW_HPP
 #define MAINWINDOW_HPP
 
-#include "default_var.hpp"
-#include "dl_view.hpp"
-#include "cmnroutines.hpp"
-#include "curl_multi.hpp"
+#include "./../default_var.hpp"
+#include "./../dl_view.hpp"
+#include "./../cmnroutines.hpp"
+#include "./../curl_multi.hpp"
 #include "addurl.hpp"
-#include "torrent_client.hpp"
+#include "./../torrent_client.hpp"
 #include <vector>
 #include <string>
 #include <memory>
