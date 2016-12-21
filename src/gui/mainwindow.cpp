@@ -175,7 +175,7 @@ void MainWindow::addDownload()
 
 /**
  * @brief MainWindow::readFromHistoryFile
- * @author         Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
  * @param fileName
  */
 void MainWindow::readFromHistoryFile()

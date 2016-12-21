@@ -28,7 +28,7 @@
            <string>General</string>
           </property>
           <property name="icon">
-           <iconset resource="assets.qrc">
+           <iconset resource="../assets.qrc">
             <normaloff>:/icons/assets-img/system-run-3.png</normaloff>:/icons/assets-img/system-run-3.png</iconset>
           </property>
          </item>
@@ -37,7 +37,7 @@
            <string>HTTP/FTP</string>
           </property>
           <property name="icon">
-           <iconset resource="assets.qrc">
+           <iconset resource="../assets.qrc">
             <normaloff>:/icons/assets-img/gftp.png</normaloff>:/icons/assets-img/gftp.png</iconset>
           </property>
          </item>
@@ -73,7 +73,7 @@
   </layout>
  </widget>
  <resources>
-  <include location="assets.qrc"/>
+  <include location="../assets.qrc"/>
  </resources>
  <connections>
   <connection>

@@ -44,8 +44,11 @@
 #define FYREDL_TORRENT_SESSION_HPP
 
 #include "./../default_var.hpp"
+#include <libtorrent/torrent_status.hpp>
 #include <QObject>
+#include <QString>
 
+namespace lt = libtorrent;
 namespace GekkoFyre {
 class GkTorrentSession: public QObject {
     Q_OBJECT
@@ -53,6 +56,12 @@ class GkTorrentSession: public QObject {
 public:
     GkTorrentSession();
     ~GkTorrentSession();
+
+    QString state(lt::torrent_status::state_t s);
+    void startTorrentDl(const std::string &unique_id, const std::string &xmlHistoryFile = CFG_HISTORY_FILE);
+
+private:
+    void init_session(const std::string &magnet_uri, const std::string &destination);
 };
 }
 

@@ -72,18 +72,19 @@ extern "C" {
 #error "Platform not supported!"
 #endif
 
-#define FYREDL_PROG_VERS "0.0.1"                // The application version
-#define FYREDL_USER_AGENT "FyreDL/0.0.1"        // The user-agent displayed externally by FyreDL, along with the application version.
-#define CFG_HISTORY_FILE "fyredl_history.xml"   // The history file-name used by FyreDL. Location is also set within the application's GUI.
-#define CFG_SETTINGS_FILE "fyredl_settings.xml" // The configuration file-name used by FyreDL. Location is also set within the application's GUI.
-#define ENBL_GUI_CHARTS false                   // Whether to enable charts/graphs within the GUI, to chart the progress of downloads.
-#define ENBL_GUI_CONTENTS_VIEW true             // Whether to enable the contents view of inside BitTorrents (located at the bottom) within the GUI.
-#define FYREDL_LIBCURL_VERBOSE 1L               // Set to '1L' if you want libcurl to tell you what it's up to!
-#define FYREDL_CONN_TIMEOUT 60L                 // The duration, in seconds, until a timeout occurs when attempting to make a connection.
-#define FYREDL_CONN_LOW_SPEED_CUTOUT 512L       // The average transfer speed in bytes per second to be considered below before connection cut-off.
-#define FYREDL_CONN_LOW_SPEED_TIME 10L          // The number of seconds that the transfer speed should be below 'FYREDL_CONN_LOW_SPEED_CUTOUT' before connection cut-off.
-#define FYREDL_EST_WAIT_TIME_PRECISION 3        // The significant digit precision of the estimated wait time counter for each active transfer
-#define FYREDL_UNIQUE_ID_DIGIT_COUNT 32         // The 'unique identifier' serial number that is given to each download item. This determines how many digits are allocated to this identifier and thus, how much RAM is used for storage thereof.
+#define FYREDL_PROG_VERS "0.0.1"                         // The application version
+#define FYREDL_USER_AGENT "FyreDL/0.0.1"                 // The user-agent displayed externally by FyreDL, along with the application version.
+#define FYREDL_TORRENT_RESUME_FILE_EXT ".fyredl"         // The file extension used for 'resume data' by the BitTorrent side of the FyreDL application
+#define CFG_HISTORY_FILE "fyredl_history.xml"            // The history file-name used by FyreDL. Location is also set within the application's GUI.
+#define CFG_SETTINGS_FILE "fyredl_settings.xml"          // The configuration file-name used by FyreDL. Location is also set within the application's GUI.
+#define ENBL_GUI_CHARTS false                            // Whether to enable charts/graphs within the GUI, to chart the progress of downloads.
+#define ENBL_GUI_CONTENTS_VIEW true                      // Whether to enable the contents view of inside BitTorrents (located at the bottom) within the GUI.
+#define FYREDL_LIBCURL_VERBOSE 1L                        // Set to '1L' if you want libcurl to tell you what it's up to!
+#define FYREDL_CONN_TIMEOUT 60L                          // The duration, in seconds, until a timeout occurs when attempting to make a connection.
+#define FYREDL_CONN_LOW_SPEED_CUTOUT 512L                // The average transfer speed in bytes per second to be considered below before connection cut-off.
+#define FYREDL_CONN_LOW_SPEED_TIME 10L                   // The number of seconds that the transfer speed should be below 'FYREDL_CONN_LOW_SPEED_CUTOUT' before connection cut-off.
+#define FYREDL_EST_WAIT_TIME_PRECISION 3                 // The significant digit precision of the estimated wait time counter for each active transfer
+#define FYREDL_UNIQUE_ID_DIGIT_COUNT 32                  // The 'unique identifier' serial number that is given to each download item. This determines how many digits are allocated to this identifier and thus, how much RAM is used for storage thereof.
 
 //
 // ######################################

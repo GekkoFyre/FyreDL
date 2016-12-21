@@ -38,7 +38,7 @@
             <string/>
            </property>
            <property name="icon">
-            <iconset resource="assets.qrc">
+            <iconset resource="../assets.qrc">
              <normaloff>:/icons/assets-img/original-logos-2015-Sep-3044-7944329.png</normaloff>:/icons/assets-img/original-logos-2015-Sep-3044-7944329.png</iconset>
            </property>
            <property name="iconSize">
@@ -91,6 +91,13 @@
           <widget class="QLabel" name="label">
            <property name="text">
             <string>Copyright © 2016. GekkoFyre.</string>
+           </property>
+          </widget>
+         </item>
+         <item alignment="Qt::AlignHCenter|Qt::AlignVCenter">
+          <widget class="QLabel" name="libtorrent_version_label">
+           <property name="text">
+            <string>N/A</string>
            </property>
           </widget>
          </item>
@@ -842,7 +849,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.</string>
   </layout>
  </widget>
  <resources>
-  <include location="assets.qrc"/>
+  <include location="../assets.qrc"/>
  </resources>
  <connections>
   <connection>
