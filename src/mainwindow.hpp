@@ -48,15 +48,15 @@
 #include "cmnroutines.hpp"
 #include "curl_multi.hpp"
 #include "addurl.hpp"
-#include "contents_view.hpp"
 #include "torrent_client.hpp"
 #include <vector>
 #include <string>
 #include <memory>
 #include <QMainWindow>
 #include <QString>
-#include <QtConcurrent/QtConcurrent>
 #include <QThread>
+#include <QStringList>
+#include <QStandardItem>
 
 namespace Ui {
 class MainWindow;
@@ -87,7 +87,9 @@ private:
     void delCharts(const std::string &file_dest);
     void updateChart();
 
+    std::unique_ptr<QStandardItemModel> cV_model;
     void contentsView_update();
+    void cV_addItems(QStandardItem *parent, const QStringList &elements);
 
     bool askDeleteFile(const QString &file_dest, const bool &noRestart = false);
     void startDownload(const QString &file_dest, const bool &resumeDl = true);
@@ -105,7 +107,6 @@ private:
     void transfer_extraDetails();
 
     downloadModel *dlModel;
-    std::unique_ptr<GekkoFyre::GkTreeModel> gk_treeModel;
     GekkoFyre::CmnRoutines *routines;
     GekkoFyre::CurlMulti *curl_multi;
     std::vector<GekkoFyre::GkCurl::CurlProgressPtr> dl_stat;
