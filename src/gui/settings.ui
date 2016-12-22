@@ -107,8 +107,510 @@
          <property name="frameShape">
           <enum>QFrame::StyledPanel</enum>
          </property>
-         <widget class="QWidget" name="page"/>
-         <widget class="QWidget" name="page_2"/>
+         <widget class="QWidget" name="main_settings">
+          <layout class="QVBoxLayout" name="verticalLayout">
+           <item>
+            <widget class="QGroupBox" name="main_groupBox">
+             <property name="title">
+              <string>Main</string>
+             </property>
+             <property name="alignment">
+              <set>Qt::AlignCenter</set>
+             </property>
+             <layout class="QVBoxLayout" name="verticalLayout_2">
+              <item>
+               <widget class="QGroupBox" name="filesanddirs_groupBox">
+                <property name="title">
+                 <string>&lt;&lt; Files and Directories &gt;&gt;</string>
+                </property>
+                <layout class="QFormLayout" name="formLayout">
+                 <item row="0" column="0">
+                  <widget class="QLabel" name="defDir_label">
+                   <property name="text">
+                    <string>Default Save/Open Dir.: </string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="0" column="1">
+                  <layout class="QHBoxLayout" name="defDir_horizLayout">
+                   <item>
+                    <widget class="QLineEdit" name="defDir_lineEdit"/>
+                   </item>
+                   <item>
+                    <widget class="QToolButton" name="defDir_toolButton">
+                     <property name="text">
+                      <string>...</string>
+                     </property>
+                    </widget>
+                   </item>
+                  </layout>
+                 </item>
+                 <item row="1" column="0">
+                  <widget class="QLabel" name="xmlHist_label">
+                   <property name="text">
+                    <string>XML History File: </string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="2" column="0">
+                  <widget class="QLabel" name="xmlCfg_label">
+                   <property name="text">
+                    <string>XML Config File: </string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="1" column="1">
+                  <layout class="QHBoxLayout" name="xmlHist_horizLayout">
+                   <item>
+                    <widget class="QLineEdit" name="xmlHist_lineEdit"/>
+                   </item>
+                   <item>
+                    <widget class="QToolButton" name="xmlHist_toolBtn">
+                     <property name="text">
+                      <string>...</string>
+                     </property>
+                    </widget>
+                   </item>
+                  </layout>
+                 </item>
+                 <item row="2" column="1">
+                  <layout class="QHBoxLayout" name="xmlCfg_horizLayout">
+                   <item>
+                    <widget class="QLineEdit" name="xmlCfg_lineEdit"/>
+                   </item>
+                   <item>
+                    <widget class="QToolButton" name="xmlCfg_toolBtn">
+                     <property name="text">
+                      <string>...</string>
+                     </property>
+                    </widget>
+                   </item>
+                  </layout>
+                 </item>
+                </layout>
+               </widget>
+              </item>
+              <item>
+               <widget class="QGroupBox" name="fyredl_groupBox">
+                <property name="title">
+                 <string>&lt;&lt; FyreDL &gt;&gt;</string>
+                </property>
+                <layout class="QFormLayout" name="formLayout_2">
+                 <item row="0" column="0">
+                  <widget class="QLabel" name="userAgent_label">
+                   <property name="text">
+                    <string>Global User Agent: </string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="0" column="1">
+                  <widget class="QLineEdit" name="userAgent_lineEdit"/>
+                 </item>
+                 <item row="1" column="0">
+                  <widget class="QLabel" name="uniqueId_label">
+                   <property name="text">
+                    <string>Item's Unique ID Length: </string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="1" column="1">
+                  <widget class="QSpinBox" name="uniqueId_spinBox">
+                   <property name="toolTip">
+                    <string>Each download item has a Unique Identifier associated with it. This is the length of its ID number so please be aware that too small of a value may cause conflicts.</string>
+                   </property>
+                   <property name="minimum">
+                    <number>32</number>
+                   </property>
+                   <property name="maximum">
+                    <number>128</number>
+                   </property>
+                  </widget>
+                 </item>
+                </layout>
+               </widget>
+              </item>
+              <item>
+               <spacer name="verticalSpacer">
+                <property name="orientation">
+                 <enum>Qt::Vertical</enum>
+                </property>
+                <property name="sizeHint" stdset="0">
+                 <size>
+                  <width>20</width>
+                  <height>40</height>
+                 </size>
+                </property>
+               </spacer>
+              </item>
+             </layout>
+            </widget>
+           </item>
+          </layout>
+         </widget>
+         <widget class="QWidget" name="torrent_general_settings">
+          <layout class="QVBoxLayout" name="verticalLayout_3">
+           <item>
+            <widget class="QScrollArea" name="scrollArea">
+             <property name="widgetResizable">
+              <bool>true</bool>
+             </property>
+             <widget class="QWidget" name="scrollAreaWidgetContents">
+              <property name="geometry">
+               <rect>
+                <x>0</x>
+                <y>0</y>
+                <width>710</width>
+                <height>994</height>
+               </rect>
+              </property>
+              <layout class="QVBoxLayout" name="verticalLayout_4">
+               <item>
+                <widget class="QGroupBox" name="torrent_general_groupBox">
+                 <property name="title">
+                  <string>BitTorrent &gt;&gt; General</string>
+                 </property>
+                 <property name="alignment">
+                  <set>Qt::AlignCenter</set>
+                 </property>
+                 <layout class="QVBoxLayout" name="verticalLayout_5">
+                  <item>
+                   <widget class="QGroupBox" name="torrent_networking_groupBox">
+                    <property name="title">
+                     <string>&lt;&lt; Networking &gt;&gt;</string>
+                    </property>
+                    <layout class="QFormLayout" name="formLayout_3">
+                     <item row="0" column="0">
+                      <widget class="QCheckBox" name="enable_dht_chkBox">
+                       <property name="text">
+                        <string>Enable DHT</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="0" column="1">
+                      <widget class="QCheckBox" name="rate_limit_overhead_chkBox_2">
+                       <property name="text">
+                        <string>Rate Limit IP Overhead</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="1" column="0">
+                      <widget class="QCheckBox" name="enable_upnp_chkBox">
+                       <property name="text">
+                        <string>Enable UPnP</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="1" column="1">
+                      <widget class="QCheckBox" name="enable_nat_pmp_chkBox">
+                       <property name="text">
+                        <string>Enable NAT-PMP</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="2" column="0">
+                      <widget class="QCheckBox" name="prefer_udp_trackers_chkBox">
+                       <property name="text">
+                        <string>Prefer UDP Trackers</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="6" column="0">
+                      <widget class="QLabel" name="tracker_receive_timeout_label">
+                       <property name="text">
+                        <string>Tracker Receive Timeout: </string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="6" column="1">
+                      <widget class="QSpinBox" name="tracker_receive_timeout_spinBox"/>
+                     </item>
+                     <item row="7" column="0">
+                      <widget class="QLabel" name="stop_tracker_timeout_label">
+                       <property name="text">
+                        <string>Stop Tracker Timeout: </string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="7" column="1">
+                      <widget class="QSpinBox" name="stop_tracker_timeout_spinBox"/>
+                     </item>
+                     <item row="8" column="0">
+                      <widget class="QLabel" name="peer_timeout_label">
+                       <property name="text">
+                        <string>Peer Timeout: </string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="8" column="1">
+                      <widget class="QSpinBox" name="peer_timeout_spinBox"/>
+                     </item>
+                     <item row="9" column="0">
+                      <widget class="QLabel" name="peer_connect_timeout_label">
+                       <property name="text">
+                        <string>Peer Connect Timeout: </string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="9" column="1">
+                      <widget class="QSpinBox" name="peer_connect_timeout_spinBox"/>
+                     </item>
+                     <item row="10" column="0">
+                      <widget class="QLabel" name="handshake_timeout_label">
+                       <property name="text">
+                        <string>Handshake Timeout: </string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="10" column="1">
+                      <widget class="QSpinBox" name="handshake_timeout_spinBox"/>
+                     </item>
+                     <item row="11" column="0">
+                      <spacer name="horizontalSpacer">
+                       <property name="orientation">
+                        <enum>Qt::Horizontal</enum>
+                       </property>
+                       <property name="sizeHint" stdset="0">
+                        <size>
+                         <width>40</width>
+                         <height>20</height>
+                        </size>
+                       </property>
+                      </spacer>
+                     </item>
+                     <item row="11" column="1">
+                      <spacer name="horizontalSpacer_2">
+                       <property name="orientation">
+                        <enum>Qt::Horizontal</enum>
+                       </property>
+                       <property name="sizeHint" stdset="0">
+                        <size>
+                         <width>40</width>
+                         <height>20</height>
+                        </size>
+                       </property>
+                      </spacer>
+                     </item>
+                     <item row="12" column="0">
+                      <widget class="QLabel" name="urlseed_pipeline_size_label">
+                       <property name="text">
+                        <string>URL Seed Pipeline Size: </string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="12" column="1">
+                      <widget class="QSpinBox" name="urlseed_pipeline_size_spinBox"/>
+                     </item>
+                     <item row="13" column="0">
+                      <widget class="QLabel" name="urlseed_timeout_label">
+                       <property name="text">
+                        <string>URL Seed Timeout: </string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="13" column="1">
+                      <widget class="QSpinBox" name="urlseed_timeout_spinBox"/>
+                     </item>
+                     <item row="14" column="0">
+                      <widget class="QLabel" name="urlseed_wait_to_reply_label">
+                       <property name="text">
+                        <string>URL Seed Wait to Retry: </string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="14" column="1">
+                      <widget class="QSpinBox" name="urlseed_wait_to_retry_spinBox"/>
+                     </item>
+                     <item row="15" column="0">
+                      <spacer name="horizontalSpacer_3">
+                       <property name="orientation">
+                        <enum>Qt::Horizontal</enum>
+                       </property>
+                       <property name="sizeHint" stdset="0">
+                        <size>
+                         <width>40</width>
+                         <height>20</height>
+                        </size>
+                       </property>
+                      </spacer>
+                     </item>
+                     <item row="15" column="1">
+                      <spacer name="horizontalSpacer_4">
+                       <property name="orientation">
+                        <enum>Qt::Horizontal</enum>
+                       </property>
+                       <property name="sizeHint" stdset="0">
+                        <size>
+                         <width>40</width>
+                         <height>20</height>
+                        </size>
+                       </property>
+                      </spacer>
+                     </item>
+                     <item row="16" column="0">
+                      <widget class="QLabel" name="request_queue_time_label">
+                       <property name="text">
+                        <string>Request Queue Time: </string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="17" column="0">
+                      <widget class="QLabel" name="request_timeout_label">
+                       <property name="text">
+                        <string>Request Timeout: </string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="19" column="0">
+                      <widget class="QLabel" name="min_reconnect_time_label">
+                       <property name="text">
+                        <string>Min. Reconnect Time: </string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="20" column="0">
+                      <widget class="QLabel" name="tracker_max_resp_length_label">
+                       <property name="text">
+                        <string>Tracker Max Resp. Length: </string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="16" column="1">
+                      <widget class="QSpinBox" name="request_queue_time_spinBox"/>
+                     </item>
+                     <item row="17" column="1">
+                      <widget class="QSpinBox" name="request_timeout_spinBox"/>
+                     </item>
+                     <item row="19" column="1">
+                      <widget class="QSpinBox" name="min_reconnect_time_spinBox"/>
+                     </item>
+                     <item row="20" column="1">
+                      <widget class="QSpinBox" name="tracker_max_resp_length_spinBox"/>
+                     </item>
+                     <item row="18" column="0">
+                      <spacer name="horizontalSpacer_5">
+                       <property name="orientation">
+                        <enum>Qt::Horizontal</enum>
+                       </property>
+                       <property name="sizeHint" stdset="0">
+                        <size>
+                         <width>40</width>
+                         <height>20</height>
+                        </size>
+                       </property>
+                      </spacer>
+                     </item>
+                     <item row="18" column="1">
+                      <spacer name="horizontalSpacer_6">
+                       <property name="orientation">
+                        <enum>Qt::Horizontal</enum>
+                       </property>
+                       <property name="sizeHint" stdset="0">
+                        <size>
+                         <width>40</width>
+                         <height>20</height>
+                        </size>
+                       </property>
+                      </spacer>
+                     </item>
+                     <item row="21" column="0">
+                      <widget class="QLabel" name="max_failcount_label">
+                       <property name="text">
+                        <string>Max Failcount: </string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="21" column="1">
+                      <widget class="QSpinBox" name="max_failcount_spinBox"/>
+                     </item>
+                     <item row="5" column="0">
+                      <spacer name="horizontalSpacer_7">
+                       <property name="orientation">
+                        <enum>Qt::Horizontal</enum>
+                       </property>
+                       <property name="sizeHint" stdset="0">
+                        <size>
+                         <width>40</width>
+                         <height>20</height>
+                        </size>
+                       </property>
+                      </spacer>
+                     </item>
+                     <item row="5" column="1">
+                      <spacer name="horizontalSpacer_8">
+                       <property name="orientation">
+                        <enum>Qt::Horizontal</enum>
+                       </property>
+                       <property name="sizeHint" stdset="0">
+                        <size>
+                         <width>40</width>
+                         <height>20</height>
+                        </size>
+                       </property>
+                      </spacer>
+                     </item>
+                     <item row="3" column="0">
+                      <widget class="QLabel" name="ssl_listen_port_label">
+                       <property name="text">
+                        <string>SSL Listening Port: </string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="3" column="1">
+                      <widget class="QSpinBox" name="ssl_listen_port_spinBox"/>
+                     </item>
+                    </layout>
+                   </widget>
+                  </item>
+                  <item>
+                   <widget class="QGroupBox" name="torrent_throttling_groupBox">
+                    <property name="title">
+                     <string>&lt;&lt; Throttling &gt;&gt;</string>
+                    </property>
+                   </widget>
+                  </item>
+                  <item>
+                   <widget class="QGroupBox" name="torrent_encryption_groupBox">
+                    <property name="title">
+                     <string>&lt;&lt; Encryption &gt;&gt;</string>
+                    </property>
+                    <layout class="QFormLayout" name="formLayout_4">
+                     <item row="0" column="0">
+                      <widget class="QCheckBox" name="announce_crypto_chkBox">
+                       <property name="text">
+                        <string>Announce Crypto Support</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="1" column="0">
+                      <widget class="QCheckBox" name="enable_ssl_chkBox">
+                       <property name="text">
+                        <string>Enable SSL support</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item row="2" column="0">
+                      <widget class="QCheckBox" name="prefer_rc4_encrypt_chkBox">
+                       <property name="text">
+                        <string>Prefer RC4 Encryption</string>
+                       </property>
+                      </widget>
+                     </item>
+                    </layout>
+                    <zorder>enable_ssl_chkBox</zorder>
+                    <zorder>enable_ssl_chkBox</zorder>
+                    <zorder>prefer_rc4_encrypt_chkBox</zorder>
+                    <zorder>announce_crypto_chkBox</zorder>
+                   </widget>
+                  </item>
+                 </layout>
+                </widget>
+               </item>
+              </layout>
+             </widget>
+            </widget>
+           </item>
+          </layout>
+         </widget>
         </widget>
        </item>
       </layout>
