@@ -71,21 +71,13 @@ GekkoFyre::GkTorrentClient::~GkTorrentClient()
  * @date 2016-12-22
  * @param unique_id The Unique ID relating to the download item in question.
  */
-void GekkoFyre::GkTorrentClient::startTorrentDl(const std::string &unique_id, const std::string &xmlHistoryFile)
+void GekkoFyre::GkTorrentClient::startTorrentDl(const GekkoFyre::GkTorrent::TorrentItem &item)
 {
-    QString torrent_error_name = tr("<N/A>");
+    QString torrent_error_name = QString::fromStdString(item.info.torrent_name);
+
     try {
-        std::vector<GekkoFyre::GkTorrent::TorrentInfo> gk_ti = routines->readTorrentInfo(false, xmlHistoryFile);
-
-        for (size_t i = 0; i < gk_ti.size(); ++i) {
-            GekkoFyre::GkTorrent::TorrentInfo indice = gk_ti.at(i);
-            if (unique_id == indice.unique_id) {
-                torrent_error_name = QString::fromStdString(indice.torrent_name);
-                std::string full_path = (indice.down_dest + fs::path::preferred_separator + indice.torrent_name);
-
-                gk_torrent_session->init_session(indice.magnet_uri, unique_id, full_path);
-            }
-        }
+        std::string full_path =item.info.down_dest + fs::path::preferred_separator + item.info.torrent_name;
+        gk_torrent_session->init_session(item, full_path);
     } catch (const std::exception &e) {
         QMessageBox::warning(nullptr, tr("Error!"), tr("An issue has occured with torrent, \"%1\".\n\n%2")
                 .arg(torrent_error_name).arg(e.what()), QMessageBox::Ok);

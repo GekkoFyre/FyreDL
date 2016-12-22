@@ -45,6 +45,7 @@
 
 #include <boost/cstdint.hpp>
 #include <boost/optional.hpp>
+#include <libtorrent/session.hpp>
 #include <locale>
 #include <string>
 #include <iostream>
@@ -164,7 +165,7 @@ extern "C" {
 #define XML_ITEM_ATTR_SETTINGS_WIN_X "main-win-x"
 
 // These determine the columns used in QTableView
-#define MN_COL_COUNT 10
+#define MN_COL_COUNT 12
 
 #define MN_FILENAME_COL 0       // The name of just the file or torrent being downloaded
 #define MN_FILESIZE_COL 1       // The content-length of the download, in kilobytes/megabytes/gigabytes/etc.
@@ -172,10 +173,12 @@ extern "C" {
 #define MN_PROGRESS_COL 3       // The progress towards completion on the download, on a scale of 0-100 percent
 #define MN_UPSPEED_COL 4        // The upward transfer speed
 #define MN_DOWNSPEED_COL 5      // The downward transfer speed
-#define MN_STATUS_COL 6         // Whether the download is paused, stopped, actively transferring, etc.
-#define MN_DESTINATION_COL 7    // The destination of the download on local storage
-#define MN_URL_COL 8            // The URL column
-#define MN_HIDDEN_UNIQUE_ID 9   // Stores the 'unique identifier' serial number for each download. Kind of a hack/cheat :)
+#define MN_SEEDERS_COL 6        // Related to BitTorrent items; the amount of seeders on a particular download
+#define MN_LEECHERS_COL 7       // Related to BitTorrent items; the amount of leechers on a particular download
+#define MN_STATUS_COL 8         // Whether the download is paused, stopped, actively transferring, etc.
+#define MN_DESTINATION_COL 9    // The destination of the download on local storage
+#define MN_URL_COL 10           // The URL column
+#define MN_HIDDEN_UNIQUE_ID 11  // Stores the 'unique identifier' serial number for each download. Kind of a hack/cheat :)
 
 // This determines the currently selected tab at the bottom of the main window
 #define TAB_INDEX_GENERAL 0
@@ -268,6 +271,41 @@ namespace GekkoFyre {
             int progress_ppm;
         };
 
+        // http://libtorrent.org/reference-Settings.html#settings_pack
+        struct SessionSettings {
+            bool rate_limit_ip_overhead;           // If set to true, the estimated TCP/IP overhead is drained from the rate limiters, to avoid exceeding the limits with the total traffic.
+            bool prefer_udp_trackers;              // Means that trackers may be rearranged in a way that udp trackers are always tried before http trackers for the same hostname.
+            bool announce_crypto_support;          // When this is true, and incoming encrypted connections are enabled, &supportcrypt=1 is included in http tracker announces.
+            bool enable_upnp;                      // Starts and stops the UPnP service. When started, the listen port and the DHT port are attempted to be forwarded on local UPnP router devices. See upnp-and-nat-pmp_.
+            bool enable_natpmp;                    // Starts and stops the NAT-PMP service. When started, the listen port and the DHT port are attempted to be forwarded on the router through NAT-PMP. See upnp-and-nat-pmp_.
+            bool enable_dht;                       // Starts the dht node and makes the trackerless service available to torrents.
+            bool prefer_rc4;                       // If the allowed encryption level is both, setting this to true will prefer rc4 if both methods are offered, plaintext otherwise.
+            int tracker_receive_timeout;           // The number of seconds to wait to receive any data from the tracker. If no data is received for this number of seconds, the tracker will be considered as having timed out. If a tracker is down, this is the kind of timeout that will occur.
+            int stop_tracker_timeout;              // The time to wait when sending a stopped message before considering a tracker to have timed out. this is usually shorter, to make the client quit faster.
+            int tracker_maximum_response_length;   // This is the maximum number of bytes in a tracker response. If a response size passes this number of bytes it will be rejected and the connection will be closed. On gzipped responses this size is measured on the uncompressed data. So, if you get 20 bytes of gzip response that'll expand to 2 megabytes, it will be interrupted before the entire response has been uncompressed (assuming the limit is lower than 2 megs).
+            int request_timeout;                   // The number of seconds one block (16kB) is expected to be received within. If it's not, the block is requested from a different peer.
+            int request_queue_time;                // The length of the request queue given in the number of seconds it should take for the other end to send all the pieces. i.e. the actual number of requests depends on the download rate and this number.
+            int peer_timeout;                      // The number of seconds the peer connection should wait (for any activity on the peer connection) before closing it due to time out. This defaults to 120 seconds, since that's what's specified in the protocol specification. After half the time out, a keep alive message is sent.
+            int urlseed_timeout;                   // Same as peer_timeout, but only applies to url-seeds. this is usually set lower, because web servers are expected to be more reliable.
+            int urlseed_pipeline_size;             // Controls the pipelining size of url-seeds. i.e. the number of HTTP request to keep outstanding before waiting for the first one to complete. It's common for web servers to limit this to a relatively low number, like 5.
+            int urlseed_wait_retry;                // Time to wait until a new retry of a web seed takes place.
+            int max_failcount;                     // The maximum times we try to connect to a peer before stop connecting again. If a peer succeeds, the failcounter is reset. If a peer is retrieved from a peer source (other than DHT) the failcount is decremented by one, allowing another try.
+            int min_reconnect_time;                // The number of seconds to wait to reconnect to a peer. this time is multiplied with the failcount.
+            int peer_connect_timeout;              // The number of seconds to wait after a connection attempt is initiated to a peer until it is considered as having timed out. This setting is especially important in case the number of half-open connections are limited, since stale half-open connection may delay the connection of other peers considerably.
+            int connection_speed;                  // The number of connection attempts that are made per second. If a number < 0 is specified, it will default to 200 connections per second. If 0 is specified, it means don't make outgoing connections at all.
+            int handshake_timeout;                 // The number of seconds to wait for a handshake response from a peer. If no response is received within this time, the peer is disconnected.
+            int dht_upload_rate_limit;             // Sets the rate limit on the DHT. This is specified in bytes per second and defaults to 4000. For busy boxes with lots of torrents that requires more DHT traffic, this should be raised.
+            int download_rate_limit;
+            int upload_rate_limit;
+            int connections_limit;                 // Sets a global limit on the number of connections opened. The number of connections is set to a hard minimum of at least two per torrent, so if you set a too lowconnections limit, and open too many torrents, the limit will not be met.
+            int connections_slack;                 // The the number of incoming connections exceeding the connection limit to accept in order to potentially replace existing ones.
+            int half_open_limit;                   // Sets the maximum number of half-open connections libtorrent will have when connecting to peers. A half-open connection is one where connect() has been called, but the connection still hasn't been established (nor failed).
+            int ssl_listen;                        // Sets the listen port for SSL connections. If this is set to 0, no SSL listen port is opened. Otherwise a socket is opened on this port. This setting is only taken into account when opening the regular listen port, and won't re-open the listen socket simply by changing this setting.
+            int share_ratio_limit;                 // When a seeding torrent reaches either the share ratio (bytes up / bytes down) or the seed time ratio (seconds as seed / seconds as downloader) or the seed time limit (seconds as seed) it is considered done, and it will leave room for other torrents these are specified as percentages.
+            int seed_time_ratio_limit;             // When a seeding torrent reaches either the share ratio (bytes up / bytes down) or the seed time ratio (seconds as seed / seconds as downloader) or the seed time limit (seconds as seed) it is considered done, and it will leave room for other torrents these are specified as percentages.
+
+        };
+
         struct TorrentFile {
             std::string file_path;              // The internal path of the file within the torrent
             std::string sha1_hash_hex;          // The SHA-1 hash of the file, if available, in hexadecimal
@@ -314,6 +352,12 @@ namespace GekkoFyre {
             std::string comment;                    // Any comments left by the author of the torrent file in question
             std::vector<std::pair<int, std::string>> trackers;
             std::vector<TorrentFile> files_vec;
+        };
+
+        struct TorrentItem {
+            TorrentInfo info;
+            SessionSettings session;
+            TorrentXferStats xfer_stats;
         };
     }
 

@@ -131,7 +131,7 @@ QVariant downloadModel::headerData(int section, Qt::Orientation orientation, int
     if (orientation == Qt::Horizontal) {
         switch (section) {
         case MN_FILENAME_COL:
-            return tr("File name");
+            return tr("Item name");
         case MN_FILESIZE_COL:
             return tr("File size");
         case MN_DOWNLOADED_COL:
@@ -139,13 +139,17 @@ QVariant downloadModel::headerData(int section, Qt::Orientation orientation, int
         case MN_PROGRESS_COL:
             return tr("Progress");
         case MN_UPSPEED_COL:
-            return tr("Upload speed");
+            return tr("U/load rate");
         case MN_DOWNSPEED_COL:
-            return tr("Download speed");
+            return tr("D/load rate");
+        case MN_SEEDERS_COL:
+            return tr("Seeders");
+        case MN_LEECHERS_COL:
+            return tr("Leechers");
         case MN_STATUS_COL:
             return tr("Status");
         case MN_DESTINATION_COL:
-            return tr("Destination");
+            return tr("Dest.");
         case MN_URL_COL:
             return tr("URL");
         case MN_HIDDEN_UNIQUE_ID:
@@ -200,6 +204,10 @@ bool downloadModel::setData(const QModelIndex &index, const QVariant &value, int
             v.insert((v.begin() + MN_UPSPEED_COL), value.toString());
         } else if (index.column() == MN_DOWNSPEED_COL) {
             v.insert((v.begin() + MN_DOWNSPEED_COL), value.toString());
+        } else if (index.column() == MN_SEEDERS_COL) {
+            v.insert((v.begin() + MN_SEEDERS_COL), value.toString());
+        } else if (index.column() == MN_LEECHERS_COL) {
+            v.insert((v.begin() + MN_LEECHERS_COL), value.toString());
         } else if (index.column() == MN_STATUS_COL) {
             v.insert((v.begin() + MN_STATUS_COL), value.toString());
         } else if (index.column() == MN_DESTINATION_COL) {

@@ -93,12 +93,47 @@ QString GekkoFyre::GkTorrentSession::state(lt::torrent_status::state_t s)
  * @note <http://libtorrent.org/tutorial.html>
  * @param magnet_uri is the 'Magnet URL' of the BitTorrent in question that's being downloaded.
  */
-void GekkoFyre::GkTorrentSession::init_session(const std::string &magnet_uri, const std::string &unique_id,
-                                               const std::string &destination)
+void GekkoFyre::GkTorrentSession::  init_session(const GekkoFyre::GkTorrent::TorrentItem &item,
+                                                 const std::string &destination)
 {
+    // http://libtorrent.org/reference-Settings.html#settings_pack
     lt::settings_pack pack;
     pack.set_int(lt::settings_pack::alert_mask, lt::alert::error_notification | lt::alert::storage_notification |
             lt::alert::status_notification);
+    pack.set_str(lt::settings_pack::user_agent, FYREDL_USER_AGENT);
+
+    pack.set_bool(lt::settings_pack::rate_limit_ip_overhead, item.session.rate_limit_ip_overhead);
+    pack.set_bool(lt::settings_pack::prefer_udp_trackers, item.session.prefer_udp_trackers);
+    pack.set_bool(lt::settings_pack::announce_crypto_support, item.session.announce_crypto_support);
+    pack.set_bool(lt::settings_pack::enable_upnp, item.session.enable_upnp);
+    pack.set_bool(lt::settings_pack::enable_natpmp, item.session.enable_natpmp);
+    pack.set_bool(lt::settings_pack::enable_dht, item.session.enable_dht);
+    pack.set_bool(lt::settings_pack::prefer_rc4, item.session.prefer_rc4);
+
+    pack.set_int(lt::settings_pack::tracker_receive_timeout, item.session.tracker_receive_timeout);
+    pack.set_int(lt::settings_pack::stop_tracker_timeout, item.session.stop_tracker_timeout);
+    pack.set_int(lt::settings_pack::tracker_maximum_response_length, item.session.tracker_maximum_response_length);
+    pack.set_int(lt::settings_pack::request_timeout, item.session.request_timeout);
+    pack.set_int(lt::settings_pack::request_queue_time, item.session.request_queue_time);
+    pack.set_int(lt::settings_pack::peer_timeout, item.session.peer_timeout);
+    pack.set_int(lt::settings_pack::peer_connect_timeout, item.session.peer_connect_timeout);
+    pack.set_int(lt::settings_pack::urlseed_pipeline_size, item.session.urlseed_pipeline_size);
+    pack.set_int(lt::settings_pack::urlseed_timeout, item.session.urlseed_timeout);
+    pack.set_int(lt::settings_pack::urlseed_wait_retry, item.session.urlseed_wait_retry);
+    pack.set_int(lt::settings_pack::max_failcount, item.session.max_failcount);
+    pack.set_int(lt::settings_pack::min_reconnect_time, item.session.min_reconnect_time);
+    pack.set_int(lt::settings_pack::connection_speed, item.session.connection_speed);
+    pack.set_int(lt::settings_pack::handshake_timeout, item.session.handshake_timeout);
+    pack.set_int(lt::settings_pack::dht_upload_rate_limit, item.session.dht_upload_rate_limit);
+    pack.set_int(lt::settings_pack::download_rate_limit, item.session.download_rate_limit);
+    pack.set_int(lt::settings_pack::upload_rate_limit, item.session.upload_rate_limit);
+    pack.set_int(lt::settings_pack::connections_limit, item.session.connections_limit);
+    pack.set_int(lt::settings_pack::connections_slack, item.session.connections_slack);
+    pack.set_int(lt::settings_pack::half_open_limit, item.session.half_open_limit);
+    pack.set_int(lt::settings_pack::ssl_listen, item.session.ssl_listen);
+    pack.set_int(lt::settings_pack::share_ratio_limit, item.session.share_ratio_limit);
+    pack.set_int(lt::settings_pack::seed_time_ratio_limit, item.session.seed_time_ratio_limit);
+
 
     lt::session ses(pack);
     lt::add_torrent_params atp; // http://libtorrent.org/reference-Core.html#add-torrent-params
@@ -108,7 +143,7 @@ void GekkoFyre::GkTorrentSession::init_session(const std::string &magnet_uri, co
     std::ifstream ifs(FYREDL_TORRENT_RESUME_FILE_EXT, std::ios::binary);
     ifs.unsetf(std::ios::skipws);
     atp.resume_data.assign(std::istream_iterator<char>(ifs), std::istream_iterator<char>());
-    atp.url = magnet_uri;
+    atp.url = item.info.magnet_uri;
     atp.save_path = destination;
     ses.async_add_torrent(atp);
 
@@ -146,7 +181,7 @@ void GekkoFyre::GkTorrentSession::init_session(const std::string &magnet_uri, co
 
                 // We only have a single torrent, so we know which one the status is for
                 const lt::torrent_status &s = st->status[0];
-                emit sendStats(unique_id, s);
+                emit sendStats(item.info.unique_id, s);
             }
         }
 

@@ -60,7 +60,7 @@ public:
     GkTorrentClient();
     ~GkTorrentClient();
 
-    void startTorrentDl(const std::string &unique_id, const std::string &xmlHistoryFile = CFG_HISTORY_FILE);
+    void startTorrentDl(const GekkoFyre::GkTorrent::TorrentItem &item);
 
 private:
     GekkoFyre::CmnRoutines *routines;

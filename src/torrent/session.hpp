@@ -58,8 +58,7 @@ public:
     ~GkTorrentSession();
 
     QString state(lt::torrent_status::state_t s);
-    void init_session(const std::string &magnet_uri, const std::string &unique_id,
-                      const std::string &destination);
+    void init_session(const GekkoFyre::GkTorrent::TorrentItem &item, const std::string &destination);
 
 signals:
     void sendStats(const std::string &unique_id, const lt::torrent_status &stats);

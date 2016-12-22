@@ -298,6 +298,12 @@ void MainWindow::insertNewRow(const std::string &fileName, const double &fileSiz
     index = dlModel->index(0, MN_DOWNSPEED_COL, QModelIndex());
     dlModel->setData(index, QString::number(downSpeed), Qt::DisplayRole);
 
+    index = dlModel->index(0, MN_SEEDERS_COL, QModelIndex());
+    dlModel->setData(index, tr("<N/A>"), Qt::DisplayRole);
+
+    index = dlModel->index(0, MN_LEECHERS_COL, QModelIndex());
+    dlModel->setData(index, tr("<N/A>"), Qt::DisplayRole);
+
     index = dlModel->index(0, MN_STATUS_COL, QModelIndex());
     dlModel->setData(index, routines->convDlStat_toString(status), Qt::DisplayRole);
 
