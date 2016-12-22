@@ -22,10 +22,38 @@
      <item>
       <layout class="QVBoxLayout" name="settings_chooser_layout">
        <item>
-        <widget class="QListWidget" name="settings_list_widget">
+        <widget class="QTreeWidget" name="category_treeWidget">
+         <property name="font">
+          <font>
+           <pointsize>16</pointsize>
+          </font>
+         </property>
+         <property name="verticalScrollBarPolicy">
+          <enum>Qt::ScrollBarAlwaysOff</enum>
+         </property>
+         <property name="horizontalScrollBarPolicy">
+          <enum>Qt::ScrollBarAlwaysOff</enum>
+         </property>
+         <property name="editTriggers">
+          <set>QAbstractItemView::NoEditTriggers</set>
+         </property>
+         <property name="tabKeyNavigation">
+          <bool>true</bool>
+         </property>
+         <property name="showDropIndicator" stdset="0">
+          <bool>false</bool>
+         </property>
+         <property name="headerHidden">
+          <bool>true</bool>
+         </property>
+         <column>
+          <property name="text">
+           <string>Category</string>
+          </property>
+         </column>
          <item>
           <property name="text">
-           <string>General</string>
+           <string>Main</string>
           </property>
           <property name="icon">
            <iconset resource="../assets.qrc">
@@ -40,6 +68,33 @@
            <iconset resource="../assets.qrc">
             <normaloff>:/icons/assets-img/gftp.png</normaloff>:/icons/assets-img/gftp.png</iconset>
           </property>
+          <item>
+           <property name="text">
+            <string>General</string>
+           </property>
+           <property name="icon">
+            <iconset resource="../assets.qrc">
+             <normaloff>:/icons/assets-img/network.png</normaloff>:/icons/assets-img/network.png</iconset>
+           </property>
+          </item>
+         </item>
+         <item>
+          <property name="text">
+           <string>BitTorrent</string>
+          </property>
+          <property name="icon">
+           <iconset resource="../assets.qrc">
+            <normaloff>:/icons/assets-img/application-x-bittorrent.png</normaloff>:/icons/assets-img/application-x-bittorrent.png</iconset>
+          </property>
+          <item>
+           <property name="text">
+            <string>General</string>
+           </property>
+           <property name="icon">
+            <iconset resource="../assets.qrc">
+             <normaloff>:/icons/assets-img/network.png</normaloff>:/icons/assets-img/network.png</iconset>
+           </property>
+          </item>
          </item>
         </widget>
        </item>

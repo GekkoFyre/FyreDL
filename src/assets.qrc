@@ -1,7 +1,6 @@
 <RCC>
     <qresource prefix="/icons">
         <file>assets-img/edit-add-4.png</file>
-        <file>assets-img/applications-internet-3.png</file>
         <file>assets-img/media-playback-pause-3.png</file>
         <file>assets-img/media-playback-start-3.png</file>
         <file>assets-img/media-playback-stop-3.png</file>
@@ -14,10 +13,12 @@
         <file>assets-img/system-run-3.png</file>
 	<file>assets-img/gnome-session-reboot.png</file>
 	<file>assets-img/original-logos-2015-Sep-3044-7944329.png</file>
+	<file>assets-img/application-x-bittorrent.png</file>
+	<file>assets-img/network.png</file>
+	<file>assets-img/network_small.png</file>
     </qresource>
     <qresource lang="en">
         <file alias="add_en.png">assets-img/edit-add-4.png</file>
-        <file alias="internet_en.png">assets-img/applications-internet-3.png</file>
         <file alias="download_pause_en.png">assets-img/media-playback-pause-3.png</file>
         <file alias="download_start_en.png">assets-img/media-playback-start-3.png</file>
         <file alias="download_stop_en.png">assets-img/media-playback-stop-3.png</file>
@@ -30,5 +31,8 @@
         <file alias="system_en.png">assets-img/system-run-3.png</file>
 	<file alias="restart_en.png">assets-img/gnome-session-reboot.png</file>
 	<file alias="gekkofyre_logo.png">assets-img/original-logos-2015-Sep-3044-7944329.png</file>
+	<file alias="bittorrent_en.png">assets-img/application-x-bittorrent.png</file>
+	<file alias="network_en.png">assets-img/network.png</file>
+	<file alias="network_small_en.png">assets-img/network_small.png</file>
     </qresource>
 </RCC>

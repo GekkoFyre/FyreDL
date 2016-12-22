@@ -91,8 +91,9 @@ private:
     void contentsView_update();
     void cV_addItems(QStandardItem *parent, const QStringList &elements);
 
-    bool askDeleteFile(const QString &file_dest, const bool &noRestart = false);
-    void startDownload(const QString &file_dest, const bool &resumeDl = true);
+    bool askDeleteHttpItem(const QString &file_dest, const QString &unique_id, const bool &noRestart = false);
+    void startHttpDownload(const QString &file_dest, const QString &unique_id, const bool &resumeDl = true);
+    void startTorrentDl(const QString &unique_id, const bool &resumeDl = true);
 
     // Immediately below are actions that the user may take on a single downloadable item, such as by pausing,
     // restarting, or halting it, for example. That is not a complete list.

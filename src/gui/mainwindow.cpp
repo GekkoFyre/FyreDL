@@ -736,14 +736,14 @@ void MainWindow::cV_addItems(QStandardItem *parent, const QStringList &elements)
 }
 
 /**
- * @brief MainWindow::askDeleteFile poses a QMessageBox to the user, asking whether they want to delete a pre-existing download
+ * @brief MainWindow::askDeleteHttpItem poses a QMessageBox to the user, asking whether they want to delete a pre-existing download
  * before restarting the same one, to the same destination.
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
  * @date 2016-12-01
  * @param file_dest The destination of the download on the user's local storage.
  * @return Whether the user selected 'yes', or 'no/cancel'.
  */
-bool MainWindow::askDeleteFile(const QString &file_dest, const bool &noRestart)
+bool MainWindow::askDeleteHttpItem(const QString &file_dest, const QString &unique_id, const bool &noRestart)
 {
     fs::path dest_boost_path(file_dest.toStdString());
     if (fs::exists(dest_boost_path)) {
@@ -770,6 +770,10 @@ bool MainWindow::askDeleteFile(const QString &file_dest, const bool &noRestart)
                         throw ec.category().name();
                     }
 
+                    if (!noRestart) {
+                        startHttpDownload(file_dest, unique_id, false);
+                    }
+
                     return true;
                 } catch (const std::exception &e) {
                     QMessageBox::warning(this, tr("Error!"), QString("%1").arg(e.what()), QMessageBox::Ok);
@@ -779,6 +783,8 @@ bool MainWindow::askDeleteFile(const QString &file_dest, const bool &noRestart)
                 return false;
             case QMessageBox::Cancel:
                 return false;
+            default:
+                return false;
         }
     }
 
@@ -786,52 +792,90 @@ bool MainWindow::askDeleteFile(const QString &file_dest, const bool &noRestart)
 }
 
 /**
- * @brief MainWindow::startDownload contains the routines necessary to instantiate a new download.
+ * @brief MainWindow::startHttpDownload contains the routines necessary to instantiate a new HTTP/FTP download.
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
  * @date 2016-12-01
  * @param file_dest The destination of the download in question on the user's local storage.
- * @param resumeDl Whether we are resuming a pre-existing download or not.
+ * @param resumeDl Whether we are resuming a pre-existing download item or not. There must be certain conditions in-place
+ * for this to work.
  */
-void MainWindow::startDownload(const QString &file_dest, const bool &resumeDl)
+void MainWindow::startHttpDownload(const QString &file_dest, const QString &unique_id, const bool &resumeDl)
 {
     QModelIndexList indexes = ui->downloadView->selectionModel()->selectedRows();
     if (indexes.size() > 0) {
         if (indexes.at(0).isValid()) {
             const QString url = ui->downloadView->model()->data(ui->downloadView->model()->index(indexes.at(0).row(), MN_URL_COL)).toString();
-            const QString dest = ui->downloadView->model()->data(ui->downloadView->model()->index(indexes.at(0).row(), MN_DESTINATION_COL)).toString();
-
             QModelIndex index = dlModel->index(indexes.at(0).row(), MN_STATUS_COL, QModelIndex());
             const GekkoFyre::DownloadStatus status = routines->convDlStat_StringToEnum(ui->downloadView->model()->data(index).toString());
-
             try {
-                // TODO: QFutureWatcher<GekkoFyre::CurlMulti::CurlInfo> *verifyFileFutWatch;
-                GekkoFyre::GkCurl::CurlInfo verify = GekkoFyre::CurlEasy::verifyFileExists(url);
-                if (verify.response_code == 200) {
-                    if (status != GekkoFyre::DownloadStatus::Downloading) {
-                        double freeDiskSpace = (double)routines->freeDiskSpace(QDir(dest).absolutePath());
-                        GekkoFyre::GkCurl::CurlInfoExt extended_info = GekkoFyre::CurlEasy::curlGrabInfo(url);
-                        if ((unsigned long int)((extended_info.content_length * FREE_DSK_SPACE_MULTIPLIER) < freeDiskSpace)) {
-                            routines->modifyDlState(dest.toStdString(), GekkoFyre::DownloadStatus::Downloading);
-                            dlModel->updateCol(index, routines->convDlStat_toString(GekkoFyre::DownloadStatus::Downloading), MN_STATUS_COL);
+                for (size_t k = 0; k < graph_init.size(); ++k) {
+                    if (graph_init.at(k).unique_id == unique_id) {
+                        if (graph_init.at(k).down_info.dl_type == GekkoFyre::DownloadType::HTTP ||
+                            graph_init.at(k).down_info.dl_type == GekkoFyre::DownloadType::FTP) {
+                            // TODO: QFutureWatcher<GekkoFyre::CurlMulti::CurlInfo> *verifyFileFutWatch;
+                            GekkoFyre::GkCurl::CurlInfo verify = GekkoFyre::CurlEasy::verifyFileExists(url);
+                            if (verify.response_code == 200) {
+                                if (status != GekkoFyre::DownloadStatus::Downloading) {
+                                    double freeDiskSpace = (double)routines->freeDiskSpace(QDir(file_dest).absolutePath());
+                                    GekkoFyre::GkCurl::CurlInfoExt extended_info = GekkoFyre::CurlEasy::curlGrabInfo(url);
+                                    if ((unsigned long int)((extended_info.content_length * FREE_DSK_SPACE_MULTIPLIER) < freeDiskSpace)) {
+                                        routines->modifyDlState(file_dest.toStdString(), GekkoFyre::DownloadStatus::Downloading);
+                                        dlModel->updateCol(index, routines->convDlStat_toString(GekkoFyre::DownloadStatus::Downloading), MN_STATUS_COL);
 
-                            QObject::connect(GekkoFyre::routine_singleton::instance(), SIGNAL(sendXferStats(GekkoFyre::GkCurl::CurlProgressPtr)), this, SLOT(recvXferStats(GekkoFyre::GkCurl::CurlProgressPtr)));
-                            QObject::connect(GekkoFyre::routine_singleton::instance(), SIGNAL(sendDlFinished(GekkoFyre::GkCurl::DlStatusMsg)), this, SLOT(recvDlFinished(GekkoFyre::GkCurl::DlStatusMsg)));
+                                        QObject::connect(GekkoFyre::routine_singleton::instance(), SIGNAL(sendXferStats(GekkoFyre::GkCurl::CurlProgressPtr)), this, SLOT(recvXferStats(GekkoFyre::GkCurl::CurlProgressPtr)));
+                                        QObject::connect(GekkoFyre::routine_singleton::instance(), SIGNAL(sendDlFinished(GekkoFyre::GkCurl::DlStatusMsg)), this, SLOT(recvDlFinished(GekkoFyre::GkCurl::DlStatusMsg)));
 
-                            // This is required for signaling, otherwise QVariant does not know the type.
-                            qRegisterMetaType<GekkoFyre::GkCurl::CurlProgressPtr>("curlProgressPtr");
-                            qRegisterMetaType<GekkoFyre::GkCurl::DlStatusMsg>("DlStatusMsg");
+                                        // This is required for signaling, otherwise QVariant does not know the type.
+                                        qRegisterMetaType<GekkoFyre::GkCurl::CurlProgressPtr>("curlProgressPtr");
+                                        qRegisterMetaType<GekkoFyre::GkCurl::DlStatusMsg>("DlStatusMsg");
 
-                            // Emit the signal data necessary to initiate a download
-                            emit sendStartDownload(url, dest, resumeDl);
-                            return;
-                        } else {
-                            throw std::runtime_error(tr("Not enough free disk space!").toStdString());
+                                        // Emit the signal data necessary to initiate a download
+                                        emit sendStartDownload(url, file_dest, resumeDl);
+                                        return;
+                                    } else {
+                                        throw std::runtime_error(tr("Not enough free disk space!").toStdString());
+                                    }
+                                }
+                            }
                         }
                     }
                 }
             } catch (const std::exception &e) {
                 QMessageBox::warning(this, tr("Error!"), QString("%1").arg(e.what()), QMessageBox::Ok);
             }
+        }
+    }
+
+    return;
+}
+
+/**
+ * @brief MainWindow::startTorrentDl instantiates a new BitTorrent session and thus, the beginning/resuming of a download.
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @date 2016-12-23
+ * @param unique_id is the unique identifier relating to the BitTorrent download item in question. It is gathered from
+ * the XML history file or the hidden QTableView column, 'MN_HIDDEN_UNIQUE_ID'.
+ * @param resumeDl Whether to resume a pre-existing BitTorrent download or not. There must be certain conditions in-place
+ * for this to work.
+ */
+void MainWindow::startTorrentDl(const QString &unique_id, const bool &resumeDl)
+{
+    std::vector<GekkoFyre::GkTorrent::TorrentInfo> gk_ti = routines->readTorrentInfo(false);
+    for (auto const &indice: gk_ti) {
+        if (indice.unique_id == unique_id.toStdString()) {
+            GekkoFyre::GkTorrent::TorrentItem torrent_item;
+
+            torrent_item.info = indice;
+            torrent_item.session.rate_limit_ip_overhead = true;
+            torrent_item.session.prefer_udp_trackers = true;
+            torrent_item.session.announce_crypto_support = true;
+            torrent_item.session.enable_upnp = true;
+            torrent_item.session.enable_natpmp = true;
+            torrent_item.session.enable_dht = true;
+            torrent_item.session.prefer_rc4 = true;
+
+            gk_torrent_client->startTorrentDl(torrent_item);
+            break;
         }
     }
 
@@ -863,7 +907,7 @@ void MainWindow::haltDownload()
                                             emit sendStopDownload(dest);
                                             routines->modifyDlState(dest.toStdString(), GekkoFyre::DownloadStatus::Stopped);
                                             dlModel->updateCol(index, routines->convDlStat_toString(GekkoFyre::DownloadStatus::Stopped), MN_STATUS_COL);
-                                            askDeleteFile(dest, true);
+                                            askDeleteHttpItem(dest, unique_id, true);
                                         }
                                     } else {
                                         QMessageBox::warning(this, tr("Error!"), tr("Please delete the download before re-adding the information once more!"), QMessageBox::Ok);
@@ -919,7 +963,7 @@ void MainWindow::resumeDownload()
                                 case GekkoFyre::DownloadStatus::Paused:
                                     if (fs::exists(dest_boost_path) && fs::is_regular_file(dest_boost_path)) {
                                         // The file still exists, so resume downloading since it's from a paused state!
-                                        startDownload(dest, true);
+                                        startHttpDownload(dest, unique_id, true);
                                     } else {
                                         // We have NO existing file... notify the user.
                                         QMessageBox file_ask;
@@ -972,7 +1016,7 @@ void MainWindow::resumeDownload()
                                                         throw ec.category().name();
                                                     }
 
-                                                    startDownload(dest, false);
+                                                    startHttpDownload(dest, unique_id, false);
                                                 } else {
                                                     throw std::runtime_error(
                                                             tr("Error with deleting file and/or starting download!")
@@ -993,7 +1037,7 @@ void MainWindow::resumeDownload()
                                         }
                                     } else {
                                         // We have NO existing file...
-                                        startDownload(dest, false);
+                                        startHttpDownload(dest, unique_id, false);
                                     }
 
                                     return;
@@ -1116,7 +1160,7 @@ void MainWindow::restartDownload()
                                                     throw ec.category().name();
                                                 }
 
-                                                startDownload(dest, false);
+                                                startHttpDownload(dest, unique_id, false);
                                             } else {
                                                 throw std::runtime_error(tr("Error with deleting file and/or starting download!")
                                                                                  .toStdString());

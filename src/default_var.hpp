@@ -40,8 +40,8 @@
  * @brief Default variables used throughout the program that the user may change to suit their preferences
  */
 
-#ifndef DEFVAR_HPP
-#define DEFVAR_HPP
+#ifndef GK_DEFVAR_HPP
+#define GK_DEFVAR_HPP
 
 #include <boost/cstdint.hpp>
 #include <boost/optional.hpp>
@@ -484,4 +484,4 @@ namespace GekkoFyre {
     }
 }
 
-#endif // DEFVAR_HPP
+#endif // GK_DEFVAR_HPP
