@@ -97,6 +97,8 @@ set(SOURCE_FILES
         singleton_proc.hpp
         torrent/client.hpp
         torrent/client.cpp
+        torrent/misc.hpp
+        torrent/misc.cpp
         torrent/session.hpp
         torrent/session.cpp)
 

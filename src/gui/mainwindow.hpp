@@ -179,4 +179,7 @@ private:
     Ui::MainWindow *ui;
 };
 
+// This is required for signaling, otherwise QVariant does not know the type.
+Q_DECLARE_METATYPE(GekkoFyre::GkTorrent::TorrentXferStats);
+
 #endif // MAINWINDOW_HPP

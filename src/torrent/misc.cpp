@@ -34,45 +34,46 @@
  ********************************************************************************/
 
 /**
- * @file client.hpp
+ * @file misc.cpp
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
- * @date 2016-12-13
- * @note <http://www.rasterbar.com/products/libtorrent/reference.html>
- *       <http://www.rasterbar.com/products/libtorrent/manual.html>
- *       <http://stackoverflow.com/questions/13953086/download-specific-piece-using-libtorrent>
- * @brief Contains the routines for downloading (and directly managing therof) any torrents, asynchronously.
+ * @date 2017-06-24
+ * @brief Contains any miscellaneous BitTorrent routines.
  */
 
-#ifndef FYREDL_TORRENT_CLIENT_HPP
-#define FYREDL_TORRENT_CLIENT_HPP
+#include "misc.hpp"
+#include <libtorrent/torrent_status.hpp>
 
-#include "./../default_var.hpp"
-#include "./../cmnroutines.hpp"
-#include "session.hpp"
-#include <libtorrent/session_handle.hpp>
-#include <libtorrent/alert_types.hpp>
-#include <string>
-#include <QObject>
+GekkoFyre::GkTorrentMisc::GkTorrentMisc()
+{}
 
-namespace GekkoFyre {
-class GkTorrentClient: public QObject {
-    Q_OBJECT
+GekkoFyre::GkTorrentMisc::~GkTorrentMisc()
+{}
 
-public:
-    GkTorrentClient();
-    ~GkTorrentClient();
-
-    void startTorrentDl(const GekkoFyre::GkTorrent::TorrentInfo &item);
-
-private:
-    GekkoFyre::CmnRoutines *routines;
-    GekkoFyre::GkTorrentSession *gk_to_ses;
-    lt::session_handle *lt_ses;
-    QThread *gk_ses_thread;
-
-signals:
-    void update_ses_hash(const std::string &save_dir, const lt::torrent_handle &lt_th);
-};
+/**
+ * @brief GekkoFyre::GkTorrentMisc::state returns the name of a libtorrent status enum.
+ * @date 2016-12-22
+ * @note <http://libtorrent.org/tutorial.html>
+ * @param s is the given libtorrent status enum.
+ * @return The name of a libtorrent status enum.
+ */
+QString GekkoFyre::GkTorrentMisc::state(lt::torrent_status::state_t s)
+{
+    switch (s) {
+        case lt::torrent_status::checking_files:
+            return tr("Checking");
+        case lt::torrent_status::downloading_metadata:
+            return tr("Downloading Metadata");
+        case lt::torrent_status::downloading:
+            return tr("Downloading");
+        case lt::torrent_status::finished:
+            return tr("Finished");
+        case lt::torrent_status::seeding:
+            return tr("Seeding");
+        case lt::torrent_status::allocating:
+            return tr("Allocating");
+        case lt::torrent_status::checking_resume_data:
+            return tr("Checking Resume Data");
+        default:
+            return QString("<N/A>");
+    }
 }
-
-#endif // FYREDL_TORRENT_CLIENT_HPP

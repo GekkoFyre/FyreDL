@@ -863,18 +863,7 @@ void MainWindow::startTorrentDl(const QString &unique_id, const bool &resumeDl)
     std::vector<GekkoFyre::GkTorrent::TorrentInfo> gk_ti = routines->readTorrentInfo(false);
     for (auto const &indice: gk_ti) {
         if (indice.unique_id == unique_id.toStdString()) {
-            GekkoFyre::GkTorrent::TorrentItem torrent_item;
-
-            torrent_item.info = indice;
-            torrent_item.session.rate_limit_ip_overhead = true;
-            torrent_item.session.prefer_udp_trackers = true;
-            torrent_item.session.announce_crypto_support = true;
-            torrent_item.session.enable_upnp = true;
-            torrent_item.session.enable_natpmp = true;
-            torrent_item.session.enable_dht = true;
-            torrent_item.session.prefer_rc4 = true;
-
-            gk_torrent_client->startTorrentDl(torrent_item);
+            gk_torrent_client->startTorrentDl(indice);
             break;
         }
     }

@@ -44,9 +44,12 @@
 #define FYREDL_TORRENT_SESSION_HPP
 
 #include "./../default_var.hpp"
+#include <libtorrent/session_handle.hpp>
+#include <libtorrent/alert_types.hpp>
 #include <libtorrent/torrent_status.hpp>
+#include <string>
 #include <QObject>
-#include <QString>
+#include <QMap>
 
 namespace lt = libtorrent;
 namespace GekkoFyre {
@@ -54,14 +57,23 @@ class GkTorrentSession: public QObject {
     Q_OBJECT
 
 public:
-    GkTorrentSession();
+    GkTorrentSession(QObject *parent = 0);
+    GkTorrentSession(lt::session_handle *gk_lt_ses, QObject *parent = 0);
     ~GkTorrentSession();
 
-    QString state(lt::torrent_status::state_t s);
-    void init_session(const GekkoFyre::GkTorrent::TorrentItem &item, const std::string &destination);
+public slots:
+    void recv_hash_update(const std::string &save_dir, const lt::torrent_handle &lt_at);
+
+private:
+    void run_session_bckgrnd();
+    int rand_port() const;
+
+    lt::session_handle *lt_ses;
+    QMap<std::string, lt::torrent_handle> *gk_lt_th;
 
 signals:
-    void sendStats(const std::string &unique_id, const lt::torrent_status &stats);
+    void sendStats(const std::string &save_path, const lt::torrent_status &stats);
+    void finish_gk_ses_thread();
 };
 }
 

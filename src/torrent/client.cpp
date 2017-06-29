@@ -44,24 +44,36 @@
  */
 
 #include "client.hpp"
+#include <libtorrent/add_torrent_params.hpp>
+#include <libtorrent/torrent_handle.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/exception/all.hpp>
+#include <iosfwd>
+#include <QString>
+#include <QThread>
 
 namespace sys = boost::system;
 namespace fs = boost::filesystem;
+
 GekkoFyre::GkTorrentClient::GkTorrentClient()
 {
     routines = new GekkoFyre::CmnRoutines();
-    gk_torrent_session = new GekkoFyre::GkTorrentSession();
 
-    QObject::connect(gk_torrent_session, SIGNAL(sendStats(std::string,lt::torrent_status)), this,
-                     SLOT(recvRawStats(std::string,lt::torrent_status)));
+    gk_ses_thread = new QThread;
+    gk_to_ses = new GekkoFyre::GkTorrentSession(lt_ses, this); // Create a session handler
+    gk_to_ses->moveToThread(gk_ses_thread);
+
+    QObject::connect(this, SIGNAL(update_ses_hash(std::string,lt::torrent_handle)), gk_to_ses, SLOT(recv_hash_update(std::string,lt::torrent_handle)));
+    QObject::connect(gk_to_ses, SIGNAL(finish_gk_ses_thread()), gk_ses_thread, SLOT(quit()));
+    QObject::connect(gk_to_ses, SIGNAL(finish_gk_ses_thread()), gk_to_ses, SLOT(deleteLater()));
+    QObject::connect(gk_ses_thread, SIGNAL(finished()), gk_ses_thread, SLOT(deleteLater()));
 }
 
 GekkoFyre::GkTorrentClient::~GkTorrentClient()
 {
     delete routines;
-    delete gk_torrent_session;
+    delete lt_ses;
+    delete gk_to_ses;
 }
 
 /**
@@ -71,26 +83,43 @@ GekkoFyre::GkTorrentClient::~GkTorrentClient()
  * @date 2016-12-22
  * @param unique_id The Unique ID relating to the download item in question.
  */
-void GekkoFyre::GkTorrentClient::startTorrentDl(const GekkoFyre::GkTorrent::TorrentItem &item)
+void GekkoFyre::GkTorrentClient::startTorrentDl(const GekkoFyre::GkTorrent::TorrentInfo &item)
 {
-    QString torrent_error_name = QString::fromStdString(item.info.torrent_name);
+    QString torrent_error_name = QString::fromStdString(item.torrent_name);
 
     try {
-        std::string full_path =item.info.down_dest + fs::path::preferred_separator + item.info.torrent_name;
-        gk_torrent_session->init_session(item, full_path);
+        std::string full_path = item.down_dest + fs::path::preferred_separator + item.torrent_name;
+        lt::add_torrent_params atp; // http://libtorrent.org/reference-Core.html#add-torrent-params
+
+        // Load resume data from disk and pass it in as we add the magnet link
+        std::ifstream ifs(FYREDL_TORRENT_RESUME_FILE_EXT, std::ios::binary);
+        ifs.unsetf(std::ios::skipws);
+        atp.resume_data.assign(std::istream_iterator<char>(ifs), std::istream_iterator<char>());
+        atp.url = item.magnet_uri;
+        atp.save_path = full_path;
+        lt_ses->async_add_torrent(atp);
+
+        std::vector<lt::alert*> alerts;
+        lt_ses->pop_alerts(&alerts);
+        while (alerts.size() > 0) {
+            for (lt::alert const *a: alerts) {
+                if (auto at = lt::alert_cast<lt::add_torrent_alert>(a)) {
+                    if (!gk_ses_thread->isRunning()) {
+                        gk_ses_thread->start();
+                    }
+
+                    emit update_ses_hash(at->params.save_path, at->handle);
+                    goto terminate;
+                }
+            }
+        }
+
+        terminate: ;
+        return;
     } catch (const std::exception &e) {
         QMessageBox::warning(nullptr, tr("Error!"), tr("An issue has occured with torrent, \"%1\".\n\n%2")
                 .arg(torrent_error_name).arg(e.what()), QMessageBox::Ok);
     }
-}
 
-void GekkoFyre::GkTorrentClient::recvRawStats(const std::string &unique_id, const lt::torrent_status &stats)
-{
-    GekkoFyre::GkTorrent::TorrentXferStats gk_xfer_stats;
-    gk_xfer_stats.unique_id = unique_id;
-    gk_xfer_stats.progress_ppm = stats.progress_ppm;
-    gk_xfer_stats.total_done = stats.total_done;
-    gk_xfer_stats.dl_payload_rate = stats.download_payload_rate;
-    gk_xfer_stats.dl_state = gk_torrent_session->state(stats.state);
-    emit sendProcTorrentStats(gk_xfer_stats);
+    return;
 }

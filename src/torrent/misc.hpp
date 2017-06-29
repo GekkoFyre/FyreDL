@@ -34,45 +34,31 @@
  ********************************************************************************/
 
 /**
- * @file client.hpp
+ * @file misc.hpp
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
- * @date 2016-12-13
- * @note <http://www.rasterbar.com/products/libtorrent/reference.html>
- *       <http://www.rasterbar.com/products/libtorrent/manual.html>
- *       <http://stackoverflow.com/questions/13953086/download-specific-piece-using-libtorrent>
- * @brief Contains the routines for downloading (and directly managing therof) any torrents, asynchronously.
+ * @date 2017-06-24
+ * @brief Contains any miscellaneous BitTorrent routines.
  */
 
-#ifndef FYREDL_TORRENT_CLIENT_HPP
-#define FYREDL_TORRENT_CLIENT_HPP
+#ifndef FYREDL_TORRENT_MISC_HPP
+#define FYREDL_TORRENT_MISC_HPP
 
 #include "./../default_var.hpp"
-#include "./../cmnroutines.hpp"
-#include "session.hpp"
-#include <libtorrent/session_handle.hpp>
-#include <libtorrent/alert_types.hpp>
-#include <string>
+#include <libtorrent/torrent_status.hpp>
 #include <QObject>
+#include <QString>
 
+namespace lt = libtorrent;
 namespace GekkoFyre {
-class GkTorrentClient: public QObject {
-    Q_OBJECT
+class GkTorrentMisc: public QObject {
+Q_OBJECT
 
 public:
-    GkTorrentClient();
-    ~GkTorrentClient();
+    GkTorrentMisc();
+    ~GkTorrentMisc();
 
-    void startTorrentDl(const GekkoFyre::GkTorrent::TorrentInfo &item);
-
-private:
-    GekkoFyre::CmnRoutines *routines;
-    GekkoFyre::GkTorrentSession *gk_to_ses;
-    lt::session_handle *lt_ses;
-    QThread *gk_ses_thread;
-
-signals:
-    void update_ses_hash(const std::string &save_dir, const lt::torrent_handle &lt_th);
+    QString state(lt::torrent_status::state_t s);
 };
 }
 
-#endif // FYREDL_TORRENT_CLIENT_HPP
+#endif // FYREDL_TORRENT_MISC_HPP
