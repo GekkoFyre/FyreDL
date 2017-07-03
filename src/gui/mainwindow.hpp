@@ -82,7 +82,7 @@ private:
     void removeSelRows();
     void resetDlStateStartup();
 
-    void initCharts(const QString &unique_id, const GekkoFyre::DownloadType &download_type);
+    void initCharts(const QString &unique_id, const QString &down_dest, const GekkoFyre::DownloadType &download_type);
     void displayCharts(const QString &unique_id);
     void delCharts(const std::string &file_dest);
     void updateChart();
@@ -111,8 +111,7 @@ private:
     GekkoFyre::CmnRoutines *routines;
     GekkoFyre::CurlMulti *curl_multi;
     GekkoFyre::GkTorrentClient *gk_torrent_client;
-    std::vector<GekkoFyre::GkCurl::CurlProgressPtr> dl_stat;
-    std::vector<GekkoFyre::GkGraph::GraphInit> graph_init;
+    std::vector<GekkoFyre::Global::DownloadInfo> gk_dl_info_cache;
     QString curr_shown_graphs;
 
     // http://stackoverflow.com/questions/10121560/stdthread-naming-your-thread
@@ -173,13 +172,13 @@ private slots:
     void recvDlFinished(const GekkoFyre::GkCurl::DlStatusMsg &status);
 
     // Libtorrent specific slots
-    void recvBitTorrent_XferStats(const GekkoFyre::GkTorrent::TorrentXferStats &gk_xfer_stats);
+    void recvBitTorrent_XferStats(const GekkoFyre::GkTorrent::TorrentResumeInfo &gk_xfer_info);
 
 private:
     Ui::MainWindow *ui;
 };
 
 // This is required for signaling, otherwise QVariant does not know the type.
-Q_DECLARE_METATYPE(GekkoFyre::GkTorrent::TorrentXferStats);
+Q_DECLARE_METATYPE(GekkoFyre::GkTorrent::TorrentResumeInfo);
 
 #endif // MAINWINDOW_HPP

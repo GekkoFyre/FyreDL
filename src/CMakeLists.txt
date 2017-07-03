@@ -273,7 +273,7 @@ IF(${CMAKE_SYSTEM_NAME} MATCHES "Windows" OR "cygwin" OR "mingw") # Check if we 
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DWIN32_LEAN_AND_MEAN")
         message(STATUS "Using the Microsoft Visual C++ compiler!")
     elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU" OR "Clang")
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mwindows -WIN32_LEAN_AND_MEAN -Wno-shorten-64-to-32 -Wno-sign-conversion") # This is apparently not tested!
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mwindows -WIN32_LEAN_AND_MEAN -Wno-shorten-64-to-32 -Wno-sign-conversion -Wno-deprecated-declarations") # This is apparently not tested!
         message(STATUS "Using either the GCC or Clang compiler!")
     else()
         message(SEND_ERROR "You are using an unsupported Microsoft Windows compiler! (Not MSVC or GCC)")
@@ -284,7 +284,7 @@ elseif(${CMAKE_SYSTEM_NAME} MATCHES "Linux") # Check if we are on Linux
         if("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
             # https://spin.atomicobject.com/2013/10/20/clang-compiler/
             # http://clang.llvm.org/docs/UsersManual.html#controlling-code-generation
-            set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libstdc++ -Wall -Wextra -Werror -Wconversion -Qunused-arguments -Wno-missing-braces -Wno-unused-parameter -Wno-shorten-64-to-32 -Wno-sign-conversion -g")
+            set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libstdc++ -Wall -Wextra -Werror -Wconversion -Qunused-arguments -Wno-missing-braces -Wno-unused-parameter -Wno-shorten-64-to-32 -Wno-sign-conversion -Wno-deprecated-declarations -g")
             message(STATUS "DEBUG build using the Clang compiler!")
 
             set(GK_ADDR_SANITIZE FALSE CACHE BOOL "See the Clang AddressSanitizer documentation for more details.")
@@ -303,7 +303,7 @@ elseif(${CMAKE_SYSTEM_NAME} MATCHES "Linux") # Check if we are on Linux
             endif(GK_THREAD_SANITIZE)
         elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
             # http://stackoverflow.com/questions/3375697/useful-gcc-flags-for-c
-            set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wpointer-arith -Wcast-align -Wconversion -Wunreachable-code -Wno-shorten-64-to-32 -Wno-sign-conversion -g")
+            set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wpointer-arith -Wcast-align -Wconversion -Wunreachable-code -Wno-shorten-64-to-32 -Wno-sign-conversion -Wno-deprecated-declarations -g")
             message(STATUS "DEBUG build using the GCC compiler!")
         elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel")
             message(STATUS "DEBUG build using the Intel compiler!")
@@ -313,11 +313,11 @@ elseif(${CMAKE_SYSTEM_NAME} MATCHES "Linux") # Check if we are on Linux
         endif()
     elseif(CMAKE_BUILD_TYPE MATCHES "Release")
         if("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
-            set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-conversion -Qno-unused-arguments -Wno-missing-braces -Wno-unused-parameter -Wno-shorten-64-to-32 -Wno-sign-conversion")
+            set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-conversion -Qno-unused-arguments -Wno-missing-braces -Wno-unused-parameter -Wno-shorten-64-to-32 -Wno-sign-conversion -Wno-deprecated-declarations")
             message(STATUS "DEBUG build using the Clang compiler!")
         elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
             # http://stackoverflow.com/questions/3375697/useful-gcc-flags-for-c
-            set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-pointer-arith -Wno-cast-align -Wno-conversion -Wno-unreachable-code -Wno-shorten-64-to-32 -Wno-sign-conversion")
+            set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-pointer-arith -Wno-cast-align -Wno-conversion -Wno-unreachable-code -Wno-shorten-64-to-32 -Wno-sign-conversion -Wno-deprecated-declarations")
             message(STATUS "DEBUG build using the GCC compiler!")
         elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel")
             message(STATUS "DEBUG build using the Intel compiler!")

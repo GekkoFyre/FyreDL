@@ -53,6 +53,7 @@
 #include <memory>
 #include <vector>
 #include <ctime>
+#include <cassert>
 #include <QString>
 #include <QtCharts>
 #include <QLineSeries>
@@ -270,11 +271,22 @@ namespace GekkoFyre {
 
     namespace GkTorrent {
         struct TorrentXferStats {
-            std::string unique_id;
+            int dl_rate;                     // The total rates for all peers for this torrent. The rates are given as the number of bytes per second.
+            int ul_rate;                     // The total rates for all peers for this torrent. The rates are given as the number of bytes per second.
+            int num_pieces_downloaded;       // The number of pieces that has been downloaded. This can be used to see if anything has updated since last time if you want to keep a graph of the pieces up to date.
+            int progress_ppm;                // Reflects progress, but instead [0, 1000000] (ppm = parts per million).
+            std::time_t cur_time;
+        };
+
+        struct TorrentResumeInfo {
+            std::string save_path;
             QString dl_state;
-            int dl_payload_rate;
-            boost::int64_t total_done;
-            int progress_ppm;
+            boost::int64_t total_uploaded;   // These are saved in and restored from resume data to maintain totals across sessions.
+            boost::int64_t total_downloaded; // These are saved in and restored from resume data to maintain totals across sessions.
+            std::time_t last_seen_cmplte;    // The time when we, or one of our peers, last saw a complete copy of this torrent.
+            std::time_t last_scrape;         // The number of seconds since this torrent acquired scrape data. If it has never done that, this value is -1.
+            std::time_t time_started;
+            boost::optional<GekkoFyre::GkTorrent::TorrentXferStats> xfer_stats;
         };
 
         struct TorrentFile {
@@ -299,7 +311,7 @@ namespace GekkoFyre {
             unsigned int cId;                       // Automatically incremented Content ID for each download/file
             long long insert_timestamp;             // The date/time of the download/file having been inserted into the history file
             long long complt_timestamp;             // The date/time of the download/file having completed transfer
-            long creatn_timestamp; // The date/time that the torrent file was authored
+            long creatn_timestamp;                  // The date/time that the torrent file was authored
             GekkoFyre::DownloadStatus dlStatus;     // Status of the downloading file(s) in question
             std::string comment;                    // Any comments left by the author of the torrent file in question
             std::string creator;                    // The author of the torrent file in question
@@ -309,6 +321,7 @@ namespace GekkoFyre {
             int num_pieces;                         // How many pieces are contained within this torrent
             int piece_length;                       // The length of each piece
             std::string unique_id;                  // A unique identifier for this torrent
+            boost::optional<GekkoFyre::GkTorrent::TorrentResumeInfo> to_resume_info;
             std::vector<std::pair<std::string, int>> nodes;
             std::vector<TorrentTrackers> trackers;
             std::vector<TorrentFile> files_vec;
@@ -323,18 +336,6 @@ namespace GekkoFyre {
             std::string comment;                    // Any comments left by the author of the torrent file in question
             std::vector<std::pair<int, std::string>> trackers;
             std::vector<TorrentFile> files_vec;
-        };
-
-        struct TorrentItem {
-            TorrentInfo info;
-            libtorrent::torrent_handle to_handle;
-            TorrentXferStats xfer_stats;
-        };
-    }
-
-    namespace Global {
-        struct DownloadInfo {
-            GekkoFyre::DownloadType dl_type;
         };
     }
 
@@ -399,12 +400,11 @@ namespace GekkoFyre {
             std::string file_loc; // The full location of where the file is being saved to disk
         };
 
-        struct CurlProgressPtr {
+        struct [[deprecated("use 'Global::DownloadInfo' instead, which is more universal")]] CurlProgressPtr {
             CURL *curl;                    // Easy interface pointer
             std::vector<CurlDlStats> stat; // Download statistics struct
             std::string url;               // The URL in question
             std::string file_dest;         // The destination of where the download is being saved to disk
-            std::time_t timer_begin;       // The time since epoch at which the timer begun (for charting facilities)
             bool timer_set;                // Whether the timer, 'timer_begin' has been set for this object or not
             double content_length;         // The file size of the download, as given by the web-server
         };
@@ -439,11 +439,21 @@ namespace GekkoFyre {
             std::vector<std::pair<double, double>> down_speed_vals;
         };
 
-        struct GraphInit {
-            GekkoFyre::Global::DownloadInfo down_info; // Hijacking 'GraphInit' for the purpose of using this
-            DownSpeedGraph down_speed;                 // The 'download speed' graph
-            QString unique_id;                         // File destination of the download on user's local storage
-            bool currShown;                            // Whether the graph for the given 'file_dest' is actually displayed or not
+        struct GkXferStats {
+            double upload_rate;                   // The current upload transfer rate, in bytes per second.
+            double download_rate;                 // The current download transfer rate, in bytes per second.
+            long progress_ppm;                    // Reflects progress, but instead [0, 1000000] (ppm = parts per million).
+            long download_total;                  // The total amount that has been downloaded, in bytes.
+            long upload_total;                    // The total amount that has been uploaded, in bytes.
+            boost::optional<int> num_pieces_dled; // The number of BitTorrent pieces that have been downloaded. Can be used to see if the BitTorrent download has updated.
+            std::time_t cur_time;                 // The current time these statistics were 'snapshotted'.
+        };
+
+        struct GkDlStats {
+            GekkoFyre::DownloadStatus dl_state;  // The state of the download, i.e. whether it's paused or actively transferring data
+            std::time_t timer_begin;             // The time since epoch at which the timer begun (for charting facilities)
+            double content_length;               // The file size of the download, as given by the web-server
+            std::vector<GkXferStats> xfer_stats; // The all important transfer statistics of the download in question
         };
     }
 
@@ -451,6 +461,19 @@ namespace GekkoFyre {
         struct FyreDL {
             int main_win_x;
             int main_win_y;
+        };
+    }
+
+    namespace Global {
+        struct DownloadInfo {
+            DownloadType dl_type;                            // The type of download in question, whether HTTP(S)/FTP(S) or BitTorrent
+            QString dl_dest;                                 // The location of the download on local storage
+            QString unique_id;                               // Unique ID, if any, for the download in question
+            QString url;                                     // The URL of the download in question, whether it be the magnet link or a HTTP URL
+            GkGraph::GkDlStats stats;                        // Statistics relating to the download in question
+            GkGraph::DownSpeedGraph xfer_graph;              // The 'download speed' graph
+            boost::optional<GkTorrent::TorrentInfo> to_info; // Information relating to BitTorrent downloads
+            boost::optional<GkCurl::CurlDlInfo> curl_info;   // Information relating to HTTP(S) or FTP(S) downloads
         };
     }
 }

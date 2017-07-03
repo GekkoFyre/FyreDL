@@ -49,6 +49,7 @@
 #include <boost/filesystem.hpp>
 #include <boost/exception/all.hpp>
 #include <boost/system/error_code.hpp>
+#include <cmath>
 #include <qmetatype.h>
 #include <QInputDialog>
 #include <QModelIndex>
@@ -119,9 +120,6 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
     QObject::connect(ui->downloadView, SIGNAL(customContextMenuRequested(QPoint)), this, SLOT(on_downloadView_customContextMenuRequested(QPoint)));
     QObject::connect(this, SIGNAL(updateDlStats()), this, SLOT(manageDlStats()));
 
-    QObject::connect(gk_torrent_client, SIGNAL(sendProcTorrentStats(GekkoFyre::GkTorrent::TorrentXferStats)), this,
-                     SLOT(recvBitTorrent_XferStats(GekkoFyre::GkTorrent::TorrentXferStats)));
-
     try {
         readFromHistoryFile();
     } catch (const std::exception &e) {
@@ -154,8 +152,7 @@ MainWindow::~MainWindow()
     emit finish_curl_multi_thread();
     delete routines;
     delete gk_torrent_client;
-    dl_stat.clear();
-    graph_init.clear();
+    gk_dl_info_cache.clear();
 }
 
 /**
@@ -278,46 +275,52 @@ void MainWindow::insertNewRow(const std::string &fileName, const double &fileSiz
                               const std::string &destination, const std::string &unique_id,
                               const GekkoFyre::DownloadType &download_type)
 {
-    dlModel->insertRows(0, 1, QModelIndex());
+    try {
+        dlModel->insertRows(0, 1, QModelIndex());
 
-    QModelIndex index = dlModel->index(0, MN_FILENAME_COL, QModelIndex());
-    dlModel->setData(index, routines->extractFilename(QString::fromStdString(fileName)), Qt::DisplayRole);
+        QModelIndex index = dlModel->index(0, MN_FILENAME_COL, QModelIndex());
+        dlModel->setData(index, routines->extractFilename(QString::fromStdString(fileName)), Qt::DisplayRole);
 
-    index = dlModel->index(0, MN_FILESIZE_COL, QModelIndex());
-    dlModel->setData(index, routines->numberConverter(fileSize), Qt::DisplayRole);
+        index = dlModel->index(0, MN_FILESIZE_COL, QModelIndex());
+        dlModel->setData(index, routines->numberConverter(fileSize), Qt::DisplayRole);
 
-    index = dlModel->index(0, MN_DOWNLOADED_COL, QModelIndex());
-    dlModel->setData(index, QString::number(downloaded), Qt::DisplayRole);
+        index = dlModel->index(0, MN_DOWNLOADED_COL, QModelIndex());
+        dlModel->setData(index, QString::number(downloaded), Qt::DisplayRole);
 
-    index = dlModel->index(0, MN_PROGRESS_COL, QModelIndex());
-    dlModel->setData(index, QString::number(progress), Qt::DisplayRole);
+        index = dlModel->index(0, MN_PROGRESS_COL, QModelIndex());
+        dlModel->setData(index, QString::number(progress), Qt::DisplayRole);
 
-    index = dlModel->index(0, MN_UPSPEED_COL, QModelIndex());
-    dlModel->setData(index, QString::number(upSpeed), Qt::DisplayRole);
+        index = dlModel->index(0, MN_UPSPEED_COL, QModelIndex());
+        dlModel->setData(index, QString::number(upSpeed), Qt::DisplayRole);
 
-    index = dlModel->index(0, MN_DOWNSPEED_COL, QModelIndex());
-    dlModel->setData(index, QString::number(downSpeed), Qt::DisplayRole);
+        index = dlModel->index(0, MN_DOWNSPEED_COL, QModelIndex());
+        dlModel->setData(index, QString::number(downSpeed), Qt::DisplayRole);
 
-    index = dlModel->index(0, MN_SEEDERS_COL, QModelIndex());
-    dlModel->setData(index, tr("<N/A>"), Qt::DisplayRole);
+        index = dlModel->index(0, MN_SEEDERS_COL, QModelIndex());
+        dlModel->setData(index, tr("<N/A>"), Qt::DisplayRole);
 
-    index = dlModel->index(0, MN_LEECHERS_COL, QModelIndex());
-    dlModel->setData(index, tr("<N/A>"), Qt::DisplayRole);
+        index = dlModel->index(0, MN_LEECHERS_COL, QModelIndex());
+        dlModel->setData(index, tr("<N/A>"), Qt::DisplayRole);
 
-    index = dlModel->index(0, MN_STATUS_COL, QModelIndex());
-    dlModel->setData(index, routines->convDlStat_toString(status), Qt::DisplayRole);
+        index = dlModel->index(0, MN_STATUS_COL, QModelIndex());
+        dlModel->setData(index, routines->convDlStat_toString(status), Qt::DisplayRole);
 
-    index = dlModel->index(0, MN_DESTINATION_COL, QModelIndex());
-    dlModel->setData(index, QString::fromStdString(destination), Qt::DisplayRole);
+        index = dlModel->index(0, MN_DESTINATION_COL, QModelIndex());
+        dlModel->setData(index, QString::fromStdString(destination), Qt::DisplayRole);
 
-    index = dlModel->index(0, MN_URL_COL, QModelIndex());
-    dlModel->setData(index, QString::fromStdString(url), Qt::DisplayRole);
+        index = dlModel->index(0, MN_URL_COL, QModelIndex());
+        dlModel->setData(index, QString::fromStdString(url), Qt::DisplayRole);
 
-    index = dlModel->index(0, MN_HIDDEN_UNIQUE_ID, QModelIndex());
-    dlModel->setData(index, QString::fromStdString(unique_id), Qt::DisplayRole);
+        index = dlModel->index(0, MN_HIDDEN_UNIQUE_ID, QModelIndex());
+        dlModel->setData(index, QString::fromStdString(unique_id), Qt::DisplayRole);
 
-    // Initialize the graphs
-    initCharts(QString::fromStdString(unique_id), download_type);
+        // Initialize the graphs
+        initCharts(QString::fromStdString(unique_id), QString::fromStdString(destination), download_type);
+        return;
+    } catch (const std::exception &e) {
+        QMessageBox::warning(this, tr("Error!"), QString("%1").arg(e.what()), QMessageBox::Ok);
+        return;
+    }
 
     return;
 }
@@ -401,15 +404,64 @@ void MainWindow::resetDlStateStartup()
     return;
 }
 
-void MainWindow::initCharts(const QString &unique_id, const GekkoFyre::DownloadType &download_type)
+/**
+ * @brief MainWindow::initCharts
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @date 2017-07-03
+ * @param unique_id A unique identifier for the download in question.
+ * @param down_dest Refers to the location of the download in question on local storage.
+ * @param download_type The type of download, whether it be HTTP(S), FTP(S), or BitTorrent.
+ */
+void MainWindow::initCharts(const QString &unique_id, const QString &down_dest,
+                            const GekkoFyre::DownloadType &download_type)
 {
     if (!unique_id.isEmpty()) {
-        GekkoFyre::GkGraph::GraphInit graph;
-        graph.down_speed.down_speed_vals.push_back(std::make_pair(0.0, 0.0));
-        graph.down_speed.down_speed_init = false;
-        graph.unique_id = unique_id;
-        graph.down_info.dl_type = download_type;
-        graph_init.push_back(graph);
+        if (gk_dl_info_cache.size() > 0) {
+            for (size_t i = 0; i < gk_dl_info_cache.size(); ++i) {
+                if (gk_dl_info_cache.at(i).unique_id == unique_id) {
+                    throw std::invalid_argument(tr("Value, '%1', already exists when it shouldn't!")
+                                                        .arg(gk_dl_info_cache.at(i).unique_id).toStdString());
+                }
+            }
+        }
+
+        GekkoFyre::Global::DownloadInfo graph_info;
+        graph_info.xfer_graph.down_speed_vals.push_back(std::make_pair(0.0, 0.0));
+        graph_info.xfer_graph.down_speed_init = false;
+        graph_info.unique_id = unique_id;
+        graph_info.dl_dest = down_dest;
+        graph_info.dl_type = download_type;
+        graph_info.stats.timer_begin = 0;
+        graph_info.stats.xfer_stats = std::vector<GekkoFyre::GkGraph::GkXferStats>();
+
+        if (download_type == GekkoFyre::DownloadType::HTTP || download_type == GekkoFyre::DownloadType::FTP) {
+            // Download type is either HTTP or FTP
+            std::vector<GekkoFyre::GkCurl::CurlDlInfo> curl_dl_info = routines->readDownloadInfo();
+            for (size_t j = 0; j < curl_dl_info.size(); ++j) {
+                if (curl_dl_info.at(j).unique_id == unique_id.toStdString()) {
+                    graph_info.curl_info = curl_dl_info.at(j);
+                    graph_info.stats.content_length = graph_info.curl_info.value().ext_info.content_length;
+                    break;
+                }
+            }
+        } else if (download_type == GekkoFyre::DownloadType::Torrent ||
+                download_type == GekkoFyre::DownloadType::TorrentMagnetLink) {
+            // Download type is BitTorrent
+            std::vector<GekkoFyre::GkTorrent::TorrentInfo> gk_torrent_info = routines->readTorrentInfo(false);
+            for (size_t j = 0; j < gk_torrent_info.size(); ++j) {
+                if (gk_torrent_info.at(j).unique_id == graph_info.unique_id.toStdString()) {
+                    graph_info.to_info = gk_torrent_info.at(j);
+                    graph_info.stats.content_length = ((double)graph_info.to_info.value().num_pieces *
+                            (double)graph_info.to_info.value().piece_length);
+                    break;
+                }
+            }
+        } else {
+            throw std::invalid_argument(tr("An invalid download type has been given!").toStdString());
+        }
+
+        gk_dl_info_cache.push_back(graph_info);
+        return;
     } else {
         throw std::invalid_argument(tr("Unable to initialize charts! 'file_dest' is empty!").toStdString());
     }
@@ -430,22 +482,22 @@ void MainWindow::initCharts(const QString &unique_id, const GekkoFyre::DownloadT
  */
 void MainWindow::displayCharts(const QString &unique_id)
 {
-    for (size_t i = 0; i < graph_init.size(); ++i) {
+    for (size_t i = 0; i < gk_dl_info_cache.size(); ++i) {
         if (ui->tabStatusWidget->currentIndex() == TAB_INDEX_GRAPH) {
-            if (!graph_init.at(i).down_speed.down_speed_init) {
+            if (!gk_dl_info_cache.at(i).xfer_graph.down_speed_init) {
                 // Create the needed 'series'
-                graph_init.at(i).down_speed.down_speed_series = new QtCharts::QLineSeries(this);
-                graph_init.at(i).down_speed.down_speed_init = true;
+                gk_dl_info_cache.at(i).xfer_graph.down_speed_series = new QtCharts::QLineSeries(this);
+                gk_dl_info_cache.at(i).xfer_graph.down_speed_init = true;
             }
 
-            if (graph_init.at(i).unique_id == unique_id) {
+            if (gk_dl_info_cache.at(i).unique_id == unique_id) {
                 if (curr_shown_graphs != unique_id) {
                     // NOTE: Only clear and/or then show the QChartView once, if 'file_dest' has not changed despite this
                     // function being called.
                     QString prev_shown_graphs = curr_shown_graphs;
                     curr_shown_graphs = unique_id;
 
-                    graph_init.at(i).down_speed.down_speed_series->setName(tr("Download speed spline %1").arg(i));
+                    gk_dl_info_cache.at(i).xfer_graph.down_speed_series->setName(tr("Download speed spline %1").arg(i));
 
                     QString file_dest_string = "nullptr";
                     for (int k = 0; k < dlModel->getList().size(); ++k) {
@@ -460,14 +512,14 @@ void MainWindow::displayCharts(const QString &unique_id)
 
                     QFile qfile_path(file_dest_string);
 
-                    for (size_t j = 0; j < graph_init.at(i).down_speed.down_speed_vals.size(); ++j) {
-                        graph_init.at(i).down_speed.down_speed_series->append(graph_init.at(i).down_speed.down_speed_vals.at(j).second,
-                                                                              graph_init.at(i).down_speed.down_speed_vals.at(j).first);
+                    for (size_t j = 0; j < gk_dl_info_cache.at(i).xfer_graph.down_speed_vals.size(); ++j) {
+                        gk_dl_info_cache.at(i).xfer_graph.down_speed_series->append(gk_dl_info_cache.at(i).xfer_graph.down_speed_vals.at(j).second,
+                                                                                    gk_dl_info_cache.at(i).xfer_graph.down_speed_vals.at(j).first);
                     }
 
                     // Create the needed QChart and set its initial properties
                     QtCharts::QChart *chart = new QtCharts::QChart();
-                    chart->addSeries(graph_init.at(i).down_speed.down_speed_series);
+                    chart->addSeries(gk_dl_info_cache.at(i).xfer_graph.down_speed_series);
                     chart->setTitle(QString("%1").arg(qfile_path.fileName()));
                     chart->createDefaultAxes();
                     chart->axisY()->setTitleText(tr("Download speed (KB/sec)")); // The title of the y-axis
@@ -482,9 +534,9 @@ void MainWindow::displayCharts(const QString &unique_id)
                         routines->clearLayout(ui->graphVerticalLayout);
                     }
 
-                    for (size_t j = 0; j < graph_init.size(); ++j) {
-                        if (graph_init.at(j).unique_id == prev_shown_graphs) {
-                            graph_init.at(j).down_speed.down_speed_init = false;
+                    for (size_t j = 0; j < gk_dl_info_cache.size(); ++j) {
+                        if (gk_dl_info_cache.at(j).unique_id == prev_shown_graphs) {
+                            gk_dl_info_cache.at(j).xfer_graph.down_speed_init = false;
                             break;
                         }
                     }
@@ -495,9 +547,9 @@ void MainWindow::displayCharts(const QString &unique_id)
                     ui->graphVerticalLayout->update();
                     return;
                 } else {
-                    for (size_t j = 0; j < graph_init.at(i).down_speed.down_speed_vals.size(); ++j) {
-                        graph_init.at(i).down_speed.down_speed_series->append(graph_init.at(i).down_speed.down_speed_vals.at(j).second,
-                                                                              graph_init.at(i).down_speed.down_speed_vals.at(j).first);
+                    for (size_t j = 0; j < gk_dl_info_cache.at(i).xfer_graph.down_speed_vals.size(); ++j) {
+                        gk_dl_info_cache.at(i).xfer_graph.down_speed_series->append(gk_dl_info_cache.at(i).xfer_graph.down_speed_vals.at(j).second,
+                                                                                    gk_dl_info_cache.at(i).xfer_graph.down_speed_vals.at(j).first);
                     }
 
                     return;
@@ -570,15 +622,15 @@ void MainWindow::contentsView_update()
             if (indexes.at(0).isValid()) {
                 const QString unique_id = ui->downloadView->model()->data(
                         ui->downloadView->model()->index(indexes.at(0).row(), MN_HIDDEN_UNIQUE_ID)).toString();
-                for (size_t k = 0; k < graph_init.size(); ++k) {
+                for (size_t k = 0; k < gk_dl_info_cache.size(); ++k) {
                     try {
 
                         // Verify that we have the right download item
-                        if (graph_init.at(k).unique_id == unique_id) {
+                        if (gk_dl_info_cache.at(k).unique_id == unique_id) {
 
                             // Verify that this download is of the type 'BitTorrent'
-                            if (graph_init.at(k).down_info.dl_type == GekkoFyre::DownloadType::Torrent ||
-                                graph_init.at(k).down_info.dl_type == GekkoFyre::DownloadType::TorrentMagnetLink) {
+                            if (gk_dl_info_cache.at(k).dl_type == GekkoFyre::DownloadType::Torrent ||
+                                    gk_dl_info_cache.at(k).dl_type == GekkoFyre::DownloadType::TorrentMagnetLink) {
 
                                 // Read the XML data into memory
                                 std::vector<GekkoFyre::GkTorrent::TorrentInfo> gk_ti = GekkoFyre::CmnRoutines::readTorrentInfo(false);
@@ -808,10 +860,10 @@ void MainWindow::startHttpDownload(const QString &file_dest, const QString &uniq
             QModelIndex index = dlModel->index(indexes.at(0).row(), MN_STATUS_COL, QModelIndex());
             const GekkoFyre::DownloadStatus status = routines->convDlStat_StringToEnum(ui->downloadView->model()->data(index).toString());
             try {
-                for (size_t k = 0; k < graph_init.size(); ++k) {
-                    if (graph_init.at(k).unique_id == unique_id) {
-                        if (graph_init.at(k).down_info.dl_type == GekkoFyre::DownloadType::HTTP ||
-                            graph_init.at(k).down_info.dl_type == GekkoFyre::DownloadType::FTP) {
+                for (size_t k = 0; k < gk_dl_info_cache.size(); ++k) {
+                    if (gk_dl_info_cache.at(k).unique_id == unique_id) {
+                        if (gk_dl_info_cache.at(k).dl_type == GekkoFyre::DownloadType::HTTP ||
+                                gk_dl_info_cache.at(k).dl_type == GekkoFyre::DownloadType::FTP) {
                             // TODO: QFutureWatcher<GekkoFyre::CurlMulti::CurlInfo> *verifyFileFutWatch;
                             GekkoFyre::GkCurl::CurlInfo verify = GekkoFyre::CurlEasy::verifyFileExists(url);
                             if (verify.response_code == 200) {
@@ -863,6 +915,7 @@ void MainWindow::startTorrentDl(const QString &unique_id, const bool &resumeDl)
     std::vector<GekkoFyre::GkTorrent::TorrentInfo> gk_ti = routines->readTorrentInfo(false);
     for (auto const &indice: gk_ti) {
         if (indice.unique_id == unique_id.toStdString()) {
+            QObject::connect(gk_torrent_client, SIGNAL(xfer_torrent_info(GekkoFyre::GkTorrent::TorrentResumeInfo)), this, SLOT(recvBitTorrent_XferStats(GekkoFyre::GkTorrent::TorrentResumeInfo)));
             gk_torrent_client->startTorrentDl(indice);
             break;
         }
@@ -884,10 +937,10 @@ void MainWindow::haltDownload()
                 QModelIndex index = dlModel->index(indexes.at(0).row(), MN_STATUS_COL, QModelIndex());
                 const GekkoFyre::DownloadStatus status = routines->convDlStat_StringToEnum(ui->downloadView->model()->data(index).toString());
 
-                for (size_t k = 0; k < graph_init.size(); ++k) {
-                    if (graph_init.at(k).unique_id == unique_id) {
-                        if (graph_init.at(k).down_info.dl_type == GekkoFyre::DownloadType::HTTP ||
-                            graph_init.at(k).down_info.dl_type == GekkoFyre::DownloadType::FTP) {
+                for (size_t k = 0; k < gk_dl_info_cache.size(); ++k) {
+                    if (gk_dl_info_cache.at(k).unique_id == unique_id) {
+                        if (gk_dl_info_cache.at(k).dl_type == GekkoFyre::DownloadType::HTTP ||
+                                gk_dl_info_cache.at(k).dl_type == GekkoFyre::DownloadType::FTP) {
                             if (status != GekkoFyre::DownloadStatus::Stopped) {
                                 if (status != GekkoFyre::DownloadStatus::Completed) {
                                     if (status != GekkoFyre::DownloadStatus::Failed) {
@@ -904,7 +957,7 @@ void MainWindow::haltDownload()
                                     }
                                 }
                             }
-                        } else if (graph_init.at(k).down_info.dl_type == GekkoFyre::DownloadType::Torrent) {
+                        } else if (gk_dl_info_cache.at(k).dl_type == GekkoFyre::DownloadType::Torrent) {
                             // Torrent
                             return;
                         }
@@ -941,12 +994,12 @@ void MainWindow::resumeDownload()
             QModelIndex index = dlModel->index(indexes.at(0).row(), MN_STATUS_COL, QModelIndex());
             const GekkoFyre::DownloadStatus status = routines->convDlStat_StringToEnum(
                     ui->downloadView->model()->data(index).toString());
-            for (size_t k = 0; k < graph_init.size(); ++k) {
+            for (size_t k = 0; k < gk_dl_info_cache.size(); ++k) {
                 const QString unique_id = ui->downloadView->model()->data(
                         ui->downloadView->model()->index(indexes.at(0).row(), MN_HIDDEN_UNIQUE_ID)).toString();
-                if (graph_init.at(k).unique_id == unique_id) {
-                    if (graph_init.at(k).down_info.dl_type == GekkoFyre::DownloadType::HTTP ||
-                        graph_init.at(k).down_info.dl_type == GekkoFyre::DownloadType::FTP) {
+                if (gk_dl_info_cache.at(k).unique_id == unique_id) {
+                    if (gk_dl_info_cache.at(k).dl_type == GekkoFyre::DownloadType::HTTP ||
+                            gk_dl_info_cache.at(k).dl_type == GekkoFyre::DownloadType::FTP) {
                         try {
                             switch (status) {
                                 case GekkoFyre::DownloadStatus::Paused:
@@ -1037,7 +1090,7 @@ void MainWindow::resumeDownload()
                         } catch (const std::exception &e) {
                             QMessageBox::warning(this, tr("Error!"), QString("%1").arg(e.what()), QMessageBox::Ok);
                         }
-                    } else if (graph_init.at(k).down_info.dl_type == GekkoFyre::DownloadType::Torrent) {
+                    } else if (gk_dl_info_cache.at(k).dl_type == GekkoFyre::DownloadType::Torrent) {
                         // Torrent
                         return;
                     }
@@ -1069,10 +1122,10 @@ void MainWindow::pauseDownload()
                 QModelIndex index = dlModel->index(indexes.at(0).row(), MN_STATUS_COL, QModelIndex());
                 const GekkoFyre::DownloadStatus status = routines->convDlStat_StringToEnum(ui->downloadView->model()->data(index).toString());
 
-                for (size_t k = 0; k < graph_init.size(); ++k) {
-                    if (graph_init.at(k).unique_id == unique_id) {
-                        if (graph_init.at(k).down_info.dl_type == GekkoFyre::DownloadType::HTTP ||
-                            graph_init.at(k).down_info.dl_type == GekkoFyre::DownloadType::FTP) {
+                for (size_t k = 0; k < gk_dl_info_cache.size(); ++k) {
+                    if (gk_dl_info_cache.at(k).unique_id == unique_id) {
+                        if (gk_dl_info_cache.at(k).dl_type == GekkoFyre::DownloadType::HTTP ||
+                                gk_dl_info_cache.at(k).dl_type == GekkoFyre::DownloadType::FTP) {
                             if (status != GekkoFyre::DownloadStatus::Paused) {
                                 if (status != GekkoFyre::DownloadStatus::Completed) {
                                     if (status != GekkoFyre::DownloadStatus::Stopped) {
@@ -1090,7 +1143,7 @@ void MainWindow::pauseDownload()
                                     }
                                 }
                             }
-                        } else if (graph_init.at(k).down_info.dl_type == GekkoFyre::DownloadType::Torrent) {
+                        } else if (gk_dl_info_cache.at(k).dl_type == GekkoFyre::DownloadType::Torrent) {
                             // Torrent
                             return;
                         }
@@ -1123,10 +1176,10 @@ void MainWindow::restartDownload()
             QModelIndex index = dlModel->index(indexes.at(0).row(), MN_STATUS_COL, QModelIndex());
             const GekkoFyre::DownloadStatus status = routines->convDlStat_StringToEnum(
                     ui->downloadView->model()->data(index).toString());
-            for (size_t k = 0; k < graph_init.size(); ++k) {
-                if (graph_init.at(k).unique_id == unique_id) {
-                    if (graph_init.at(k).down_info.dl_type == GekkoFyre::DownloadType::HTTP ||
-                        graph_init.at(k).down_info.dl_type == GekkoFyre::DownloadType::FTP) {
+            for (size_t k = 0; k < gk_dl_info_cache.size(); ++k) {
+                if (gk_dl_info_cache.at(k).unique_id == unique_id) {
+                    if (gk_dl_info_cache.at(k).dl_type == GekkoFyre::DownloadType::HTTP ||
+                            gk_dl_info_cache.at(k).dl_type == GekkoFyre::DownloadType::FTP) {
                         if (status != GekkoFyre::DownloadStatus::Invalid) {
                             if (status != GekkoFyre::DownloadStatus::Failed) {
                                 QMessageBox file_ask;
@@ -1167,7 +1220,7 @@ void MainWindow::restartDownload()
                                 }
                             }
                         }
-                    } else if (graph_init.at(k).down_info.dl_type == GekkoFyre::DownloadType::Torrent) {
+                    } else if (gk_dl_info_cache.at(k).dl_type == GekkoFyre::DownloadType::Torrent) {
                         // Torrent
                         return;
                     }
@@ -1247,6 +1300,13 @@ void MainWindow::removeDlItem()
     removeSelRows();
 }
 
+/**
+ * @brief MainWindow::general_extraDetails appears as a selectable tab for the download in question, where extra details
+ * about the item are provided.
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @date 2017-07-03
+ * @see MainWindow::manageDlStats()
+ */
 void MainWindow::general_extraDetails()
 {
     QModelIndexList indexes = ui->downloadView->selectionModel()->selectedRows();
@@ -1255,41 +1315,60 @@ void MainWindow::general_extraDetails()
             const QModelIndex url_index = dlModel->index(indexes.at(0).row(), MN_URL_COL, QModelIndex());
             const QModelIndex dest_index = dlModel->index(indexes.at(0).row(), MN_DESTINATION_COL, QModelIndex());
             const QModelIndex size_index = dlModel->index(indexes.at(0).row(), MN_FILESIZE_COL, QModelIndex());
+            const QModelIndex unique_id_index = dlModel->index(indexes.at(0).row(), MN_HIDDEN_UNIQUE_ID, QModelIndex());
             const QString url_string = ui->downloadView->model()->data(url_index).toString();
             const QString dest_string = ui->downloadView->model()->data(dest_index).toString();
             const QString size_string = ui->downloadView->model()->data(size_index).toString();
+            const QString unique_id_string = ui->downloadView->model()->data(unique_id_index).toString();
             ui->fileNameDataLabel->setText(QUrl(url_string).fileName());
             ui->destDataLabel->setText(QString::fromStdString(fs::path(dest_string.toStdString()).remove_filename().string()));
             ui->totSizeDataLabel->setText(size_string);
             ui->urlDataLabel->setText(url_string);
 
-            std::vector<GekkoFyre::GkCurl::CurlDlInfo> dl_info = routines->readDownloadInfo();
             long long insert_time = 0;
             long long complt_time = 0;
             double content_length = 0;
             std::string hash_val_given = "";
             std::string hash_val_calc = "";
             QString hashType = "";
-            for (size_t i = 0; i < dl_info.size(); ++i) {
-                if (dl_info.at(i).file_loc == dest_string.toStdString()) {
-                    insert_time = dl_info.at(i).insert_timestamp;
-                    complt_time = dl_info.at(i).complt_timestamp;
-                    content_length = dl_info.at(i).ext_info.content_length;
-                    hash_val_given = dl_info.at(i).hash_val_given;
-                    hash_val_calc = dl_info.at(i).hash_val_rtrnd;
-                    hashType = routines->convHashType_toString(dl_info.at(i).hash_type);
-                    break;
+            for (size_t i = 0; i < gk_dl_info_cache.size(); ++i) {
+                if (gk_dl_info_cache.at(i).unique_id == unique_id_string) {
+                    if (gk_dl_info_cache.at(i).dl_type == GekkoFyre::DownloadType::HTTP ||
+                            gk_dl_info_cache.at(i).dl_type == GekkoFyre::DownloadType::FTP) {
+                        // This is a HTTP(S) or FTP(S) download!
+                        insert_time = gk_dl_info_cache.at(i).curl_info.get().insert_timestamp;
+                        complt_time = gk_dl_info_cache.at(i).curl_info.get().complt_timestamp;
+                        content_length = gk_dl_info_cache.at(i).curl_info.get().ext_info.content_length;
+                        hash_val_given = gk_dl_info_cache.at(i).curl_info.get().hash_val_given;
+                        hash_val_calc = gk_dl_info_cache.at(i).curl_info.get().hash_val_rtrnd;
+                        hashType = routines->convHashType_toString(gk_dl_info_cache.at(i).curl_info.get().hash_type);
+                        break;
+                    } else if (gk_dl_info_cache.at(i).dl_type == GekkoFyre::DownloadType::Torrent ||
+                            gk_dl_info_cache.at(i).dl_type == GekkoFyre::DownloadType::TorrentMagnetLink) {
+                        // This is a BitTorrent download!
+                        insert_time = gk_dl_info_cache.at(i).to_info.get().insert_timestamp;
+                        complt_time = gk_dl_info_cache.at(i).to_info.get().complt_timestamp;
+                        content_length = ((double)gk_dl_info_cache.at(i).to_info.get().num_pieces *
+                                (double)gk_dl_info_cache.at(i).to_info.get().piece_length);
+                        hash_val_given = tr("N/A").toStdString();
+                        hash_val_calc = tr("N/A").toStdString();
+                        hashType = tr("Unknown");
+                    } else {
+                        // Throw an exception!
+                        throw std::invalid_argument(tr("An invalid download-type has been given! It must be either a "
+                                                               "HTTP(S)/FTP(S) or BitTorrent download.").toStdString());
+                    }
                 }
             }
 
             double curr_dl_amount = 0;
             double curr_dl_speed = 0;
-            if (dl_stat.size() > 0) {
-                for (size_t i = 0; i < dl_stat.size(); ++i) {
-                    if (dl_stat.at(i).file_dest == dest_string.toStdString()) {
-                        if (dl_stat.at(i).stat.size() > 0) {
-                            curr_dl_amount = (double)dl_stat.at(i).stat.back().dltotal;
-                            curr_dl_speed = dl_stat.at(i).stat.back().dlnow;
+            if (gk_dl_info_cache.size() > 0) {
+                for (size_t i = 0; i < gk_dl_info_cache.size(); ++i) {
+                    if (gk_dl_info_cache.at(i).dl_dest == dest_string) {
+                        if (gk_dl_info_cache.at(i).stats.xfer_stats.size() > 0) {
+                            curr_dl_amount = (double)gk_dl_info_cache.at(i).stats.xfer_stats.back().download_total;
+                            curr_dl_speed = gk_dl_info_cache.at(i).stats.xfer_stats.back().download_rate;
                             break;
                         }
 
@@ -1344,6 +1423,13 @@ void MainWindow::general_extraDetails()
     return;
 }
 
+/**
+ * @brief MainWindow::transfer_extraDetails appears as a selectable tab for the download in question, where extra details
+ * about the item are provided.
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @date 2017-07-03
+ * @see MainWindow::manageDlStats()
+ */
 void MainWindow::transfer_extraDetails()
 {
     QModelIndexList indexes = ui->downloadView->selectionModel()->selectedRows();
@@ -1705,118 +1791,107 @@ void MainWindow::sendDetails(const std::string &fileName, const double &fileSize
 }
 
 /**
- * @brief MainWindow::recvXferStats receives the statistics regarding a download.
+ * @brief MainWindow::recvXferStats receives the statistics regarding a HTTP(S)/FTP(S) download.
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
  * @date   2016-10-23
  * @note   <http://stackoverflow.com/questions/9086372/how-to-compare-pointers>
  *         <http://doc.qt.io/qt-5/qmutexlocker.html>
  *         <http://stackoverflow.com/questions/19981161/using-qmutexlocker-to-protect-shared-variables-when-running-function-with-qtconc>
  * @param info is the struct related to the download info.
+ * @see MainWindow::manageDlStats()
  */
 void MainWindow::recvXferStats(const GekkoFyre::GkCurl::CurlProgressPtr &info)
 {
     QMutex curl_multi_mutex;
-    GekkoFyre::GkCurl::CurlProgressPtr prog_temp;
+    GekkoFyre::GkGraph::GkXferStats stats_temp;
+    std::time(&stats_temp.cur_time);
     curl_multi_mutex.lock();
-    prog_temp.stat = info.stat;
-    curl_multi_mutex.unlock();
-    prog_temp.url = info.url;
-    prog_temp.file_dest = info.file_dest;
-    prog_temp.content_length = info.content_length;
-    prog_temp.timer_set = info.timer_set;
-
-    bool alreadyExists = false;
-    for (size_t i = 0; i < dl_stat.size(); ++i) {
-        if (dl_stat.at(i).file_dest == prog_temp.file_dest) {
-            alreadyExists = true;
-            break;
-        }
+    if (info.stat.size() > 1) {
+        throw std::runtime_error(tr("Given vector is larger than expected!").toStdString());
     }
 
-    if (!alreadyExists) {
-        // If it doesn't exist, push the whole of 'prog_temp' onto the private, class-global 'dl_stat' and
-        // thusly updateDlStats().
-        dl_stat.push_back(prog_temp);
-        emit updateDlStats();
-        return;
-    } else {
-        // If it does exist, then only update certain elements instead and thusly updateDlStats() also.
-        for (size_t i = 0; i < dl_stat.size(); ++i) {
-            if (dl_stat.at(i).file_dest == prog_temp.file_dest) {
-                dl_stat.at(i).stat = prog_temp.stat;
-                emit updateDlStats();
-                return;
+    stats_temp.download_rate = info.stat.at(0).dlnow;
+    stats_temp.upload_rate = info.stat.at(0).upnow;
+    stats_temp.download_total = info.stat.at(0).dltotal;
+    stats_temp.upload_total = info.stat.at(0).uptotal;
+
+    for (size_t i = 0; i < gk_dl_info_cache.size(); ++i) {
+        if (gk_dl_info_cache.at(i).dl_type == GekkoFyre::DownloadType::HTTP ||
+                gk_dl_info_cache.at(i).dl_type == GekkoFyre::DownloadType::FTP) {
+            if (gk_dl_info_cache.at(i).dl_dest == QString::fromStdString(info.file_dest)) {
+                if (gk_dl_info_cache.at(i).stats.timer_begin == 0) {
+                    // If it doesn't exist, push the whole of 'prog_temp' onto the private, class-global 'dl_stat' and
+                    // thusly updateDlStats().
+                    std::time(&gk_dl_info_cache.at(i).stats.timer_begin);
+                    gk_dl_info_cache.at(i).stats.xfer_stats.push_back(stats_temp);
+                    emit updateDlStats();
+                    goto finish_loop;
+                } else {
+                    // If it does exist, then only update certain elements instead and thusly updateDlStats() also.
+                    gk_dl_info_cache.at(i).stats.xfer_stats.push_back(stats_temp);
+                    emit updateDlStats();
+                    goto finish_loop;
+                }
             }
         }
     }
+
+    finish_loop: ;
+    curl_multi_mutex.unlock();
     return;
 }
 
 /**
- * @brief MainWindow::manageDlStats manages the statistics regarding a HTTP/FTP download and updates the relevant columns.
+ * @brief MainWindow::manageDlStats manages the statistics regarding a HTTP(S)/FTP(S)/Torrent download and updates the
+ * relevant columns.
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
- * @date   2016-10-23
- * @note   <http://www.qtcentre.org/threads/18082-Hot-to-get-a-QModelIndexList-from-a-model>
+ * @date 2016-10-23
+ * @note <http://www.qtcentre.org/threads/18082-Hot-to-get-a-QModelIndexList-from-a-model>
+ * @see MainWindow::recvXferStats(), MainWindow::recvBitTorrent_XferStats()
  */
 void MainWindow::manageDlStats()
 {
-    for (int i = 0; i < dlModel->getList().size(); ++i) {
-        QModelIndex find_index = dlModel->index(i, MN_DESTINATION_COL);
-        for (size_t j = 0; j < dl_stat.size(); ++j) {
-            if (!dl_stat.at(j).timer_set) {
-                std::time(&dl_stat.at(j).timer_begin);
-                dl_stat.at(j).timer_set = true;
-            }
-
+    try {
+        for (int i = 0; i < dlModel->getList().size(); ++i) {
+            QModelIndex find_index = dlModel->index(i, MN_DESTINATION_COL);
             QModelIndex unique_id_index = dlModel->index(i, MN_HIDDEN_UNIQUE_ID);
             const QString dest_string = ui->downloadView->model()->data(find_index).toString();
             const QString unique_id_string = ui->downloadView->model()->data(unique_id_index).toString();
 
-            try {
-                if (dest_string.toStdString() == dl_stat.at(j).file_dest) {
-                    std::vector<GekkoFyre::GkCurl::CurlDlInfo> xml_history_info = routines->readDownloadInfo();
-                    if (dl_stat.at(j).content_length == 0) {
-                        for (size_t o = 0; o < xml_history_info.size(); ++o) {
-                            if (xml_history_info.at(o).file_loc == dl_stat.at(j).file_dest) {
-                                dl_stat.at(j).content_length = xml_history_info.at(o).ext_info.content_length;
-                                break;
-                            }
-                        }
+            for (size_t j = 0;  j < gk_dl_info_cache.size(); ++j) {
+                if (unique_id_string == gk_dl_info_cache.at(j).unique_id) {
+                    GekkoFyre::GkGraph::GkXferStats xfer_stat_indice = gk_dl_info_cache.at(j).stats.xfer_stats.back();
+                    std::ostringstream oss_dl_bps, oss_ul_bps;
+
+                    oss_dl_bps << routines->numberConverter(xfer_stat_indice.download_rate).toStdString() << tr("/sec").toStdString();
+                    oss_ul_bps << routines->numberConverter(xfer_stat_indice.upload_rate).toStdString() << tr("/sec").toStdString();
+                    long cur_dl_amount = xfer_stat_indice.download_total;
+                    // long cur_ul_amount = xfer_stat_indice.upload_total;
+
+                    if (gk_dl_info_cache.at(j).dl_type == GekkoFyre::DownloadType::Torrent || gk_dl_info_cache.at(j).dl_type == GekkoFyre::DownloadType::TorrentMagnetLink) {
+                        double progress_percent = std::round((xfer_stat_indice.progress_ppm / 1000000) * 100);
+                        dlModel->updateCol(dlModel->index(i, MN_PROGRESS_COL), QString::number(progress_percent), MN_PROGRESS_COL);
+                    } else if (gk_dl_info_cache.at(j).dl_type == GekkoFyre::DownloadType::HTTP || gk_dl_info_cache.at(j).dl_type == GekkoFyre::DownloadType::FTP) {
+                        long cur_file_size = GekkoFyre::CmnRoutines::getFileSize(gk_dl_info_cache.at(j).dl_dest.toStdString());
+                        dlModel->updateCol(dlModel->index(i, MN_PROGRESS_COL), routines->percentDownloaded(gk_dl_info_cache.at(j).stats.content_length, (double)cur_file_size), MN_PROGRESS_COL);
                     }
 
-                    GekkoFyre::GkCurl::CurlDlStats dl_stat_element = dl_stat.at(j).stat.back();
-                    std::ostringstream oss_dlnow;
-                    oss_dlnow << routines->numberConverter(dl_stat_element.dlnow).toStdString() << tr("/sec").toStdString();
+                    dlModel->updateCol(dlModel->index(i, MN_DOWNSPEED_COL), QString::fromStdString(oss_dl_bps.str()), MN_DOWNSPEED_COL);
+                    dlModel->updateCol(dlModel->index(i, MN_UPSPEED_COL), QString::fromStdString(oss_ul_bps.str()), MN_UPSPEED_COL);
+                    dlModel->updateCol(dlModel->index(i, MN_DOWNLOADED_COL), routines->numberConverter((double)cur_dl_amount), MN_DOWNLOADED_COL);
 
-                    long cur_file_size = GekkoFyre::CmnRoutines::getFileSize(dl_stat.at(j).file_dest);
-
-                    dlModel->updateCol(dlModel->index(i, MN_DOWNSPEED_COL), QString::fromStdString(oss_dlnow.str()), MN_DOWNSPEED_COL);
-                    dlModel->updateCol(dlModel->index(i, MN_DOWNLOADED_COL), routines->numberConverter((double)cur_file_size), MN_DOWNLOADED_COL);
-                    dlModel->updateCol(dlModel->index(i, MN_PROGRESS_COL), routines->percentDownloaded(dl_stat.at(j).content_length, (double)cur_file_size), MN_PROGRESS_COL);
-
-                    // Update the 'download speed' spline-graph, via the file location
-                    // Append our statistics to the 'graph_init' struct and thus, the graph in question
-                    std::time_t cur_time;
-                    std::time(&cur_time);
-                    double passed_time = std::difftime(cur_time, dl_stat.at(j).timer_begin);
-
-                    for (size_t k = 0; k < graph_init.size(); ++k) {
-                        if (graph_init.at(k).unique_id == unique_id_string) {
-                            graph_init.at(k).down_speed.down_speed_vals.push_back(std::make_pair(dl_stat_element.dlnow,
-                                                                                                 passed_time));
-                            break;
-                        }
-                    }
+                    double passed_time = std::difftime(xfer_stat_indice.cur_time, gk_dl_info_cache.at(j).stats.timer_begin);
+                    gk_dl_info_cache.at(j).xfer_graph.down_speed_vals.push_back(std::make_pair(xfer_stat_indice.download_rate, passed_time));
 
                     general_extraDetails();
                     transfer_extraDetails();
                     updateChart();
-                    break;
+                    return;
                 }
-            } catch (const std::exception &e) {
-                QMessageBox::warning(this, tr("Error!"), QString("%1").arg(e.what()), QMessageBox::Ok);
             }
         }
+    } catch (const std::exception &e) {
+        QMessageBox::warning(this, tr("Error!"), QString("%1").arg(e.what()), QMessageBox::Ok);
     }
 
     return;
@@ -1893,6 +1968,47 @@ void MainWindow::recvDlFinished(const GekkoFyre::GkCurl::DlStatusMsg &status)
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
  * @date 2016-12-22
  * @param gk_xfer_stats is the statistics in question, in the form of a struct.
+ * @see MainWindow::manageDlSotats()
  */
-void MainWindow::recvBitTorrent_XferStats(const GekkoFyre::GkTorrent::TorrentXferStats &gk_xfer_stats)
-{}
+void MainWindow::recvBitTorrent_XferStats(const GekkoFyre::GkTorrent::TorrentResumeInfo &gk_xfer_info)
+{
+    QMutex to_ses_mutex;
+    GekkoFyre::GkGraph::GkXferStats stats_temp;
+    std::time(&stats_temp.cur_time);
+    to_ses_mutex.lock();
+    stats_temp.progress_ppm = gk_xfer_info.xfer_stats.get().progress_ppm;
+    stats_temp.upload_rate = gk_xfer_info.xfer_stats.get().ul_rate;
+    stats_temp.download_rate = gk_xfer_info.xfer_stats.get().dl_rate;
+    stats_temp.download_total = gk_xfer_info.total_downloaded;
+    stats_temp.upload_total = gk_xfer_info.total_uploaded;
+    stats_temp.num_pieces_dled = gk_xfer_info.xfer_stats.get().num_pieces_downloaded;
+
+    for (size_t i = 0; i < gk_dl_info_cache.size(); ++i) {
+        if (gk_dl_info_cache.at(i).dl_type == GekkoFyre::DownloadType::Torrent ||
+                gk_dl_info_cache.at(i).dl_type == GekkoFyre::DownloadType::TorrentMagnetLink) {
+            if (gk_dl_info_cache.at(i).dl_dest == QString::fromStdString(gk_xfer_info.save_path)) {
+                if (gk_dl_info_cache.at(i).stats.timer_begin == 0) {
+                    // If it doesn't exist, push the whole of 'prog_temp' onto the private, class-global 'dl_stat' and
+                    // thusly updateDlStats().
+                    std::time(&gk_dl_info_cache.at(i).stats.timer_begin);
+                    gk_dl_info_cache.at(i).stats.xfer_stats.push_back(stats_temp);
+                    gk_dl_info_cache.at(i).to_info.get().to_resume_info = gk_xfer_info;
+
+                    emit updateDlStats();
+                    goto finish_loop;
+                } else {
+                    // If it does exist, then only update certain elements instead and thusly updateDlStats() also.
+                    gk_dl_info_cache.at(i).stats.xfer_stats.push_back(stats_temp);
+                    gk_dl_info_cache.at(i).to_info.get().to_resume_info = gk_xfer_info;
+
+                    emit updateDlStats();
+                    goto finish_loop;
+                }
+            }
+        }
+    }
+
+    finish_loop: ;
+    to_ses_mutex.unlock();
+    return;
+}

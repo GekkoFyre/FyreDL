@@ -653,13 +653,17 @@ void GekkoFyre::CmnRoutines::clearLayout(QLayout *layout)
 }
 
 /**
- * @brief GekkoFyre::CmnRoutines::readDownloadInfo
+ * @brief GekkoFyre::CmnRoutines::readDownloadInfo extracts the history information from 'CFG_HISTORY_FILE' relating to
+ * HTTP(S) or FTP(S) downloads that have been added to FyreDL. This excludes BitTorrent downloads, which are handled by
+ * different functions.
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
  * @date   2016-10
  * @note   <http://www.gerald-fahrnholz.eu/sw/DocGenerated/HowToUse/html/group___grp_pugi_xml.html>
  *         <http://stackoverflow.com/questions/16155888/proper-way-to-parse-xml-using-pugixml>
  * @param xmlCfgFile is the XML history file in question.
- * @return
+ * @param hashesOnly excludes all the 'extended' information by not loading it into memory. *** Warning! The extended
+ * information will not be initialized! ***
+ * @return A STL standard container holding a struct pertaining to all the needed CURL information is returned.
  */
 std::vector<GekkoFyre::GkCurl::CurlDlInfo> GekkoFyre::CmnRoutines::readDownloadInfo(const std::string &xmlCfgFile,
                                                                                     const bool &hashesOnly)
@@ -1136,12 +1140,16 @@ bool GekkoFyre::CmnRoutines::writeTorrentItem(GekkoFyre::GkTorrent::TorrentInfo 
 }
 
 /**
+ * @brief GekkoFyre::CmnRoutines::readTorrentInfo extracts the history information from 'CFG_HISTORY_FILE' relating to
+ * BitTorrent downloads that have been added to FyreDL. This excludes HTTP(S) and FTP(S) downloads, which are handled
+ * by different functions.
  * @note <http://en.cppreference.com/w/cpp/header/cstdlib>
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
  * @date 2016-12-12
- * @param minimal_readout
- * @param xmlCfgFile
- * @return
+ * @param minimal_readout only extracts the most vital history information, thus (potentially) saving CPU time and
+ * memory.
+ * @param xmlCfgFile The XML configuration file in question.
+ * @return A STL standard container holding a struct pertaining to all the needed BitTorrent information is returned.
  */
 std::vector<GekkoFyre::GkTorrent::TorrentInfo> GekkoFyre::CmnRoutines::readTorrentInfo(const bool &minimal_readout,
                                                                                        const std::string &xmlCfgFile)

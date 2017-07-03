@@ -64,6 +64,7 @@ GekkoFyre::GkTorrentClient::GkTorrentClient()
     gk_to_ses->moveToThread(gk_ses_thread);
 
     QObject::connect(this, SIGNAL(update_ses_hash(std::string,lt::torrent_handle)), gk_to_ses, SLOT(recv_hash_update(std::string,lt::torrent_handle)));
+    QObject::connect(gk_to_ses, SIGNAL(sendStats(std::string,lt::torrent_status)), this, SLOT(recv_proc_to_stats(std::string,lt::torrent_status)));
     QObject::connect(gk_to_ses, SIGNAL(finish_gk_ses_thread()), gk_ses_thread, SLOT(quit()));
     QObject::connect(gk_to_ses, SIGNAL(finish_gk_ses_thread()), gk_to_ses, SLOT(deleteLater()));
     QObject::connect(gk_ses_thread, SIGNAL(finished()), gk_ses_thread, SLOT(deleteLater()));
@@ -72,7 +73,6 @@ GekkoFyre::GkTorrentClient::GkTorrentClient()
 GekkoFyre::GkTorrentClient::~GkTorrentClient()
 {
     delete routines;
-    delete lt_ses;
     delete gk_to_ses;
 }
 
@@ -121,5 +121,25 @@ void GekkoFyre::GkTorrentClient::startTorrentDl(const GekkoFyre::GkTorrent::Torr
                 .arg(torrent_error_name).arg(e.what()), QMessageBox::Ok);
     }
 
+    return;
+}
+
+void GekkoFyre::GkTorrentClient::recv_proc_to_stats(const std::string &save_path,
+                                                    const lt::torrent_status &stats)
+{
+    GekkoFyre::GkTorrentMisc gk_to_misc;
+    GekkoFyre::GkTorrent::TorrentResumeInfo to_xfer_stats;
+    to_xfer_stats.save_path = save_path;
+    to_xfer_stats.dl_state = gk_to_misc.state(stats.state);
+    to_xfer_stats.xfer_stats.get().progress_ppm = stats.progress_ppm;
+    to_xfer_stats.xfer_stats.get().dl_rate = stats.upload_rate;
+    to_xfer_stats.xfer_stats.get().ul_rate = stats.download_rate;
+    to_xfer_stats.xfer_stats.get().num_pieces_downloaded = stats.num_pieces;
+    to_xfer_stats.last_seen_cmplte = stats.last_seen_complete;
+    to_xfer_stats.last_scrape = stats.last_scrape;
+    to_xfer_stats.total_downloaded = stats.all_time_download;
+    to_xfer_stats.total_uploaded = stats.all_time_upload;
+
+    emit xfer_torrent_info(to_xfer_stats);
     return;
 }

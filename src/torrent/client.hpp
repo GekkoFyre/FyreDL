@@ -49,6 +49,7 @@
 #include "./../default_var.hpp"
 #include "./../cmnroutines.hpp"
 #include "session.hpp"
+#include "misc.hpp"
 #include <libtorrent/session_handle.hpp>
 #include <libtorrent/alert_types.hpp>
 #include <string>
@@ -70,8 +71,12 @@ private:
     lt::session_handle *lt_ses;
     QThread *gk_ses_thread;
 
+private slots:
+    void recv_proc_to_stats(const std::string &save_path, const lt::torrent_status &stats);
+
 signals:
     void update_ses_hash(const std::string &save_dir, const lt::torrent_handle &lt_th);
+    void xfer_torrent_info(const GekkoFyre::GkTorrent::TorrentResumeInfo &xfer_stats);
 };
 }
 

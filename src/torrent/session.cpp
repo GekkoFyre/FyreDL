@@ -69,6 +69,8 @@ GekkoFyre::GkTorrentSession::GkTorrentSession(QObject *parent) : QObject(parent)
  */
 GekkoFyre::GkTorrentSession::GkTorrentSession(lt::session_handle *gk_lt_ses, QObject *parent)
 {
+    gk_lt_th = new QMap<std::string, lt::torrent_handle>();
+
     // http://libtorrent.org/reference-Settings.html#settings_pack
     // http://www.libtorrent.org/include/libtorrent/session_settings.hpp
     lt::settings_pack pack;
@@ -101,12 +103,12 @@ GekkoFyre::GkTorrentSession::GkTorrentSession(lt::session_handle *gk_lt_ses, QOb
     pack.set_str(lt::settings_pack::listen_interfaces, interface);          // Binding to port 0 will make the operating system pick the port. The default is "0.0.0.0:6881", which binds to all interfaces on port 6881. Once/if binding the listen socket(s) succeed, listen_succeeded_alert is posted.
 
     lt_ses = new lt::session(pack, 0);
-    *gk_lt_ses = *lt_ses;
+    gk_lt_ses = lt_ses;
 
     // While we wait for items to be added to the QMap object, we pause the thread until an item is
     // added and THEN process the function 'run_session_bckgrnd()'. There is also a timeout of 5 seconds.
     clk::time_point cur_time = clk::now();
-    while (gk_lt_th->size() < 1) {
+    while (gk_lt_th->empty()) {
         std::this_thread::sleep_for(std::chrono::milliseconds(200));
 
         if ((clk::now() - cur_time) > std::chrono::seconds(5)) {
