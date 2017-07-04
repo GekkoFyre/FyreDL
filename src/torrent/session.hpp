@@ -45,9 +45,10 @@
 
 #include "./../default_var.hpp"
 #include <libtorrent/session_handle.hpp>
-#include <libtorrent/alert_types.hpp>
 #include <libtorrent/torrent_status.hpp>
+#include <libtorrent/torrent_handle.hpp>
 #include <string>
+#include <memory>
 #include <QObject>
 #include <QMap>
 
@@ -58,18 +59,20 @@ class GkTorrentSession: public QObject {
 
 public:
     GkTorrentSession(QObject *parent = 0);
-    GkTorrentSession(lt::session_handle *gk_lt_ses, QObject *parent = 0);
+    GkTorrentSession(std::shared_ptr<lt::session_handle> lt_ses, QObject *parent = 0);
     ~GkTorrentSession();
 
+private:
+    QMap<std::string, lt::torrent_handle> lt_to_handle;
+    std::shared_ptr<lt::session_handle> gk_lt_ses;
+    bool thread_terminate;
+
 public slots:
+    void run_session_bckgrnd();
     void recv_hash_update(const std::string &save_dir, const lt::torrent_handle &lt_at);
 
-private:
-    void run_session_bckgrnd();
-    int rand_port() const;
-
-    lt::session_handle *lt_ses;
-    QMap<std::string, lt::torrent_handle> *gk_lt_th;
+private slots:
+    void finish_thread_cleanup();
 
 signals:
     void sendStats(const std::string &save_path, const lt::torrent_status &stats);

@@ -45,36 +45,73 @@
 
 #include "client.hpp"
 #include <libtorrent/add_torrent_params.hpp>
-#include <libtorrent/torrent_handle.hpp>
+#include <libtorrent/alert_types.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/exception/all.hpp>
-#include <iosfwd>
 #include <QString>
-#include <QThread>
+#include <random>
+#include <thread>
 
 namespace sys = boost::system;
 namespace fs = boost::filesystem;
 
+/**
+ * @note <http://www.rasterbar.com/products/libtorrent/manual.html>
+ *       <http://libtorrent.org/tutorial.html>
+ *       <http://libtorrent.org/reference-Core.html#save_resume_data()>
+ *       <http://libtorrent.org/reference-Core.html#session_handle>
+ */
 GekkoFyre::GkTorrentClient::GkTorrentClient()
 {
-    routines = new GekkoFyre::CmnRoutines();
+    routines = std::make_unique<GekkoFyre::CmnRoutines>();
+
+    // http://libtorrent.org/reference-Settings.html#settings_pack
+    // http://www.libtorrent.org/include/libtorrent/session_settings.hpp
+    lt::settings_pack pack;
+    pack.set_int(lt::settings_pack::alert_mask, lt::alert::error_notification | lt::alert::storage_notification |
+                                                lt::alert::status_notification);
+    pack.set_str(lt::settings_pack::user_agent, FYREDL_USER_AGENT);         // This is the client identification to the tracker.
+    pack.set_str(lt::settings_pack::peer_fingerprint, FYREDL_FINGERPRINT);  // This is the fingerprint for the client. It will be used as the prefix to the peer_id. If this is 20 bytes (or longer) it will be truncated at 20 bytes and used as the entire peer-id.
+    pack.set_str(lt::settings_pack::handshake_client_version, "");          // This is the client name and version identifier sent to peers in the handshake message. If this is an empty string, the user_agent is used instead.
+
+    pack.set_bool(lt::settings_pack::rate_limit_ip_overhead, true);         // If set to true, the estimated TCP/IP overhead is drained from the rate limiters, to avoid exceeding the limits with the total traffic.
+    pack.set_bool(lt::settings_pack::prefer_udp_trackers, true);            // It means that trackers may be rearranged in a way that udp trackers are always tried before http trackers for the same hostname.
+    pack.set_bool(lt::settings_pack::announce_crypto_support, true);        // When this is true, and incoming encrypted connections are enabled, &supportcrypt=1 is included in http tracker announces.
+    pack.set_bool(lt::settings_pack::enable_upnp, true);                    // Starts and stops the UPnP service.
+    pack.set_bool(lt::settings_pack::enable_natpmp, true);                  // Starts and stops the NAT-PMP service.
+    pack.set_bool(lt::settings_pack::enable_dht, true);                     // Starts the dht node and makes the trackerless service available to torrents.
+    pack.set_bool(lt::settings_pack::prefer_rc4, true);                     // If the allowed encryption level is both, setting this to true will prefer rc4 if both methods are offered, plaintext otherwise.
+
+    pack.set_int(lt::settings_pack::connection_speed, 10);                  // The number of connection attempts that are made per second.
+    pack.set_int(lt::settings_pack::handshake_timeout, 30);                 // The number of seconds to wait for a handshake response from a peer.
+    pack.set_int(lt::settings_pack::download_rate_limit, 0);                // Sets the session-global limits of upload and download rate limits, in bytes per second. By default peers on the local network are not rate limited.
+    pack.set_int(lt::settings_pack::upload_rate_limit, 0);                  // Sets the session-global limits of upload and download rate limits, in bytes per second. By default peers on the local network are not rate limited.
+    pack.set_int(lt::settings_pack::dht_upload_rate_limit, 4000);           // Sets the rate limit on the DHT. This is specified in bytes per second and defaults to 4000. For busy boxes with lots of torrents that requires more DHT traffic, this should be raised.
+    pack.set_int(lt::settings_pack::connections_limit, 500);                // Sets a global limit on the number of connections opened.
+    pack.set_int(lt::settings_pack::connections_slack, 10);                 // The number of incoming connections exceeding the connection limit to accept in order to potentially replace existing ones.
+    pack.set_int(lt::settings_pack::half_open_limit, -1);
+    pack.set_int(lt::settings_pack::ssl_listen, 4433);                      // Sets the listen port for SSL connections. This setting is only taken into account when opening the regular listen port, and won't re-open the listen socket simply by changing this setting.
+
+    std::string interface = std::string("0.0.0.0:" + std::to_string(rand_port()));
+    pack.set_str(lt::settings_pack::listen_interfaces, interface);          // Binding to port 0 will make the operating system pick the port. The default is "0.0.0.0:6881", which binds to all interfaces on port 6881. Once/if binding the listen socket(s) succeed, listen_succeeded_alert is posted.
+
+    lt_ses = std::make_shared<lt::session>(pack, 0);
 
     gk_ses_thread = new QThread;
-    gk_to_ses = new GekkoFyre::GkTorrentSession(lt_ses, this); // Create a session handler
+    gk_to_ses = new GekkoFyre::GkTorrentSession(lt_ses); // Create a session handler
     gk_to_ses->moveToThread(gk_ses_thread);
 
+    QObject::connect(gk_ses_thread, SIGNAL(started()), gk_to_ses, SLOT(run_session_bckgrnd()));
     QObject::connect(this, SIGNAL(update_ses_hash(std::string,lt::torrent_handle)), gk_to_ses, SLOT(recv_hash_update(std::string,lt::torrent_handle)));
     QObject::connect(gk_to_ses, SIGNAL(sendStats(std::string,lt::torrent_status)), this, SLOT(recv_proc_to_stats(std::string,lt::torrent_status)));
     QObject::connect(gk_to_ses, SIGNAL(finish_gk_ses_thread()), gk_ses_thread, SLOT(quit()));
     QObject::connect(gk_to_ses, SIGNAL(finish_gk_ses_thread()), gk_to_ses, SLOT(deleteLater()));
     QObject::connect(gk_ses_thread, SIGNAL(finished()), gk_ses_thread, SLOT(deleteLater()));
+    gk_ses_thread->start();
 }
 
 GekkoFyre::GkTorrentClient::~GkTorrentClient()
-{
-    delete routines;
-    delete gk_to_ses;
-}
+{}
 
 /**
  * @brief GekkoFyre::GkTorrentClient::startTorrentDl reads the download item's Unique ID from the XML history file
@@ -142,4 +179,20 @@ void GekkoFyre::GkTorrentClient::recv_proc_to_stats(const std::string &save_path
 
     emit xfer_torrent_info(to_xfer_stats);
     return;
+}
+
+/**
+ * @brief GekkoFyre::GkTorrentClient::rand_port
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @date 2017-06-27
+ * @note <https://stackoverflow.com/questions/5008804/generating-random-integer-from-a-range>
+ * @return
+ */
+int GekkoFyre::GkTorrentClient::rand_port() const
+{
+    std::random_device rd;
+    std::mt19937 rng(rd());
+    std::uniform_int_distribution<int> uni(TORRENT_MIN_PORT_LISTEN, TORRENT_MAX_PORT_LISTEN);
+
+    return uni(rng);
 }
