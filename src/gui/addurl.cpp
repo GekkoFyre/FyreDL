@@ -60,7 +60,7 @@ AddURL::AddURL(QWidget *parent) :
     ui(new Ui::AddURL)
 {
     ui->setupUi(this);
-    routines = new GekkoFyre::CmnRoutines();
+    routines = std::make_unique<GekkoFyre::CmnRoutines>();
 
     ui->url_dest_lineEdit->setText(QDir::homePath());
     ui->file_dest_lineEdit->setText(QDir::homePath());
@@ -69,7 +69,6 @@ AddURL::AddURL(QWidget *parent) :
 AddURL::~AddURL()
 {
     delete ui;
-    delete routines;
 }
 
 /**

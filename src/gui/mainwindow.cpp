@@ -249,7 +249,7 @@ MainWindow::~MainWindow()
  */
 void MainWindow::addDownload()
 {
-    AddURL *add_url = new AddURL(this);
+    QPointer<AddURL> add_url = new AddURL(this);
     QObject::connect(add_url, SIGNAL(sendDetails(std::string,double,int,double,int,int,GekkoFyre::DownloadStatus,std::string,std::string,GekkoFyre::HashType,std::string,long long,bool,std::string,std::string,GekkoFyre::DownloadType)),
                      this, SLOT(sendDetails(std::string,double,int,double,int,int,GekkoFyre::DownloadStatus,std::string,std::string,GekkoFyre::HashType,std::string,long long,bool,std::string,std::string,GekkoFyre::DownloadType)));
     add_url->setAttribute(Qt::WA_DeleteOnClose, true);
@@ -571,82 +571,6 @@ void MainWindow::initCharts(const QString &unique_id, const QString &down_dest,
  */
 void MainWindow::displayCharts(const QString &unique_id)
 {
-    for (size_t i = 0; i < gk_dl_info_cache.size(); ++i) {
-        if (ui->tabStatusWidget->currentIndex() == TAB_INDEX_GRAPH) {
-            if (!gk_dl_info_cache.at(i).xfer_graph.down_speed_init) {
-                // Create the needed 'series'
-                gk_dl_info_cache.at(i).xfer_graph.down_speed_series = new QtCharts::QLineSeries(this);
-                gk_dl_info_cache.at(i).xfer_graph.down_speed_init = true;
-            }
-
-            if (gk_dl_info_cache.at(i).unique_id == unique_id) {
-                if (curr_shown_graphs != unique_id) {
-                    // NOTE: Only clear and/or then show the QChartView once, if 'file_dest' has not changed despite this
-                    // function being called.
-                    QString prev_shown_graphs = curr_shown_graphs;
-                    curr_shown_graphs = unique_id;
-
-                    gk_dl_info_cache.at(i).xfer_graph.down_speed_series->setName(tr("Download speed spline %1").arg(i));
-
-                    QString file_dest_string = "nullptr";
-                    for (int k = 0; k < dlModel->getList().size(); ++k) {
-                        QModelIndex find_id_index = dlModel->index(k, MN_HIDDEN_UNIQUE_ID);
-                        const QString id_string = ui->downloadView->model()->data(find_id_index).toString();
-                        if (id_string == unique_id) {
-                            QModelIndex file_dest_index = dlModel->index(k, MN_DESTINATION_COL);
-                            file_dest_string = ui->downloadView->model()->data(file_dest_index).toString();
-                            break;
-                        }
-                    }
-
-                    QFile qfile_path(file_dest_string);
-
-                    for (size_t j = 0; j < gk_dl_info_cache.at(i).xfer_graph.down_speed_vals.size(); ++j) {
-                        gk_dl_info_cache.at(i).xfer_graph.down_speed_series->append(gk_dl_info_cache.at(i).xfer_graph.down_speed_vals.at(j).second,
-                                                                                    gk_dl_info_cache.at(i).xfer_graph.down_speed_vals.at(j).first);
-                    }
-
-                    // Create the needed QChart and set its initial properties
-                    QtCharts::QChart *chart = new QtCharts::QChart();
-                    chart->addSeries(gk_dl_info_cache.at(i).xfer_graph.down_speed_series);
-                    chart->setTitle(QString("%1").arg(qfile_path.fileName()));
-                    chart->createDefaultAxes();
-                    chart->axisY()->setTitleText(tr("Download speed (KB/sec)")); // The title of the y-axis
-                    chart->axisX()->setTitleText(tr("Time passed (seconds)")); // The title of the x-axis
-                    chart->legend()->hide();
-
-                    // Create the QChartView, which displays the graph, and set some initial properties
-                    QtCharts::QChartView *chartView = new QtCharts::QChartView(chart);
-                    chartView->setRenderHint(QPainter::Antialiasing);
-
-                    if (!ui->graphVerticalLayout->isEmpty()) { // Check to see if the layout contains any widgets
-                        routines->clearLayout(ui->graphVerticalLayout);
-                    }
-
-                    for (size_t j = 0; j < gk_dl_info_cache.size(); ++j) {
-                        if (gk_dl_info_cache.at(j).unique_id == prev_shown_graphs) {
-                            gk_dl_info_cache.at(j).xfer_graph.down_speed_init = false;
-                            break;
-                        }
-                    }
-
-                    ui->graphVerticalLayout->insertWidget(0, chartView);
-                    chartView->setAlignment(Qt::AlignCenter);
-                    chartView->show();
-                    ui->graphVerticalLayout->update();
-                    return;
-                } else {
-                    for (size_t j = 0; j < gk_dl_info_cache.at(i).xfer_graph.down_speed_vals.size(); ++j) {
-                        gk_dl_info_cache.at(i).xfer_graph.down_speed_series->append(gk_dl_info_cache.at(i).xfer_graph.down_speed_vals.at(j).second,
-                                                                                    gk_dl_info_cache.at(i).xfer_graph.down_speed_vals.at(j).first);
-                    }
-
-                    return;
-                }
-            }
-        }
-    }
-
     return;
 }
 
@@ -661,36 +585,11 @@ void MainWindow::displayCharts(const QString &unique_id)
  */
 void MainWindow::delCharts(const std::string &file_dest)
 {
-    /*
-    if (!graph_init.empty()) {
-        for (size_t i = 0; i < graph_init.size(); ++i) {
-            if (!graph_init.at(i).file_dest.isEmpty() &&
-                    graph_init.at(i).down_speed.down_speed_series != nullptr) {
-                if (graph_init.at(i).file_dest.toStdString() == file_dest) {
-                    graph_init.erase(graph_init.begin() + (long)i);
-                    return;
-                }
-            }
-        }
-    }
-
-    throw std::invalid_argument(tr("'delCharts()' failed!").toStdString());
-     */
+    return;
 }
 
 void MainWindow::updateChart()
 {
-    if (ENBL_GUI_CHARTS) {
-        QModelIndexList indexes = ui->downloadView->selectionModel()->selectedRows();
-
-        if (indexes.size() > 0) {
-            if (indexes.at(0).isValid()) {
-                const QString dest = ui->downloadView->model()->data(ui->downloadView->model()->index(indexes.at(0).row(), MN_DESTINATION_COL)).toString();
-                displayCharts(dest);
-            }
-        }
-    }
-
     return;
 }
 
@@ -1947,45 +1846,49 @@ void MainWindow::manageDlStats()
             const QString unique_id_string = ui->downloadView->model()->data(unique_id_index).toString();
 
             for (size_t j = 0;  j < gk_dl_info_cache.size(); ++j) {
-                if (unique_id_string == gk_dl_info_cache.at(j).unique_id) {
-                    GekkoFyre::GkGraph::GkXferStats xfer_stat_indice = gk_dl_info_cache.at(j).stats.xfer_stats.back();
-                    std::ostringstream oss_dl_bps, oss_ul_bps;
+                if (gk_dl_info_cache.at(j).stats.xfer_stats.size() > 1) {
+                    if (unique_id_string == gk_dl_info_cache.at(j).unique_id) {
+                        GekkoFyre::GkGraph::GkXferStats xfer_stat_indice = gk_dl_info_cache.at(j).stats.xfer_stats.back();
+                        std::ostringstream oss_dl_bps, oss_ul_bps;
 
-                    oss_dl_bps << routines->numberConverter(xfer_stat_indice.download_rate).toStdString() << tr("/sec").toStdString();
+                        oss_dl_bps << routines->numberConverter(xfer_stat_indice.download_rate).toStdString() << tr("/sec").toStdString();
 
-                    if (xfer_stat_indice.upload_rate.is_initialized()) {
-                        oss_ul_bps << routines->numberConverter(xfer_stat_indice.upload_rate.value()).toStdString() << tr("/sec").toStdString();
-                    } else {
-                        oss_ul_bps << "0" << tr("/sec").toStdString();
-                    }
-
-                    long cur_dl_amount = xfer_stat_indice.download_total;
-                    // long cur_ul_amount = xfer_stat_indice.upload_total;
-
-                    if (gk_dl_info_cache.at(j).dl_type == GekkoFyre::DownloadType::Torrent || gk_dl_info_cache.at(j).dl_type == GekkoFyre::DownloadType::TorrentMagnetLink) {
-                        double progress_percent = std::round((xfer_stat_indice.progress_ppm / 1000000) * 100);
-                        dlModel->updateCol(dlModel->index(i, MN_PROGRESS_COL), QString::number(progress_percent), MN_PROGRESS_COL);
-                    } else if (gk_dl_info_cache.at(j).dl_type == GekkoFyre::DownloadType::HTTP || gk_dl_info_cache.at(j).dl_type == GekkoFyre::DownloadType::FTP) {
-                        long cur_file_size = GekkoFyre::CmnRoutines::getFileSize(gk_dl_info_cache.at(j).dl_dest.toStdString());
-                        dlModel->updateCol(dlModel->index(i, MN_PROGRESS_COL), routines->percentDownloaded(gk_dl_info_cache.at(j).stats.content_length, (double)cur_file_size), MN_PROGRESS_COL);
-                    }
-
-                    dlModel->updateCol(dlModel->index(i, MN_DOWNSPEED_COL), QString::fromStdString(oss_dl_bps.str()), MN_DOWNSPEED_COL);
-                    dlModel->updateCol(dlModel->index(i, MN_UPSPEED_COL), QString::fromStdString(oss_ul_bps.str()), MN_UPSPEED_COL);
-                    dlModel->updateCol(dlModel->index(i, MN_DOWNLOADED_COL), routines->numberConverter((double)cur_dl_amount), MN_DOWNLOADED_COL);
-
-                    if (xfer_stat_indice.cur_time.is_initialized()) {
-                        if (gk_dl_info_cache.at(j).stats.timer_begin == 0) {
-                            throw std::invalid_argument(tr("An invalid timer value has been given! Please contact the developer about this bug and with what conditions caused it.").toStdString());
+                        if (xfer_stat_indice.upload_rate.is_initialized()) {
+                            oss_ul_bps << routines->numberConverter(xfer_stat_indice.upload_rate.value()).toStdString() << tr("/sec").toStdString();
+                        } else {
+                            oss_ul_bps << "0" << tr("/sec").toStdString();
                         }
 
-                        double passed_time = std::difftime(xfer_stat_indice.cur_time.value(), gk_dl_info_cache.at(j).stats.timer_begin);
-                        gk_dl_info_cache.at(j).xfer_graph.down_speed_vals.push_back(std::make_pair(xfer_stat_indice.download_rate, passed_time));
-                    }
+                        long cur_dl_amount = xfer_stat_indice.download_total;
+                        // long cur_ul_amount = xfer_stat_indice.upload_total;
 
-                    general_extraDetails();
-                    transfer_extraDetails();
-                    updateChart();
+                        if (gk_dl_info_cache.at(j).dl_type == GekkoFyre::DownloadType::Torrent || gk_dl_info_cache.at(j).dl_type == GekkoFyre::DownloadType::TorrentMagnetLink) {
+                            double progress_percent = std::round((xfer_stat_indice.progress_ppm / 1000000) * 100);
+                            dlModel->updateCol(dlModel->index(i, MN_PROGRESS_COL), QString::number(progress_percent), MN_PROGRESS_COL);
+                        } else if (gk_dl_info_cache.at(j).dl_type == GekkoFyre::DownloadType::HTTP || gk_dl_info_cache.at(j).dl_type == GekkoFyre::DownloadType::FTP) {
+                            long cur_file_size = GekkoFyre::CmnRoutines::getFileSize(gk_dl_info_cache.at(j).dl_dest.toStdString());
+                            dlModel->updateCol(dlModel->index(i, MN_PROGRESS_COL), routines->percentDownloaded(gk_dl_info_cache.at(j).stats.content_length, (double)cur_file_size), MN_PROGRESS_COL);
+                        }
+
+                        dlModel->updateCol(dlModel->index(i, MN_DOWNSPEED_COL), QString::fromStdString(oss_dl_bps.str()), MN_DOWNSPEED_COL);
+                        dlModel->updateCol(dlModel->index(i, MN_UPSPEED_COL), QString::fromStdString(oss_ul_bps.str()), MN_UPSPEED_COL);
+                        dlModel->updateCol(dlModel->index(i, MN_DOWNLOADED_COL), routines->numberConverter((double)cur_dl_amount), MN_DOWNLOADED_COL);
+
+                        if (xfer_stat_indice.cur_time.is_initialized()) {
+                            if (gk_dl_info_cache.at(j).stats.timer_begin == 0) {
+                                throw std::invalid_argument(tr("An invalid timer value has been given! Please contact the developer about this bug and with what conditions caused it.").toStdString());
+                            }
+
+                            double passed_time = std::difftime(xfer_stat_indice.cur_time.value(), gk_dl_info_cache.at(j).stats.timer_begin);
+                            gk_dl_info_cache.at(j).xfer_graph.down_speed_vals.push_back(std::make_pair(xfer_stat_indice.download_rate, passed_time));
+                        }
+
+                        general_extraDetails();
+                        transfer_extraDetails();
+                        updateChart();
+                        continue;
+                    }
+                } else {
                     continue;
                 }
             }

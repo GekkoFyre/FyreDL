@@ -344,7 +344,7 @@ namespace GekkoFyre {
         // http://stackoverflow.com/questions/18031357/why-the-constructor-of-stdostream-is-protected
         struct FileStream {
             std::string file_loc;   // Name to store file as if download /and/ disk writing is successful
-            std::ofstream *astream; // I/O stream
+            std::shared_ptr<std::ofstream> astream; // I/O stream
         };
 
         // Global information, common to all connections

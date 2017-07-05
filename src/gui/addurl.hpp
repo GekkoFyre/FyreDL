@@ -44,6 +44,7 @@
 #define ADDURL_HPP
 
 #include "./../cmnroutines.hpp"
+#include <memory>
 #include <QDialog>
 #include <QString>
 
@@ -77,7 +78,7 @@ signals:
 
 private:
     Ui::AddURL *ui;
-    GekkoFyre::CmnRoutines *routines;
+    std::unique_ptr<GekkoFyre::CmnRoutines> routines;
 
     QString browseForDir();
 };

@@ -48,6 +48,7 @@
 #include <cstdlib>
 #include <random>
 #include <ctime>
+#include <memory>
 #include <QMessageBox>
 
 namespace sys = boost::system;
@@ -664,7 +665,7 @@ std::string GekkoFyre::CurlMulti::new_conn(const QString &url, const QString &fi
 
         // http://stackoverflow.com/questions/18031357/why-the-constructor-of-stdostream-is-protected
         // TODO: Fix the memory leak hereinafter!
-        ci->file_buf.astream = new std::ofstream;
+        ci->file_buf.astream = std::make_shared<std::ofstream>();
         if (file_offset == 0 && ci->file_buf.astream != nullptr) {
             ci->file_buf.astream->open(ci->file_buf.file_loc, std::ofstream::out | std::ios::app | std::ios::binary);
         } else if (file_offset > 0 && ci->file_buf.astream != nullptr) {
