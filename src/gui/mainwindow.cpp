@@ -49,7 +49,12 @@
 #include <boost/filesystem.hpp>
 #include <boost/exception/all.hpp>
 #include <boost/system/error_code.hpp>
+#include <boost/iostreams/filtering_streambuf.hpp>
+#include <boost/iostreams/copy.hpp>
+#include <boost/iostreams/filter/gzip.hpp>
 #include <cmath>
+#include <fstream>
+#include <iostream>
 #include <qmetatype.h>
 #include <QInputDialog>
 #include <QModelIndex>
@@ -69,9 +74,57 @@
 
 namespace sys = boost::system;
 namespace fs = boost::filesystem;
+namespace io = boost::iostreams;
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
+    routines = std::make_unique<GekkoFyre::CmnRoutines>();
+
+    std::string xml_history_file_raw = routines->findCfgFile(CFG_HISTORY_FILE);
+    std::string xml_history_file_compr = (xml_history_file_raw + ".gz");
+    try {
+        if (fs::exists(xml_history_file_compr) && fs::is_regular_file(xml_history_file_compr)) {
+            // The compressed version of the history file does exist!
+            if (fs::exists(xml_history_file_raw) && fs::is_regular_file(xml_history_file_raw)) {
+                // The raw version of the history file also exists, alongside the compressed version. This must be a
+                // leftover from an un-clean exit and thus needs to be deleted before proceeding.
+                bool remv_succ_raw = fs::remove(xml_history_file_raw);
+                if (!remv_succ_raw) {
+                    throw std::runtime_error(tr("Unable to delete file, \"%1\".").arg(QString::fromStdString(xml_history_file_raw)).toStdString());
+                }
+            }
+
+            std::ifstream file_read(xml_history_file_compr, std::ios_base::in);
+            std::ofstream file_write(xml_history_file_raw, std::ios_base::out | std::ios_base::binary);
+            io::filtering_streambuf<io::input> in;
+            in.push(io::gzip_decompressor());
+            in.push(file_read);
+
+            io::copy(in, file_write);
+            io::close(in);
+
+            bool remv_succ_compr = fs::remove(xml_history_file_compr);
+            if (!remv_succ_compr) {
+                throw std::runtime_error(tr("Unable to delete file, \"%1\".").arg(QString::fromStdString(xml_history_file_raw)).toStdString());
+            }
+        } else if ((fs::exists(xml_history_file_raw) && fs::is_regular_file(xml_history_file_raw)) && !fs::exists(xml_history_file_compr)) {
+            // Only the RAW version of the history file exists!
+            // There must have been an un-clean exit at one point for this to have happened, or some other error.
+            if (routines->getFileSize(xml_history_file_raw) == 0) {
+                bool remv_succ_raw = fs::remove(xml_history_file_raw);
+                if (!remv_succ_raw) {
+                    throw std::runtime_error(tr("Unable to delete file, \"%1\".").arg(QString::fromStdString(xml_history_file_raw)).toStdString());
+                }
+
+                routines->createNewXmlFile(CFG_HISTORY_FILE);
+            }
+        } else {
+            // The history file does not exist in any determinable manner!
+            routines->createNewXmlFile(CFG_HISTORY_FILE);
+        }
+    } catch (const std::exception &e) {
+        QMessageBox::warning(this, tr("Error!"), e.what(), QMessageBox::Ok);
+    }
 
     try {
         #ifdef _WIN32
@@ -94,7 +147,6 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
                                                 "time! Please only use at your own risk."),
                          QMessageBox::Ok);
 
-    routines = new GekkoFyre::CmnRoutines();
     curl_multi = new GekkoFyre::CurlMulti();
     gk_torrent_client = new GekkoFyre::GkTorrentClient();
 
@@ -144,13 +196,44 @@ MainWindow::~MainWindow()
         if (routines->writeXmlSettings(settings) == 1) {
             routines->modifyXmlSettings(settings);
         }
+
+        // http://www.boost.org/doc/libs/1_64_0/libs/iostreams/doc/classes/gzip.html
+        // Upon termination of FyreDL, 'CFG_HISTORY_FILE' will be compressed and upon success of this operation, the
+        // original XML history file will be deleted. This is due to the fact that 'CFG_HISTORY_FILE' can get quite
+        // large, on the order of hundreds of megabytes in extreme cases.
+        std::string xml_history_file_raw = routines->findCfgFile(CFG_HISTORY_FILE);
+        std::string xml_history_file_compr = (xml_history_file_raw + ".gz");
+        if (fs::exists(xml_history_file_raw) && fs::is_regular_file(xml_history_file_raw)) {
+            // The raw version of the history file does exist!
+            if (fs::exists(xml_history_file_compr) && fs::is_regular_file(xml_history_file_compr)) {
+                // The compressed version of the history file also exists, alongside the raw version. This must be a
+                // leftover from an un-clean exit and thus needs to be deleted before proceeding.
+                bool remv_succ_compr = fs::remove(xml_history_file_compr);
+                if (!remv_succ_compr) {
+                    throw std::runtime_error(tr("Unable to delete file, \"%1\".").arg(QString::fromStdString(xml_history_file_compr)).toStdString());
+                }
+            }
+
+            std::ifstream file_read(xml_history_file_raw, std::ios_base::in);
+            std::ofstream file_write(xml_history_file_compr, std::ios_base::out | std::ios_base::binary);
+            io::filtering_streambuf<io::input> in;
+            in.push(io::gzip_compressor(io::gzip_params(io::gzip::best_speed)));
+            in.push(file_read);
+
+            io::copy(in, file_write);
+            io::close(in);
+
+            bool remv_succ_raw = fs::remove(xml_history_file_raw);
+            if (!remv_succ_raw) {
+                throw std::runtime_error(tr("Unable to delete file, \"%1\".").arg(QString::fromStdString(xml_history_file_raw)).toStdString());
+            }
+        }
     } catch (const std::exception &e) {
-        QMessageBox::warning(this, tr("Error!"), QString("%1").arg(e.what()), QMessageBox::Ok);
+        QMessageBox::warning(this, tr("Error!"), e.what(), QMessageBox::Ok);
     }
 
     delete ui;
     emit finish_curl_multi_thread();
-    delete routines;
     delete gk_torrent_client;
     gk_dl_info_cache.clear();
 }

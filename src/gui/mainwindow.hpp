@@ -57,6 +57,7 @@
 #include <QThread>
 #include <QStringList>
 #include <QStandardItem>
+#include <QPointer>
 
 namespace Ui {
 class MainWindow;
@@ -107,8 +108,8 @@ private:
     void general_extraDetails();
     void transfer_extraDetails();
 
-    downloadModel *dlModel;
-    GekkoFyre::CmnRoutines *routines;
+    QPointer<downloadModel> dlModel;
+    std::unique_ptr<GekkoFyre::CmnRoutines> routines;
     GekkoFyre::CurlMulti *curl_multi;
     GekkoFyre::GkTorrentClient *gk_torrent_client;
     std::vector<GekkoFyre::Global::DownloadInfo> gk_dl_info_cache;

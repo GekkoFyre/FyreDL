@@ -105,7 +105,7 @@ public:
     GekkoFyre::GkFile::FileHash cryptoFileHash(const QString &file_dest, const GekkoFyre::HashType &hash_type,
                                                const QString &given_hash_val);
     GekkoFyre::GkTorrent::TorrentInfo torrentFileInfo(const std::string &file_dest,
-                                                      const int &item_limit = 1000000,
+                                                      const int &item_limit = 500000,
                                                       const int &depth_limit = 1000);
 
     void clearLayout(QLayout *layout);

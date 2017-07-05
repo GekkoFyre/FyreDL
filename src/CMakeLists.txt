@@ -303,7 +303,7 @@ elseif(${CMAKE_SYSTEM_NAME} MATCHES "Linux") # Check if we are on Linux
             endif(GK_THREAD_SANITIZE)
         elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
             # http://stackoverflow.com/questions/3375697/useful-gcc-flags-for-c
-            set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wpointer-arith -Wcast-align -Wconversion -Wunreachable-code -Wno-shorten-64-to-32 -Wno-sign-conversion -Wno-deprecated-declarations -g")
+            set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wpointer-arith -Wcast-align -Wconversion -Wunreachable-code -Wno-shorten-64-to-32 -Wno-sign-conversion -Wno-deprecated-declarations -Wno-unused-parameter -g")
             message(STATUS "DEBUG build using the GCC compiler!")
         elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel")
             message(STATUS "DEBUG build using the Intel compiler!")

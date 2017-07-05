@@ -326,14 +326,14 @@ void GekkoFyre::CurlMulti::check_multi_info(GekkoFyre::GkCurl::GlobalInfo *g)
     int msgs_left;
     GekkoFyre::GkCurl::ConnInfo *conn;
     CURL *easy;
-    CURLcode res;
+    // CURLcode res;
 
     std::cout << QString("REMAINING: %1\n").arg(QString::number(g->still_running)).toStdString();
 
     while((msg = curl_multi_info_read(g->multi, &msgs_left))) {
         if(msg->msg == CURLMSG_DONE) {
             easy = msg->easy_handle;
-            res = msg->data.result;
+            // res = msg->data.result;
             curl_easy_getinfo(easy, CURLINFO_PRIVATE, &conn);
             curl_easy_getinfo(easy, CURLINFO_EFFECTIVE_URL, &eff_url);
             std::cerr << QString("DONE: %1 => %2\n").arg(eff_url).arg(conn->error).toStdString();
