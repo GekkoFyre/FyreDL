@@ -234,7 +234,6 @@ MainWindow::~MainWindow()
 
     delete ui;
     emit finish_curl_multi_thread();
-    delete gk_torrent_client;
     gk_dl_info_cache.clear();
 }
 
@@ -515,7 +514,14 @@ void MainWindow::initCharts(const QString &unique_id, const QString &down_dest,
         graph_info.dl_dest = down_dest;
         graph_info.dl_type = download_type;
         graph_info.stats.timer_begin = 0;
-        graph_info.stats.xfer_stats = std::vector<GekkoFyre::GkGraph::GkXferStats>();
+
+        GekkoFyre::GkGraph::GkXferStats xfer_stats_temp;
+        xfer_stats_temp.download_rate = 0.0;
+        xfer_stats_temp.upload_rate = 0.0;
+        xfer_stats_temp.download_total = 0;
+        xfer_stats_temp.upload_total = 0;
+        xfer_stats_temp.progress_ppm = 0;
+        graph_info.stats.xfer_stats.push_back(xfer_stats_temp);
 
         if (download_type == GekkoFyre::DownloadType::HTTP || download_type == GekkoFyre::DownloadType::FTP) {
             // Download type is either HTTP or FTP
@@ -1887,16 +1893,15 @@ void MainWindow::recvXferStats(const GekkoFyre::GkCurl::CurlProgressPtr &info)
 {
     QMutex curl_multi_mutex;
     GekkoFyre::GkGraph::GkXferStats stats_temp;
-    std::time(&stats_temp.cur_time);
+    std::time_t cur_time_temp;
+    std::time(&cur_time_temp);
+    stats_temp.cur_time = cur_time_temp;
     curl_multi_mutex.lock();
-    if (info.stat.size() > 1) {
-        throw std::runtime_error(tr("Given vector is larger than expected!").toStdString());
-    }
 
-    stats_temp.download_rate = info.stat.at(0).dlnow;
-    stats_temp.upload_rate = info.stat.at(0).upnow;
-    stats_temp.download_total = info.stat.at(0).dltotal;
-    stats_temp.upload_total = info.stat.at(0).uptotal;
+    stats_temp.download_rate = info.stat.back().dlnow;
+    stats_temp.upload_rate = info.stat.back().upnow;
+    stats_temp.download_total = info.stat.back().dltotal;
+    stats_temp.upload_total = info.stat.back().uptotal;
 
     for (size_t i = 0; i < gk_dl_info_cache.size(); ++i) {
         if (gk_dl_info_cache.at(i).dl_type == GekkoFyre::DownloadType::HTTP ||
@@ -1947,7 +1952,13 @@ void MainWindow::manageDlStats()
                     std::ostringstream oss_dl_bps, oss_ul_bps;
 
                     oss_dl_bps << routines->numberConverter(xfer_stat_indice.download_rate).toStdString() << tr("/sec").toStdString();
-                    oss_ul_bps << routines->numberConverter(xfer_stat_indice.upload_rate).toStdString() << tr("/sec").toStdString();
+
+                    if (xfer_stat_indice.upload_rate.is_initialized()) {
+                        oss_ul_bps << routines->numberConverter(xfer_stat_indice.upload_rate.value()).toStdString() << tr("/sec").toStdString();
+                    } else {
+                        oss_ul_bps << "0" << tr("/sec").toStdString();
+                    }
+
                     long cur_dl_amount = xfer_stat_indice.download_total;
                     // long cur_ul_amount = xfer_stat_indice.upload_total;
 
@@ -1963,13 +1974,19 @@ void MainWindow::manageDlStats()
                     dlModel->updateCol(dlModel->index(i, MN_UPSPEED_COL), QString::fromStdString(oss_ul_bps.str()), MN_UPSPEED_COL);
                     dlModel->updateCol(dlModel->index(i, MN_DOWNLOADED_COL), routines->numberConverter((double)cur_dl_amount), MN_DOWNLOADED_COL);
 
-                    double passed_time = std::difftime(xfer_stat_indice.cur_time, gk_dl_info_cache.at(j).stats.timer_begin);
-                    gk_dl_info_cache.at(j).xfer_graph.down_speed_vals.push_back(std::make_pair(xfer_stat_indice.download_rate, passed_time));
+                    if (xfer_stat_indice.cur_time.is_initialized()) {
+                        if (gk_dl_info_cache.at(j).stats.timer_begin == 0) {
+                            throw std::invalid_argument(tr("An invalid timer value has been given! Please contact the developer about this bug and with what conditions caused it.").toStdString());
+                        }
+
+                        double passed_time = std::difftime(xfer_stat_indice.cur_time.value(), gk_dl_info_cache.at(j).stats.timer_begin);
+                        gk_dl_info_cache.at(j).xfer_graph.down_speed_vals.push_back(std::make_pair(xfer_stat_indice.download_rate, passed_time));
+                    }
 
                     general_extraDetails();
                     transfer_extraDetails();
                     updateChart();
-                    return;
+                    continue;
                 }
             }
         }
@@ -2057,7 +2074,9 @@ void MainWindow::recvBitTorrent_XferStats(const GekkoFyre::GkTorrent::TorrentRes
 {
     QMutex to_ses_mutex;
     GekkoFyre::GkGraph::GkXferStats stats_temp;
-    std::time(&stats_temp.cur_time);
+    std::time_t cur_time_temp;
+    std::time(&cur_time_temp);
+    stats_temp.cur_time = cur_time_temp;
     to_ses_mutex.lock();
     stats_temp.progress_ppm = gk_xfer_info.xfer_stats.get().progress_ppm;
     stats_temp.upload_rate = gk_xfer_info.xfer_stats.get().ul_rate;

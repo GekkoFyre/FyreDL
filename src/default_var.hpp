@@ -58,6 +58,7 @@
 #include <QtCharts>
 #include <QLineSeries>
 #include <QVariant>
+#include <QPointer>
 
 extern "C" {
 #include <curl/curl.h>
@@ -428,25 +429,24 @@ namespace GekkoFyre {
             MemoryStruct mem_chunk;
             FileStream file_buf;
             CurlProgressPtr prog;
-            std::string uuid;
         };
     }
 
     namespace GkGraph {
         struct DownSpeedGraph {
-            QtCharts::QLineSeries *down_speed_series;
+            QPointer<QtCharts::QLineSeries> down_speed_series;
             bool down_speed_init;
             std::vector<std::pair<double, double>> down_speed_vals;
         };
 
         struct GkXferStats {
-            double upload_rate;                   // The current upload transfer rate, in bytes per second.
-            double download_rate;                 // The current download transfer rate, in bytes per second.
-            long progress_ppm;                    // Reflects progress, but instead [0, 1000000] (ppm = parts per million).
-            long download_total;                  // The total amount that has been downloaded, in bytes.
-            long upload_total;                    // The total amount that has been uploaded, in bytes.
-            boost::optional<int> num_pieces_dled; // The number of BitTorrent pieces that have been downloaded. Can be used to see if the BitTorrent download has updated.
-            std::time_t cur_time;                 // The current time these statistics were 'snapshotted'.
+            boost::optional<double> upload_rate;   // The current upload transfer rate, in bytes per second.
+            double download_rate;                  // The current download transfer rate, in bytes per second.
+            long progress_ppm;                     // Reflects progress, but instead [0, 1000000] (ppm = parts per million).
+            long download_total;                   // The total amount that has been downloaded, in bytes.
+            boost::optional<long> upload_total;    // The total amount that has been uploaded, in bytes.
+            boost::optional<int> num_pieces_dled;  // The number of BitTorrent pieces that have been downloaded. Can be used to see if the BitTorrent download has updated.
+            boost::optional<std::time_t> cur_time; // The current time these statistics were 'snapshotted'.
         };
 
         struct GkDlStats {

@@ -650,7 +650,6 @@ std::string GekkoFyre::CurlMulti::new_conn(const QString &url, const QString &fi
         curl_easy_setopt(ci->conn_info->easy, CURLOPT_CONNECTTIMEOUT, FYREDL_CONN_TIMEOUT);
 
         ci->conn_info->url = url.toStdString();
-        ci->uuid = uuid;
         curl_easy_setopt(ci->conn_info->easy, CURLOPT_URL, ci->conn_info->url.c_str());
 
         if (!fileLoc.isEmpty()) {
