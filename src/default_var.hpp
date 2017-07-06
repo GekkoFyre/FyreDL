@@ -91,6 +91,7 @@ extern "C" {
 #define FYREDL_CONN_LOW_SPEED_TIME 10L                   // The number of seconds that the transfer speed should be below 'FYREDL_CONN_LOW_SPEED_CUTOUT' before connection cut-off.
 #define FYREDL_EST_WAIT_TIME_PRECISION 3                 // The significant digit precision of the estimated wait time counter for each active transfer
 #define FYREDL_UNIQUE_ID_DIGIT_COUNT 32                  // The 'unique identifier' serial number that is given to each download item. This determines how many digits are allocated to this identifier and thus, how much RAM is used for storage thereof.
+#define FYREDL_DEFAULT_RESOLUTION_WIDTH 1920
 
 //
 // ######################################

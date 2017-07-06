@@ -41,12 +41,35 @@
  */
 
 #include "gui/mainwindow.hpp"
+#include "default_var.hpp"
 #include <QApplication>
+
+#ifdef Q_OS_LINUX
+extern "C" {
+#include <X11/Xlib.h>
+};
+
+#endif
 
 #define BOOST_FILESYSTEM_NO_DEPRECATED
 
 int main(int argc, char *argv[])
 {
+    // https://github.com/notepadqq/notepadqq/issues/323
+    #ifdef Q_OS_LINUX
+    Display *d = XOpenDisplay(nullptr);
+    Screen *s = DefaultScreenOfDisplay(d);
+    int width = s->width;
+    double ratio = (width / FYREDL_DEFAULT_RESOLUTION_WIDTH);
+    if (ratio > 1.1) {
+        qputenv("QT_DEVICE_PIXEL_RATIO", QString::number(ratio).toLatin1());
+    }
+
+    delete s;
+    #else
+    qputenv("QT_AUTO_SCREEN_SCALE_FACTOR", "1");
+    #endif
+
     QApplication a(argc, argv);
     MainWindow w;
     w.show();

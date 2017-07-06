@@ -180,6 +180,16 @@ else()
 endif(Boost_FOUND)
 
 #
+# Find X11 subsystem
+#
+if(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
+    find_package(X11 REQUIRED)
+    if (X11_FOUND)
+        set(LIBS ${LIBS} ${X11_LIBRARIES})
+    endif(X11_FOUND)
+endif()
+
+#
 # Find 'libpthreads'
 #
 find_package(Threads REQUIRED)
