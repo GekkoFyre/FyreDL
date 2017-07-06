@@ -314,3 +314,66 @@ QList<std::vector<QString>> downloadModel::getList()
 {
     return vectorList;
 }
+
+/**
+ * @brief downloadDelegate::downloadDelegate
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @date 2017-07-06
+ * @param parent
+ */
+downloadDelegate::downloadDelegate(QObject *parent) : QAbstractItemDelegate(parent)
+{}
+
+downloadDelegate::~downloadDelegate()
+{}
+
+/**
+ * @brief downloadDelegate::paint
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @date 2017-07-06
+ * @note <http://doc.qt.io/qt-5/qabstractitemdelegate.html>
+ * @param painter
+ * @param option
+ * @param index
+ */
+void downloadDelegate::paint(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index) const
+{
+    if (index.column() == MN_PROGRESS_COL) {
+        int progress = index.data().toInt();
+
+        QStyleOptionProgressBar progressBarOption;
+        progressBarOption.rect = option.rect;
+        progressBarOption.minimum = 0;
+        progressBarOption.maximum = 100;
+        progressBarOption.progress = progress;
+        progressBarOption.text = QString::number(progress) + "%";
+        progressBarOption.textVisible = true;
+
+
+        QApplication::style()->drawControl(QStyle::CE_ProgressBar, &progressBarOption, painter);
+        return;
+    } else {
+        QStyleOptionViewItem viewItemOption;
+        viewItemOption.rect = option.rect;
+        viewItemOption.font = QFont(option.font, painter->device());
+        viewItemOption.palette = option.palette;
+
+        painter->drawText(viewItemOption.rect, index.data().toString());
+
+        QApplication::style()->drawControl(QStyle::CE_ItemViewItem, &viewItemOption, painter);
+        return;
+    }
+}
+
+/**
+ * @brief downloadDelegate::sizeHint
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @date 2017-07-06
+ * @param option
+ * @param index
+ * @return
+ */
+QSize downloadDelegate::sizeHint(const QStyleOptionViewItem &option, const QModelIndex &index) const
+{
+    return QSize();
+}

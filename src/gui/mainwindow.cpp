@@ -169,6 +169,9 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
     ui->downloadView->setContextMenuPolicy(Qt::CustomContextMenu);
     ui->downloadView->setColumnHidden(MN_HIDDEN_UNIQUE_ID, true);
 
+    QPointer<downloadDelegate> dlDel = new downloadDelegate();
+    ui->downloadView->setItemDelegate(dlDel);
+
     QObject::connect(ui->downloadView, SIGNAL(customContextMenuRequested(QPoint)), this, SLOT(on_downloadView_customContextMenuRequested(QPoint)));
     QObject::connect(this, SIGNAL(updateDlStats()), this, SLOT(manageDlStats()));
 
