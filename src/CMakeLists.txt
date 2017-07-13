@@ -214,6 +214,17 @@ if (CURL_FOUND)
 endif(CURL_FOUND)
 
 #
+# Find LevelDB
+#
+find_package(LevelDB REQUIRED)
+if (LEVELDB_FOUND)
+    include_directories(${LEVELDB_INCLUDE_DIR})
+    set(LIBS ${LIBS} ${LEVELDB_LIBRARIES})
+else()
+    message(SEND_ERROR "The 'LevelDB' library could not be found!")
+endif(LEVELDB_FOUND)
+
+#
 # Find 'pugixml'
 #
 find_package(PugiXML REQUIRED)

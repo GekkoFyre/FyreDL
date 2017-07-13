@@ -41,6 +41,10 @@
  */
 
 #include "cmnroutines.hpp"
+#include "default_var.hpp"
+#include <leveldb/db.h>
+#include <leveldb/write_batch.h>
+#include <leveldb/cache.h>
 #include <boost/filesystem.hpp>
 #include <boost/exception/all.hpp>
 #include <libtorrent/bdecode.hpp>
@@ -291,6 +295,467 @@ std::string GekkoFyre::CmnRoutines::findCfgFile(const std::string &cfgFileName)
 }
 
 /**
+ * @brief GekkoFyre::CmnRoutines::openDatabase
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @date 2017-07-08
+ * @note <http://www.lmdb.tech/doc/>
+ *       <http://doc.qt.io/qt-5/qdir.html>
+ * @param dbFileName
+ * @return
+ */
+GekkoFyre::GkFile::FileDb GekkoFyre::CmnRoutines::openDatabase(const std::string &dbFileName)
+{
+    leveldb::Status s;
+    GekkoFyre::GkFile::FileDb db_struct;
+    db_struct.options.create_if_missing = true;
+    std::unique_ptr<leveldb::Cache>(db_struct.options.block_cache).reset(leveldb::NewLRUCache(LEVELDB_CFG_CACHE_SIZE));
+    db_struct.options.compression = leveldb::CompressionType::kSnappyCompression;
+
+    // Determine the home directory and where to put the database files, depending on whether this is a Linux or
+    // Microsoft Windows operating system that FyreDL is running on.
+    fs::path home_dir(QDir::homePath().toStdString());
+    std::ostringstream oss_db_dir;
+    std::ostringstream oss_db_file;
+    if (fs::is_directory(home_dir)) {
+        #ifdef __linux__
+        oss_db_dir << home_dir.string() << fs::path::preferred_separator << CFG_FILES_DIR_LINUX;
+        #elif _WIN32
+        oss_db_dir << home_dir.string() << fs::path::preferred_separator << CFG_FILES_DIR_WNDWS;
+        #endif
+
+        if (!fs::is_directory(oss_db_dir.str())) {
+            fs::create_directory(oss_db_dir.str());
+        }
+
+        oss_db_file << oss_db_dir.str() << fs::path::preferred_separator << dbFileName;
+    } else {
+        throw std::invalid_argument(tr("Unable to find home directory!").toStdString());
+    }
+
+    leveldb::DB *raw_db_ptr;
+    s = leveldb::DB::Open(db_struct.options, oss_db_file.str(), &raw_db_ptr);
+    db_struct.db.reset(raw_db_ptr);
+    if (!s.ok()) {
+        throw std::runtime_error(tr("Unable to open/create database! %1").arg(QString::fromStdString(s.ToString())).toStdString());
+    }
+
+    sys::error_code ec;
+    if (fs::exists(oss_db_file.str(), ec) && fs::is_regular_file(oss_db_file.str())) {
+        std::cout << tr("Database object created. Status: ").toStdString() << s.ToString();
+    }
+
+    return db_struct;
+}
+
+/**
+ * @brief GekkoFyre::CmnRoutines::batch_write_single_db
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @date 2017-07-09
+ * @note <https://github.com/google/leveldb/blob/master/doc/index.md>
+ *       <http://www.gerald-fahrnholz.eu/sw/DocGenerated/HowToUse/html/group___grp_pugi_xml.html#pugi_xml_add_data>
+ * @param key
+ * @param value
+ * @param unique_id
+ * @param dbFileName
+ * @return
+ */
+bool GekkoFyre::CmnRoutines::batch_write_single_db(const std::string &key, const std::string &value,
+                                                   const std::string &unique_id, const GekkoFyre::GkFile::FileDb &file_db_struct)
+{
+    leveldb::Status s;
+    if (s.ok()) {
+        std::string existing_value;
+        leveldb::ReadOptions read_opt;
+        read_opt.verify_checksums = true;
+
+        s = file_db_struct.db->Get(read_opt, key, &existing_value);
+        leveldb::WriteOptions write_options;
+        write_options.sync = true;
+        leveldb::WriteBatch batch;
+
+        pugi::xml_node root;
+        std::unique_ptr<pugi::xml_document> doc = std::make_unique<pugi::xml_document>();
+        if (!existing_value.empty() && existing_value.size() > CFG_XML_MIN_PARSE_SIZE) {
+            pugi::xml_parse_result result = doc->load_string(existing_value.c_str());
+            if (!result) {
+                throw std::invalid_argument(tr("There has been an error within the database batch writer routine.\n\nParse error: %1, character pos = %2")
+                                                    .arg(result.description()).arg(result.offset).toStdString());
+            }
+
+            batch.Delete(key);
+        } else {
+            std::stringstream new_xml_data;
+            // Generate XML declaration
+            auto declarNode = doc->append_child(pugi::node_declaration);
+            declarNode.append_attribute("version") = "1.0";
+            declarNode.append_attribute("encoding") = "UTF-8";;
+            declarNode.append_attribute("standalone") = "yes";
+
+            // A valid XML doc must contain a single root node of any name
+            root = doc->append_child(LEVELDB_PARENT_NODE);
+            pugi::xml_node xml_version_node = root.append_child(LEVELDB_CHILD_NODE_VERS);
+            pugi::xml_node xml_version_child = xml_version_node.append_child(LEVELDB_CHILD_ITEM_VERS);
+            xml_version_child.append_attribute(LEVELDB_ITEM_ATTR_VERS_NO) = FYREDL_PROG_VERS;
+        }
+
+        root = doc->document_element();
+        pugi::xml_node nodeParent = root.append_child(LEVELDB_XML_CHILD_NODE);
+        pugi::xml_node nodeChild = nodeParent.append_child(LEVELDB_XML_CHILD_ITEM);
+        nodeChild.append_attribute(LEVELDB_XML_ATTR_ITEM_VALUE) = value.c_str();
+        nodeChild.append_attribute(LEVELDB_ITEM_ATTR_UNIQUE_ID) = unique_id.c_str();
+
+        // Save XML tree to file.
+        // Remark: second optional param is indent string to be used;
+        // default indentation is tab character.
+        std::stringstream ss;
+        doc->save(ss, PUGIXML_TEXT("    "));
+        batch.Put(key, ss.str());
+
+        s = file_db_struct.db->Write(write_options, &batch);
+        if (!s.ok()) {
+            throw std::runtime_error(s.ToString());
+        } else {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+/**
+ * @brief GekkoFyre::CmnRoutines::read_database will read the LevelDB database and process the XML contained within,
+ * outputting an STL container that's ready for use.
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @date 2017-07-09
+ * @note <https://github.com/google/leveldb/blob/master/doc/index.md>
+ * @param key
+ * @param unique_id
+ * @param dbFileName
+ * @return An STL container of the processed XML from the database, all ready for use right away.
+ */
+GekkoFyre::GkFile::FileDbVal GekkoFyre::CmnRoutines::read_database(const std::string &key, const std::string &unique_id,
+                                                                   const std::string &dbFileName)
+{
+    GekkoFyre::GkFile::FileDb db_struct = openDatabase(dbFileName);
+    leveldb::Status s;
+    if (s.ok()) {
+        std::string value;
+        s = db_struct.db->Get(leveldb::ReadOptions(), key, &value);
+        if (!s.ok()) {
+            throw std::runtime_error(tr("A problem has occured while attmepting to read key, \"%1\", from the database. Details:\n\n%2")
+                                             .arg(QString::fromStdString(key)).arg(QString::fromStdString(s.ToString())).toStdString());
+        }
+
+        pugi::xml_node root;
+        std::unique_ptr<pugi::xml_document> doc = std::make_unique<pugi::xml_document>();
+        pugi::xml_parse_result result = doc->load_string(value.c_str());
+        if (!result) {
+            throw std::invalid_argument(tr("There has been an error reading information from the database.\n\nParse error: %1, character pos = %2")
+                                                .arg(result.description()).arg(result.offset).toStdString());
+        }
+
+        std::vector<GekkoFyre::GkFile::FileDbVal> file_db_vec;
+        pugi::xml_node items = doc->child(LEVELDB_XML_CHILD_NODE);
+        for (const auto &file: items.children(LEVELDB_XML_CHILD_ITEM)) {
+            GekkoFyre::GkFile::FileDbVal v;
+            v.dl_type = convDownType_StringToEnum(file.child_value());
+            v.value = file.attribute(LEVELDB_XML_ATTR_ITEM_VALUE).as_string();
+            v.unique_id = file.attribute(LEVELDB_ITEM_ATTR_UNIQUE_ID).as_string();
+            v.key = key;
+            file_db_vec.push_back(v);
+        }
+
+        if (file_db_vec.size() > 0) {
+            for (size_t i = 0; i < file_db_vec.size(); ++i) {
+                if (file_db_vec.at(i).unique_id == unique_id) {
+                    return file_db_vec.at(i);
+                }
+            }
+        }
+    }
+
+    return GekkoFyre::GkFile::FileDbVal();
+}
+
+/**
+ * @brief GekkoFyre::CmnRoutines::read_db_vec will read the LevelDB database and process the XML contained within,
+ * outputting an STL container that's ready for use.
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @date 2017-07-09
+ * @note <https://github.com/google/leveldb/blob/master/doc/index.md>
+ * @param key The key whose value we are retrieving.
+ * @param file_db_struct An object that contains data relating to and pointing towards the database in question.
+ * @return An STL container of the processed XML from the database, all ready for use right away.
+ */
+std::vector<GekkoFyre::GkFile::FileDbVal> GekkoFyre::CmnRoutines::read_db_vec(const std::string &key, const GekkoFyre::GkFile::FileDb &file_db_struct)
+{
+    leveldb::ReadOptions read_opt;
+    leveldb::Status s;
+    read_opt.verify_checksums = true;
+
+    std::string read_xml;
+    s = file_db_struct.db->Get(read_opt, key, &read_xml);
+    if (!s.ok()) {
+        throw std::runtime_error(tr("A problem has occured while attmepting to read from the database. Details:\n\n%1")
+                                         .arg(QString::fromStdString(s.ToString())).toStdString());
+    } else {
+        // Proceed
+        pugi::xml_node root;
+        std::unique_ptr<pugi::xml_document> doc = std::make_unique<pugi::xml_document>();
+        pugi::xml_parse_result result = doc->load_string(read_xml.c_str());
+        if (!result) {
+            throw std::invalid_argument(tr("There has been an error reading information from the database.\n\nParse error: %1, character pos = %2")
+                                                .arg(result.description()).arg(result.offset).toStdString());
+        }
+
+        std::vector<GekkoFyre::GkFile::FileDbVal> file_db_vec;
+        pugi::xml_node items = doc->child(LEVELDB_XML_CHILD_NODE);
+        for (const auto &file: items.children(LEVELDB_XML_CHILD_ITEM)) {
+            GekkoFyre::GkFile::FileDbVal v;
+            v.dl_type = convDownType_StringToEnum(file.child_value());
+            v.value = file.attribute(LEVELDB_XML_ATTR_ITEM_VALUE).as_string();
+            v.unique_id = file.attribute(LEVELDB_ITEM_ATTR_UNIQUE_ID).as_string();
+            v.key = key;
+            file_db_vec.push_back(v);
+        }
+
+        if (file_db_vec.size() > 0) {
+            return file_db_vec;
+        }
+    }
+
+    return std::vector<GekkoFyre::GkFile::FileDbVal>();
+}
+
+std::pair<std::string, std::string> GekkoFyre::CmnRoutines::read_db_min(const std::string &key, const GekkoFyre::GkFile::FileDb &file_db_struct)
+{
+    leveldb::ReadOptions read_opt;
+    leveldb::Status s;
+    read_opt.verify_checksums = true;
+
+    std::string read_xml;
+    s = file_db_struct.db->Get(read_opt, key, &read_xml);
+
+    return std::make_pair(key, read_xml);
+}
+
+/**
+ * @brief GekkoFyre::CmnRoutines::process_db_map processes raw database output into a slightly more readable 'QMap<std::string, std::string>', that's
+ * ready for further processing.
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @date 2017-07-09
+ * @note <https://isocpp.org/wiki/faq/templates>
+ *       <http://kevinushey.github.io/blog/2016/01/27/introduction-to-c++-variadic-templates/>
+ *       <https://stackoverflow.com/questions/37139379/stdinitializer-list-vs-variadic-templates>
+ *       <https://stackoverflow.com/questions/10044449/a-function-with-variable-number-of-arguments-with-known-types-the-c11-way>
+ * @param args The raw database information.
+ * @return A slightly more readable 'QMap<std::string, std::string>' that's ready for further processing.
+ */
+QMap<std::string, std::string> GekkoFyre::CmnRoutines::process_db(std::initializer_list<std::tuple<std::string, std::string>> args)
+{
+    QMap<std::string, std::string> mmap;
+    for (const std::tuple<std::string, std::string> &i: args) {
+        // Arguments have been split up
+        std::string val_to_down_dest, val_to_insert_timestamp, val_to_complt_timestamp, val_to_creatn_timestamp,
+                val_to_status, val_to_comment, val_to_creator, val_to_magnet_uri, val_to_name, val_to_num_files,
+                val_to_num_pieces, val_to_piece_length;
+
+        if (std::get<0>(i) == LEVELDB_KEY_TORRENT_FLOC) {
+            val_to_down_dest = std::get<1>(i);
+            mmap.insert(LEVELDB_KEY_TORRENT_FLOC, val_to_down_dest);
+        } else if (std::get<0>(i) == LEVELDB_KEY_TORRENT_INSERT_DATE) {
+            val_to_insert_timestamp = std::get<1>(i);
+            mmap.insert(LEVELDB_KEY_TORRENT_INSERT_DATE, val_to_insert_timestamp);
+        } else if (std::get<0>(i) == LEVELDB_KEY_TORRENT_COMPLT_DATE) {
+            val_to_complt_timestamp = std::get<1>(i);
+            mmap.insert(LEVELDB_KEY_TORRENT_COMPLT_DATE, val_to_complt_timestamp);
+        } else if (std::get<0>(i) == LEVELDB_KEY_TORRENT_CREATN_DATE) {
+            val_to_creatn_timestamp = std::get<1>(i);
+            mmap.insert(LEVELDB_KEY_TORRENT_CREATN_DATE, val_to_creatn_timestamp);
+        } else if (std::get<0>(i) == LEVELDB_KEY_TORRENT_DLSTATUS) {
+            val_to_status = DownloadStatus::Unknown;
+            mmap.insert(LEVELDB_KEY_TORRENT_DLSTATUS, val_to_status);
+        } else if (std::get<0>(i) == LEVELDB_KEY_TORRENT_TORRNT_COMMENT) {
+            val_to_comment = std::get<1>(i);
+            mmap.insert(LEVELDB_KEY_TORRENT_TORRNT_COMMENT, val_to_comment);
+        } else if (std::get<0>(i) == LEVELDB_KEY_TORRENT_TORRNT_CREATOR) {
+            val_to_creator = std::get<1>(i);
+            mmap.insert(LEVELDB_KEY_TORRENT_TORRNT_CREATOR, val_to_creator);
+        } else if (std::get<0>(i) == LEVELDB_KEY_TORRENT_MAGNET_URI) {
+            val_to_magnet_uri = std::get<1>(i);
+            mmap.insert(LEVELDB_KEY_TORRENT_MAGNET_URI, val_to_magnet_uri);
+        } else if (std::get<0>(i) == LEVELDB_KEY_TORRENT_TORRNT_NAME) {
+            val_to_name = std::get<1>(i);
+            mmap.insert(LEVELDB_KEY_TORRENT_TORRNT_NAME, val_to_name);
+        } else if (std::get<0>(i) == LEVELDB_KEY_TORRENT_NUM_FILES) {
+            val_to_num_files = std::get<1>(i);
+            mmap.insert(LEVELDB_KEY_TORRENT_NUM_FILES, val_to_num_files);
+        } else if (std::get<0>(i) == LEVELDB_KEY_TORRENT_TORRNT_PIECES) {
+            val_to_num_pieces = std::get<1>(i);
+            mmap.insert(LEVELDB_KEY_TORRENT_TORRNT_PIECES, val_to_num_pieces);
+        } else if (std::get<0>(i) == LEVELDB_KEY_TORRENT_TORRNT_PIECE_LENGTH) {
+            val_to_piece_length = std::get<1>(i);
+            mmap.insert(LEVELDB_KEY_TORRENT_TORRNT_PIECE_LENGTH, val_to_piece_length);
+        }
+    }
+
+    return mmap;
+}
+
+/**
+ * @brief GekkoFyre::CmnRoutines::process_db_xml process a 'QMap<std::string, std::string>' into a pre-defined struct
+ * that is far more readable and easily accessed.
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @date 2017-07-12
+ * @param map The container with the XML data to process.
+ * @param args The keys required to access the values within the container.
+ * @return A pre-defined struct that is far more readable and easily accessed, specifically, 'GekkoFyre::GkTorrent::TorrentInfo'.
+ * @see GekkoFyre::CmnRoutines::process_db_map(), GekkoFyre::CmnRoutines::process_db_xml()
+ */
+std::vector<GekkoFyre::GkTorrent::GeneralInfo> GekkoFyre::CmnRoutines::process_db_map(const QMap<std::string, std::string> &map,
+                                                                                      std::initializer_list<std::string> args)
+{
+    QMultiMap<std::pair<std::string, std::string>, std::string> mmap_store;
+    QList<std::string> found_unique_keys;
+    for (const auto &i: args) {
+        std::string val;
+        for (const auto &j: map.keys()) {
+            if (i == j) {
+                val = map.value(i);
+
+                if (!val.empty()) {
+                    std::vector<std::pair<std::string, std::string>> xml_data = process_db_xml(val);
+                    if (xml_data.size() > 1) {
+                        for (const auto &k: xml_data) {
+                            std::string tmp_val, tmp_unique_id;
+                            if (!k.first.empty()) {
+                                // Value
+                                tmp_val = k.first;
+
+                                if (!k.second.empty()) {
+                                    // Unique ID
+                                    tmp_unique_id = k.second;
+                                } else {
+                                    // Determine the home directory and where to put the database files, depending on
+                                    // whether this is a Linux or Microsoft Windows operating system that FyreDL is running on.
+                                    fs::path home_dir(QDir::homePath().toStdString());
+                                    std::ostringstream oss;
+                                    #ifdef __linux__
+                                    oss << home_dir.string() << fs::path::preferred_separator << CFG_FILES_DIR_LINUX << fs::path::preferred_separator << CFG_HISTORY_DB_FILE;
+                                    #elif _WIN32
+                                    oss << home_dir.string() << fs::path::preferred_separator << CFG_FILES_DIR_WNDWS << fs::path::preferred_separator << CFG_HISTORY_DB_FILE;
+                                    #endif
+
+                                    QMessageBox::warning(nullptr, tr("Error!"), tr("We have encountered some corrupt data! If this problem persists, please delete:\n\n\"%1\"")
+                                            .arg(QString::fromStdString(oss.str())), QMessageBox::Ok);
+                                }
+                            }
+
+                            // Each key identified by something such as, 'LEVELDB_KEY_TORRENT_INSERT_DATE', will store MANY values
+                            // whilst the Unique ID will be unique per 'GekkoFyre::GkTorrent::TorrentInfo' object.
+                            mmap_store.insertMulti(std::make_pair(i, tmp_unique_id), tmp_val);
+
+                            // This is for speeding up searches later on in the function
+                            if (!found_unique_keys.contains(tmp_unique_id)) {
+                                found_unique_keys.push_back(tmp_unique_id);
+                            }
+                        }
+                    } else {
+                        break;
+                    }
+                } else {
+                    // There is no XML data present
+                    continue;
+                }
+            }
+        }
+    }
+
+    // We need to match each item of struct 'GekkoFyre::GkTorrent::TorrentInfo' to its respective place, but to do that,
+    // we must first match a Unique Identifier to each 'GekkoFyre::GkTorrent::TorrentInfo' object.
+    std::vector<GekkoFyre::GkTorrent::GeneralInfo> vec_output;
+    for (const auto &i: mmap_store.keys()) {
+        // Expand out the list of keys stored within the QMultiMap
+        for (const auto &j: found_unique_keys) {
+            if (i.second == j) {
+                GekkoFyre::GkTorrent::GeneralInfo tor_info;
+                if (i.first == LEVELDB_KEY_TORRENT_FLOC) {
+                    tor_info.down_dest = mmap_store.value(i);
+                } else if (i.first == LEVELDB_KEY_TORRENT_INSERT_DATE) {
+                    tor_info.insert_timestamp = atoll(mmap_store.value(i).c_str());
+                } else if (i.first == LEVELDB_KEY_TORRENT_COMPLT_DATE) {
+                    tor_info.complt_timestamp = atoll(mmap_store.value(i).c_str());
+                } else if (i.first == LEVELDB_KEY_TORRENT_CREATN_DATE) {
+                    tor_info.creatn_timestamp = atol(mmap_store.value(i).c_str());
+                } else if (i.first == LEVELDB_KEY_TORRENT_DLSTATUS) {
+                    tor_info.dlStatus = convDlStat_StringToEnum(QString::fromStdString(mmap_store.value(i)));
+                } else if (i.first == LEVELDB_KEY_TORRENT_TORRNT_COMMENT) {
+                    tor_info.comment = mmap_store.value(i);
+                } else if (i.first == LEVELDB_KEY_TORRENT_TORRNT_CREATOR) {
+                    tor_info.creator = mmap_store.value(i);
+                } else if (i.first == LEVELDB_KEY_TORRENT_MAGNET_URI) {
+                    tor_info.magnet_uri = mmap_store.value(i);
+                } else if (i.first == LEVELDB_KEY_TORRENT_TORRNT_NAME) {
+                    tor_info.torrent_name = mmap_store.value(i);
+                } else if (i.first == LEVELDB_KEY_TORRENT_NUM_FILES) {
+                    tor_info.num_files = atoi(mmap_store.value(i).c_str());
+                } else if (i.first == LEVELDB_KEY_TORRENT_TORRNT_PIECES) {
+                    tor_info.num_pieces = atoi(mmap_store.value(i).c_str());
+                } else if (i.first == LEVELDB_KEY_TORRENT_TORRNT_PIECE_LENGTH) {
+                    tor_info.piece_length = atoi(mmap_store.value(i).c_str());
+                }
+
+                tor_info.unique_id = j;
+                vec_output.push_back(tor_info);
+            }
+        }
+    }
+
+    if (vec_output.size() > 0) {
+        return vec_output;
+    }
+
+    return std::vector<GekkoFyre::GkTorrent::GeneralInfo>();
+}
+
+/**
+ * @brief GekkoFyre::CmnRoutines::process_db_xml processes a string containing specific raw XML data into two outputs.
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @date 2017-07-12
+ * @param xml_input The string containing the specifically formatted XML data.
+ * @return A container of the two aforementioned outputs are generated, specifically, the value being stored in question
+ * and the Unique ID relating to that value so that it maybe identified as part of a larger object.
+ * @see GekkoFyre::CmnRoutines::batch_write_single_db()
+ */
+std::vector<std::pair<std::string, std::string>> GekkoFyre::CmnRoutines::process_db_xml(const std::string &xml_input)
+{
+    if (!xml_input.empty() && xml_input.size() > CFG_XML_MIN_PARSE_SIZE) {
+        std::vector<std::pair<std::string, std::string>> ret_data;
+        pugi::xml_node root;
+        std::unique_ptr<pugi::xml_document> doc = std::make_unique<pugi::xml_document>();
+        pugi::xml_parse_result result = doc->load_string(xml_input.c_str());
+        if (!result) {
+            throw std::invalid_argument(tr("There has been an error whilst processing the XML from the database.\n\nParse error: %1, character pos = %2")
+                                                .arg(result.description()).arg(result.offset).toStdString());
+        }
+
+        pugi::xml_node items = doc->child(LEVELDB_XML_CHILD_NODE);
+        for (const auto &file: items.children(LEVELDB_XML_CHILD_ITEM)) {
+            std::string tmp_val, tmp_unique_id;
+            tmp_val = file.attribute(LEVELDB_XML_ATTR_ITEM_VALUE).as_string();
+            tmp_unique_id = file.attribute(LEVELDB_ITEM_ATTR_UNIQUE_ID).as_string();
+            ret_data.push_back(std::make_pair(tmp_val, tmp_unique_id));
+        }
+
+        if (ret_data.size() > 0) {
+            return ret_data;
+        }
+    }
+
+    return std::vector<std::pair<std::string, std::string>>();
+}
+
+/**
  * @brief GekkoFyre::CmnRoutines::getFileSize finds the size of a file /without/ having to 'open' it. Portable
  * under both Linux, Apple Macintosh and Microsoft Windows.
  * @note <http://stackoverflow.com/questions/5840148/how-can-i-get-a-files-size-in-c>
@@ -522,18 +987,18 @@ GekkoFyre::GkTorrent::TorrentInfo GekkoFyre::CmnRoutines::torrentFileInfo(const 
                                                                           const int &depth_limit)
 {
     GekkoFyre::GkTorrent::TorrentInfo gk_torrent_struct;
-    gk_torrent_struct.cId = 0;
-    gk_torrent_struct.comment = "";
-    gk_torrent_struct.complt_timestamp = 0;
-    gk_torrent_struct.creatn_timestamp = 0;
-    gk_torrent_struct.creator = "";
-    gk_torrent_struct.dlStatus = GekkoFyre::DownloadStatus::Failed;
-    gk_torrent_struct.down_dest = "";
-    gk_torrent_struct.insert_timestamp = 0;
-    gk_torrent_struct.magnet_uri = "";
-    gk_torrent_struct.num_files = 0;
-    gk_torrent_struct.num_pieces = 0;
-    gk_torrent_struct.piece_length = 0;
+    gk_torrent_struct.general.cId = 0;
+    gk_torrent_struct.general.comment = "";
+    gk_torrent_struct.general.complt_timestamp = 0;
+    gk_torrent_struct.general.creatn_timestamp = 0;
+    gk_torrent_struct.general.creator = "";
+    gk_torrent_struct.general.dlStatus = GekkoFyre::DownloadStatus::Failed;
+    gk_torrent_struct.general.down_dest = "";
+    gk_torrent_struct.general.insert_timestamp = 0;
+    gk_torrent_struct.general.magnet_uri = "";
+    gk_torrent_struct.general.num_files = 0;
+    gk_torrent_struct.general.num_pieces = 0;
+    gk_torrent_struct.general.piece_length = 0;
 
     std::vector<char> buf;
     error_code ec;
@@ -593,15 +1058,15 @@ GekkoFyre::GkTorrent::TorrentInfo GekkoFyre::CmnRoutines::torrentFileInfo(const 
     // to_hex((char const*)&t.info_hash()[0], 20, ih);
     // ih << std::hex << t.info_hash();
 
-    gk_torrent_struct.num_pieces = t.num_pieces();
-    gk_torrent_struct.piece_length = t.piece_length();
-    gk_torrent_struct.comment = t.comment();
-    gk_torrent_struct.creator = t.creator();
-    gk_torrent_struct.magnet_uri = make_magnet_uri(t);
-    gk_torrent_struct.num_files = t.num_files();
+    gk_torrent_struct.general.num_pieces = t.num_pieces();
+    gk_torrent_struct.general.piece_length = t.piece_length();
+    gk_torrent_struct.general.comment = t.comment();
+    gk_torrent_struct.general.creator = t.creator();
+    gk_torrent_struct.general.magnet_uri = make_magnet_uri(t);
+    gk_torrent_struct.general.num_files = t.num_files();
     // gk_torrent_struct.creatn_timestamp = t.creation_date().get();
-    gk_torrent_struct.torrent_name = t.name();
-    gk_torrent_struct.unique_id = createId(FYREDL_UNIQUE_ID_DIGIT_COUNT);
+    gk_torrent_struct.general.torrent_name = t.name();
+    gk_torrent_struct.general.unique_id = createId(FYREDL_UNIQUE_ID_DIGIT_COUNT);
 
     const file_storage &st = t.files();
     for (int i = 0; i < st.num_files(); ++i) {
@@ -987,153 +1452,189 @@ bool GekkoFyre::CmnRoutines::modifyDlState(const std::string &file_loc,
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
  * @date 2016-12-12
  * @param gk_ti
- * @param xmlCfgFile
  * @return
  */
-bool GekkoFyre::CmnRoutines::writeTorrentItem(GekkoFyre::GkTorrent::TorrentInfo &gk_ti,
-                                              const std::string &xmlCfgFile)
+bool GekkoFyre::CmnRoutines::writeTorrentItem(GekkoFyre::GkTorrent::TorrentInfo &gk_ti)
 {
-    fs::path xmlCfgFile_loc = findCfgFile(xmlCfgFile);
-    sys::error_code ec;
-    if (!gk_ti.down_dest.empty()) {
-        if (!xmlCfgFile_loc.string().empty()) {
-            if (gk_ti.dlStatus == GekkoFyre::DownloadStatus::Stopped || gk_ti.dlStatus == GekkoFyre::DownloadStatus::Invalid ||
-                    gk_ti.dlStatus == GekkoFyre::DownloadStatus::Unknown) {
-                pugi::xml_node root;
-                unsigned int cId = 0;
-                QDateTime now = QDateTime::currentDateTime();
-                gk_ti.insert_timestamp = now.toTime_t();
+    try {
+        GekkoFyre::GkFile::FileDb db_struct = openDatabase(CFG_HISTORY_DB_FILE);
+        leveldb::Status s;
+        if (!gk_ti.general.down_dest.empty()) {
+            if (s.ok()) {
+                // Proceed, the database status is 'okay'!
+                if (gk_ti.general.dlStatus == GekkoFyre::DownloadStatus::Stopped || gk_ti.general.dlStatus == GekkoFyre::DownloadStatus::Invalid ||
+                    gk_ti.general.dlStatus == GekkoFyre::DownloadStatus::Unknown) {
+                    QDateTime now = QDateTime::currentDateTime();
+                    gk_ti.general.insert_timestamp = now.toTime_t();
 
-                // Generate new XML document within memory
-                pugi::xml_document doc;
-                // Alternatively store as shared pointer if tree shall be used for longer
-                // time or multiple client calls:
-                // std::shared_ptr<pugi::xml_document> spDoc = std::make_shared<pugi::xml_document>();
+                    using namespace GekkoFyre::GkFile;
+                    batch_write_single_db(LEVELDB_KEY_TORRENT_FLOC, gk_ti.general.down_dest, gk_ti.general.unique_id, db_struct);
 
-                if (!fs::exists(xmlCfgFile_loc, ec) && !fs::is_regular_file(xmlCfgFile_loc)) {
-                    root = createNewXmlFile(xmlCfgFile);
-                } else {
-                    std::vector<GekkoFyre::GkTorrent::TorrentInfo> existing_info = readTorrentInfo(true, xmlCfgFile);
+                    batch_write_single_db(LEVELDB_KEY_TORRENT_INSERT_DATE,
+                                          std::to_string(gk_ti.general.insert_timestamp),
+                                          gk_ti.general.unique_id, db_struct);
 
-                    // Finds the largest 'existing_info.cId' value and then increments by +1, ready for
-                    // assignment to a new download entry.
-                    for (size_t i = 0; i < existing_info.size(); ++i) {
-                        static unsigned int tmp;
-                        tmp = existing_info.at(i).cId;
-                        if (tmp > cId) {
-                            cId = tmp;
-                        } else {
-                            ++cId;
-                        }
-                    }
+                    batch_write_single_db(LEVELDB_KEY_TORRENT_COMPLT_DATE,
+                                          std::to_string(gk_ti.general.complt_timestamp),
+                                          gk_ti.general.unique_id, db_struct);
+
+                    batch_write_single_db(LEVELDB_KEY_TORRENT_CREATN_DATE,
+                                          std::to_string(gk_ti.general.creatn_timestamp),
+                                          gk_ti.general.unique_id, db_struct);
+
+                    batch_write_single_db(LEVELDB_KEY_TORRENT_DLSTATUS,
+                                          convDlStat_toString(gk_ti.general.dlStatus).toStdString(), gk_ti.general.unique_id, db_struct);
+                    batch_write_single_db(LEVELDB_KEY_TORRENT_TORRNT_COMMENT, gk_ti.general.comment, gk_ti.general.unique_id, db_struct);
+                    batch_write_single_db(LEVELDB_KEY_TORRENT_TORRNT_CREATOR, gk_ti.general.creator, gk_ti.general.unique_id, db_struct);
+                    batch_write_single_db(LEVELDB_KEY_TORRENT_MAGNET_URI, gk_ti.general.magnet_uri, gk_ti.general.unique_id, db_struct);
+                    batch_write_single_db(LEVELDB_KEY_TORRENT_TORRNT_NAME, gk_ti.general.torrent_name, gk_ti.general.unique_id, db_struct);
+                    batch_write_single_db(LEVELDB_KEY_TORRENT_NUM_FILES, std::to_string(gk_ti.general.num_files),
+                                          gk_ti.general.unique_id, db_struct);
+                    batch_write_single_db(LEVELDB_KEY_TORRENT_TORRNT_PIECES, std::to_string(gk_ti.general.num_pieces),
+                                          gk_ti.general.unique_id, db_struct);
+                    batch_write_single_db(LEVELDB_KEY_TORRENT_TORRNT_PIECE_LENGTH,
+                                          std::to_string(gk_ti.general.piece_length), gk_ti.general.unique_id, db_struct);
+
+                    //
+                    // Files and Trackers
+                    //
+                    bool resp = writeTorrent_extra_data(gk_ti, db_struct);
+                    return resp ? true : false;
                 }
-
-                // Load XML into memory
-                // Remark: to fully read declaration entries you have to specify, "pugi::parse_declaration"
-                pugi::xml_parse_result result = doc.load_file(xmlCfgFile_loc.string().c_str(), pugi::parse_default|pugi::parse_declaration);
-                if (!result) {
-                    throw std::invalid_argument(tr("XML parse error: %1, character pos= %2")
-                                                        .arg(result.description(),
-                                                             QString::number(result.offset)).toStdString());
-                }
-
-                gk_ti.cId = cId;
-
-                // A valid XML document must have a single root node
-                root = doc.document_element();
-
-                pugi::xml_node nodeParent = root.append_child(XML_CHILD_NODE_TORRENT);
-                pugi::xml_node nodeChild = nodeParent.append_child(XML_CHILD_ITEM_TORRENT);
-                nodeChild.append_attribute(XML_ITEM_ATTR_TORRENT_CID) = gk_ti.cId;
-                nodeChild.append_attribute(XML_ITEM_ATTR_TORRENT_FLOC) = gk_ti.down_dest.c_str();
-                nodeChild.append_attribute(XML_ITEM_ATTR_TORRENT_INSERT_DATE) = gk_ti.insert_timestamp;
-                nodeChild.append_attribute(XML_ITEM_ATTR_TORRENT_COMPLT_DATE) = gk_ti.complt_timestamp;
-                nodeChild.append_attribute(XML_ITEM_ATTR_TORRENT_CREATN_DATE) = (long long)gk_ti.creatn_timestamp;
-                nodeChild.append_attribute(XML_ITEM_ATTR_TORRENT_DLSTATUS) = convDlStat_toInt(gk_ti.dlStatus);
-                nodeChild.append_attribute(XML_ITEM_ATTR_TORRENT_TORRNT_COMMENT) = gk_ti.comment.c_str();
-                nodeChild.append_attribute(XML_ITEM_ATTR_TORRENT_TORRNT_CREATOR) = gk_ti.creator.c_str();
-                nodeChild.append_attribute(XML_ITEM_ATTR_TORRENT_MAGNET_URI) = gk_ti.magnet_uri.c_str();
-                nodeChild.append_attribute(XML_ITEM_ATTR_TORRENT_TORRNT_NAME) = gk_ti.torrent_name.c_str();
-                nodeChild.append_attribute(XML_ITEM_ATTR_TORRENT_NUM_FILES) = gk_ti.num_files;
-                nodeChild.append_attribute(XML_ITEM_ATTR_TORRENT_TORRNT_PIECES) = gk_ti.num_pieces;
-                nodeChild.append_attribute(XML_ITEM_ATTR_TORRENT_TORRNT_PIECE_LENGTH) = gk_ti.piece_length;
-                nodeChild.append_attribute(XML_ITEM_ATTR_TORRENT_UNIQUE_ID) = gk_ti.unique_id.c_str();
-
-                pugi::xml_node nodeNodes = nodeChild.append_child(XML_CHILD_NODE_TORRENT_NODES);
-                for (size_t i = 0; i < gk_ti.nodes.size(); ++i) {
-                    pugi::xml_node nodeNodesNames = nodeNodes.append_child(XML_CHILD_NODES_NAMES_TORRENT);
-                    nodeNodesNames.append_child(pugi::node_pcdata).set_value(gk_ti.nodes.at(i).first.c_str());
-
-                    // Sub-node
-                    std::string buffer = std::to_string(gk_ti.nodes.at(i).second);
-                    pugi::xml_node nodeNodesNumbers = nodeNodesNames.append_child(XML_CHILD_NODES_NUMBR_TORRENT);
-                    nodeNodesNumbers.append_child(pugi::node_pcdata).set_value(buffer.data());
-                }
-
-                pugi::xml_node nodeFiles = nodeChild.append_child(XML_CHILD_NODE_TORRENT_FILES);
-                for (size_t i = 0; i < gk_ti.files_vec.size(); ++i) {
-                    pugi::xml_node nodeFilesPath = nodeFiles.append_child(XML_CHILD_FILES_PATH_TORRENT);
-                    nodeFilesPath.append_child(pugi::node_pcdata)
-                            .set_value(gk_ti.files_vec.at(i).file_path.c_str());
-
-                    // Sub-nodes
-                    pugi::xml_node nodeFilesHash = nodeFilesPath.append_child(XML_CHILD_FILES_HASH_TORRENT);
-                    nodeFilesHash.append_child(pugi::node_pcdata)
-                            .set_value(gk_ti.files_vec.at(i).sha1_hash_hex.c_str());
-
-                    pugi::xml_node nodeFilesFlags = nodeFilesPath.append_child(XML_CHILD_FILES_FLAGS_TORRENT);
-                    nodeFilesFlags.append_child(pugi::node_pcdata).set_value(std::to_string(gk_ti.files_vec.at(i).flags).data());
-
-                    pugi::xml_node nodeFilesContentLength = nodeFilesPath.append_child(XML_CHILD_FILES_CONTLNGTH_TORRENT);
-                    nodeFilesContentLength.append_child(pugi::node_pcdata)
-                            .set_value(std::to_string(gk_ti.files_vec.at(i).content_length).data());
-
-                    pugi::xml_node nodeFilesFileOffset = nodeFilesPath.append_child(XML_CHILD_FILES_FILEOFFST_TORRENT);
-                    nodeFilesFileOffset.append_child(pugi::node_pcdata)
-                            .set_value(std::to_string(gk_ti.files_vec.at(i).file_offset).data());
-
-                    pugi::xml_node nodeFilesMTime = nodeFilesPath.append_child(XML_CHILD_FILES_MTIME_TORRENT);
-                    nodeFilesMTime.append_child(pugi::node_pcdata).set_value(std::to_string(gk_ti.files_vec.at(i).mtime).data());
-
-                    pugi::xml_node nodeFilesMapFilePiece = nodeFilesPath.append_child(XML_CHILD_NODE_TORRENT_FILES_MAPFLEPCE);
-                    pugi::xml_node nodeFilesMapFilePiece_first = nodeFilesMapFilePiece
-                            .append_child(XML_CHILD_FILES_MAPFLEPCE_1_TORRENT);
-                    pugi::xml_node nodeFilesMapFilePiece_second = nodeFilesMapFilePiece
-                            .append_child(XML_CHILD_FILES_MAPFLEPCE_2_TORRENT);
-                    nodeFilesMapFilePiece_first.append_child(pugi::node_pcdata)
-                            .set_value(std::to_string(gk_ti.files_vec.at(i).map_file_piece.first).data());
-                    nodeFilesMapFilePiece_second.append_child(pugi::node_pcdata)
-                            .set_value(std::to_string(gk_ti.files_vec.at(i).map_file_piece.second).data());
-
-                    pugi::xml_node nodeFilesDownBool = nodeFilesPath.append_child(XML_CHILD_FILES_DOWNBOOL_TORRENT);
-                    nodeFilesDownBool.append_child(pugi::node_pcdata)
-                            .set_value(std::to_string(gk_ti.files_vec.at(i).downloaded).data());
-                }
-
-                pugi::xml_node nodeTrackers = nodeChild.append_child(XML_CHILD_NODE_TORRENT_TRACKERS);
-                for (size_t i = 0; i < gk_ti.trackers.size(); ++i) {
-                    pugi::xml_node nodeTrackersTier = nodeTrackers.append_child(XML_CHILD_TRACKERS_TIER_TORRENT);
-                    nodeTrackersTier.append_child(pugi::node_pcdata).set_value(std::to_string(gk_ti.trackers.at(i).tier).data());
-
-                    // Sub-node
-                    pugi::xml_node nodeTrackersUrl = nodeTrackersTier.append_child(XML_CHILD_TRACKERS_URL_TORRENT);
-                    nodeTrackersUrl.append_child(pugi::node_pcdata).set_value(gk_ti.trackers.at(i).url.c_str());
-
-                    pugi::xml_node nodeTrackersAvailable = nodeTrackersTier.append_child(XML_CHILD_TRACKERS_AVAILABLE_TORRENT);
-                    nodeTrackersAvailable.append_child(pugi::node_pcdata).set_value(std::to_string(gk_ti.trackers.at(i).enabled).data());
-                }
-
-                bool saveSucceed = doc.save_file(xmlCfgFile_loc.string().c_str(), PUGIXML_TEXT("    "));
-                if (!saveSucceed) {
-                    throw std::runtime_error(tr("Error with saving XML config file!").toStdString());
-                }
-
-                return true;
+            } else {
+                // There is a problem with the database!
+                throw std::runtime_error(tr("There is an issue with the database! Error: %1").arg(QString::fromStdString(s.ToString())).toStdString());
             }
-        } else {
-            throw std::invalid_argument(tr("Internal error: no path has been given for the XML "
-                                                   "configuration file!").toStdString());
         }
+    } catch (const std::exception &e) {
+        QMessageBox::warning(nullptr, tr("Error!"), e.what(), QMessageBox::Ok);
+        return false;
+    }
+
+    return false;
+}
+
+bool GekkoFyre::CmnRoutines::writeTorrent_extra_data(const GekkoFyre::GkTorrent::TorrentInfo &gk_ti,
+                                                     const GekkoFyre::GkFile::FileDb &ext_db_struct)
+{
+    try {
+        pugi::xml_node root;
+        std::unique_ptr<pugi::xml_document> doc = std::make_unique<pugi::xml_document>();
+
+        const std::string key = LEVELDB_KEY_TORRENT_EXTRANEOUS;
+        std::string existing_value;
+        leveldb::ReadOptions read_opt;
+        leveldb::WriteOptions write_opt;
+        leveldb::Status s;
+        leveldb::WriteBatch batch;
+        read_opt.verify_checksums = true;
+        write_opt.sync = true;
+        s = ext_db_struct.db->Get(read_opt, key, &existing_value);
+        if (!existing_value.empty() && existing_value.size() > CFG_XML_MIN_PARSE_SIZE) { // Check if previous XML data exists or not
+            //
+            // There is previous XML data, which we will build on
+            //
+            pugi::xml_parse_result result = doc->load_string(existing_value.c_str());
+            if (!result) {
+                throw std::invalid_argument(tr("There has been an error whilst reading extraneous information about a BitTorrent item from the database.\n\nParse error: %1, character pos = %2")
+                                                    .arg(result.description()).arg(result.offset).toStdString());
+            }
+
+            batch.Delete(key);
+        } else {
+            //
+            // No previous records exist, therefore create a new XML document from scratch!
+            //
+            std::stringstream new_xml_data;
+            // Generate XML declaration
+            auto declarNode = doc->append_child(pugi::node_declaration);
+            declarNode.append_attribute("version") = "1.0";
+            declarNode.append_attribute("encoding") = "UTF-8";;
+            declarNode.append_attribute("standalone") = "yes";
+
+            // A valid XML doc must contain a single root node of any name
+            root = doc->append_child(LEVELDB_PARENT_NODE);
+            pugi::xml_node xml_version_node = root.append_child(LEVELDB_CHILD_NODE_VERS);
+            pugi::xml_node xml_version_child = xml_version_node.append_child(LEVELDB_CHILD_ITEM_VERS);
+            xml_version_child.append_attribute(LEVELDB_ITEM_ATTR_VERS_NO) = FYREDL_PROG_VERS;
+        }
+
+        root = doc->document_element();
+        pugi::xml_node nodeParent = root.append_child(LEVELDB_XML_CHILD_NODE);
+        nodeParent.append_child(pugi::node_pcdata).set_value(gk_ti.general.unique_id.c_str());
+        pugi::xml_node node_val_files = nodeParent.append_child(LEVELDB_CHILD_NODE_TORRENT_FILES);
+        for (size_t i = 0; i < gk_ti.files_vec.size(); ++i) {
+            //
+            // Files
+            //
+            pugi::xml_node nodeFilesPath = node_val_files.append_child(LEVELDB_CHILD_FILES_PATH_TORRENT);
+            nodeFilesPath.append_child(pugi::node_pcdata)
+                    .set_value(gk_ti.files_vec.at(i).file_path.c_str());
+
+            // Sub-nodes
+            pugi::xml_node nodeFilesHash = nodeFilesPath.append_child(LEVELDB_CHILD_FILES_HASH_TORRENT);
+            nodeFilesHash.append_child(pugi::node_pcdata)
+                    .set_value(gk_ti.files_vec.at(i).sha1_hash_hex.c_str());
+
+            pugi::xml_node nodeFilesFlags = nodeFilesPath.append_child(LEVELDB_CHILD_FILES_FLAGS_TORRENT);
+            nodeFilesFlags.append_child(pugi::node_pcdata).set_value(std::to_string(gk_ti.files_vec.at(i).flags).data());
+
+            pugi::xml_node nodeFilesContentLength = nodeFilesPath.append_child(LEVELDB_CHILD_FILES_CONTLNGTH_TORRENT);
+            nodeFilesContentLength.append_child(pugi::node_pcdata)
+                    .set_value(std::to_string(gk_ti.files_vec.at(i).content_length).data());
+
+            pugi::xml_node nodeFilesFileOffset = nodeFilesPath.append_child(LEVELDB_CHILD_FILES_FILEOFFST_TORRENT);
+            nodeFilesFileOffset.append_child(pugi::node_pcdata)
+                    .set_value(std::to_string(gk_ti.files_vec.at(i).file_offset).data());
+
+            pugi::xml_node nodeFilesMTime = nodeFilesPath.append_child(LEVELDB_CHILD_FILES_MTIME_TORRENT);
+            nodeFilesMTime.append_child(pugi::node_pcdata).set_value(std::to_string(gk_ti.files_vec.at(i).mtime).data());
+
+            pugi::xml_node nodeFilesMapFilePiece = nodeFilesPath.append_child(LEVELDB_CHILD_NODE_TORRENT_FILES_MAPFLEPCE);
+            pugi::xml_node nodeFilesMapFilePiece_first = nodeFilesMapFilePiece
+                    .append_child(LEVELDB_CHILD_FILES_MAPFLEPCE_1_TORRENT);
+            pugi::xml_node nodeFilesMapFilePiece_second = nodeFilesMapFilePiece
+                    .append_child(LEVELDB_CHILD_FILES_MAPFLEPCE_2_TORRENT);
+            nodeFilesMapFilePiece_first.append_child(pugi::node_pcdata)
+                    .set_value(std::to_string(gk_ti.files_vec.at(i).map_file_piece.first).data());
+            nodeFilesMapFilePiece_second.append_child(pugi::node_pcdata)
+                    .set_value(std::to_string(gk_ti.files_vec.at(i).map_file_piece.second).data());
+
+            pugi::xml_node nodeFilesDownBool = nodeFilesPath.append_child(LEVELDB_CHILD_FILES_DOWNBOOL_TORRENT);
+            nodeFilesDownBool.append_child(pugi::node_pcdata)
+                    .set_value(std::to_string(gk_ti.files_vec.at(i).downloaded).data());
+        }
+
+        pugi::xml_node node_val_trackers = nodeParent.append_child(LEVELDB_CHILD_NODE_TORRENT_TRACKERS);
+        for (size_t i = 0; i < gk_ti.trackers.size(); ++i) {
+            //
+            // Trackers
+            //
+            pugi::xml_node nodeTrackersTier = node_val_trackers.append_child(LEVELDB_CHILD_TRACKERS_TIER_TORRENT);
+            nodeTrackersTier.append_child(pugi::node_pcdata).set_value(std::to_string(gk_ti.trackers.at(i).tier).data());
+
+            // Sub-node
+            pugi::xml_node nodeTrackersUrl = nodeTrackersTier.append_child(LEVELDB_CHILD_TRACKERS_URL_TORRENT);
+            nodeTrackersUrl.append_child(pugi::node_pcdata).set_value(gk_ti.trackers.at(i).url.c_str());
+
+            pugi::xml_node nodeTrackersAvailable = nodeTrackersTier.append_child(LEVELDB_CHILD_TRACKERS_AVAILABLE_TORRENT);
+            nodeTrackersAvailable.append_child(pugi::node_pcdata).set_value(std::to_string(gk_ti.trackers.at(i).enabled).data());
+        }
+
+        std::stringstream ss;
+        doc->save(ss, PUGIXML_TEXT("    "));
+
+        batch.Put(LEVELDB_KEY_TORRENT_EXTRANEOUS, ss.str());
+        s = ext_db_struct.db->Write(write_opt, &batch);
+        if (s.ok()) {
+            return true;
+        } else {
+            throw std::runtime_error(s.ToString());
+        }
+    } catch (const std::exception &e) {
+        QMessageBox::warning(nullptr, tr("Error!"), tr("An issue was encountered whilst writing the extraneous data for torrent item, \"%1\".").arg(QString::fromStdString(gk_ti.general.unique_id)),
+                             QMessageBox::Ok);
+        return false;
     }
 
     return false;
@@ -1151,124 +1652,152 @@ bool GekkoFyre::CmnRoutines::writeTorrentItem(GekkoFyre::GkTorrent::TorrentInfo 
  * @param xmlCfgFile The XML configuration file in question.
  * @return A STL standard container holding a struct pertaining to all the needed BitTorrent information is returned.
  */
-std::vector<GekkoFyre::GkTorrent::TorrentInfo> GekkoFyre::CmnRoutines::readTorrentInfo(const bool &minimal_readout,
-                                                                                       const std::string &xmlCfgFile)
+std::vector<GekkoFyre::GkTorrent::TorrentInfo> GekkoFyre::CmnRoutines::readTorrentInfo(const bool &minimal_readout)
 {
-    fs::path xmlCfgFile_loc = findCfgFile(xmlCfgFile);
-    sys::error_code ec;
-    if (fs::exists(xmlCfgFile_loc, ec) && fs::is_regular_file(xmlCfgFile_loc)) {
-        std::vector<GekkoFyre::GkTorrent::TorrentInfo> gk_torrent_info_list;
+    std::vector<GekkoFyre::GkTorrent::TorrentInfo> to_info_vec;
+    try {
+        GekkoFyre::GkFile::FileDb db_struct = openDatabase(CFG_HISTORY_DB_FILE);
+        leveldb::Status s;
+        if (s.ok()) {
+            std::tuple<std::string, std::string> val_to_down_dest, val_to_insert_timestamp,
+                    val_to_complt_timestamp, val_to_creatn_timestamp, val_to_status, val_to_comment, val_to_creator,
+                    val_to_magnet_uri, val_to_name, val_to_num_files, val_to_num_pieces, val_to_piece_length;
 
-        pugi::xml_document doc;
-        pugi::xml_parse_result result = doc.load_file(xmlCfgFile_loc.string().c_str(),
-                                                      pugi::parse_default | pugi::parse_declaration);
-        if (!result) {
-            throw std::invalid_argument(tr("XML parse error: %1, character pos= %2")
-                                                .arg(result.description(),
-                                                     QString::number(result.offset)).toStdString());
-        }
+            // Proceed, the database status is 'okay'!
+            val_to_down_dest = read_db_min(LEVELDB_KEY_TORRENT_FLOC, db_struct);
+            val_to_insert_timestamp = read_db_min(LEVELDB_KEY_TORRENT_INSERT_DATE, db_struct);
+            val_to_complt_timestamp = read_db_min(LEVELDB_KEY_TORRENT_COMPLT_DATE, db_struct);
+            val_to_creatn_timestamp = read_db_min(LEVELDB_KEY_TORRENT_CREATN_DATE, db_struct);
+            val_to_status = read_db_min(LEVELDB_KEY_TORRENT_DLSTATUS, db_struct);
+            val_to_comment = read_db_min(LEVELDB_KEY_TORRENT_TORRNT_COMMENT, db_struct);
+            val_to_creator = read_db_min(LEVELDB_KEY_TORRENT_TORRNT_CREATOR, db_struct);
+            val_to_magnet_uri = read_db_min(LEVELDB_KEY_TORRENT_MAGNET_URI, db_struct);
+            val_to_name = read_db_min(LEVELDB_KEY_TORRENT_TORRNT_NAME, db_struct);
+            val_to_num_files = read_db_min(LEVELDB_KEY_TORRENT_NUM_FILES, db_struct);
+            val_to_num_pieces = read_db_min(LEVELDB_KEY_TORRENT_TORRNT_PIECES, db_struct);
+            val_to_piece_length = read_db_min(LEVELDB_KEY_TORRENT_TORRNT_PIECE_LENGTH, db_struct);
 
-        pugi::xml_node items = doc.child(XML_PARENT_NODE);
-        for (const auto &file: items.children(XML_CHILD_NODE_TORRENT)) {
-            for (const auto &item: file.children(XML_CHILD_ITEM_TORRENT)) {
-                GekkoFyre::GkTorrent::TorrentInfo i;
-                i.cId = item.attribute(XML_ITEM_ATTR_TORRENT_CID).as_uint();
-                i.down_dest = item.attribute(XML_ITEM_ATTR_TORRENT_FLOC).as_string();
-                i.insert_timestamp = item.attribute(XML_ITEM_ATTR_TORRENT_INSERT_DATE).as_llong();
-                i.complt_timestamp = item.attribute(XML_ITEM_ATTR_TORRENT_COMPLT_DATE).as_llong();
-                i.creatn_timestamp = item.attribute(XML_ITEM_ATTR_TORRENT_CREATN_DATE).as_llong();
-                i.dlStatus = convDlStat_IntToEnum(item.attribute(XML_ITEM_ATTR_TORRENT_DLSTATUS).as_int());
-                i.comment = item.attribute(XML_ITEM_ATTR_TORRENT_TORRNT_COMMENT).as_string();
-                i.creator = item.attribute(XML_ITEM_ATTR_TORRENT_TORRNT_CREATOR).as_string();
-                i.magnet_uri = item.attribute(XML_ITEM_ATTR_TORRENT_MAGNET_URI).as_string();
-                i.torrent_name = item.attribute(XML_ITEM_ATTR_TORRENT_TORRNT_NAME).as_string();
-                i.num_files = item.attribute(XML_ITEM_ATTR_TORRENT_NUM_FILES).as_int();
-                i.num_pieces = item.attribute(XML_ITEM_ATTR_TORRENT_TORRNT_PIECES).as_int();
-                i.piece_length = item.attribute(XML_ITEM_ATTR_TORRENT_TORRNT_PIECE_LENGTH).as_int();
-                i.unique_id = item.attribute(XML_ITEM_ATTR_TORRENT_UNIQUE_ID).as_string();
+            QMap<std::string, std::string> map_output;
+            map_output = process_db({val_to_down_dest, val_to_insert_timestamp, val_to_complt_timestamp, val_to_creatn_timestamp,
+                                     val_to_status, val_to_comment, val_to_creator, val_to_magnet_uri, val_to_name, val_to_num_files,
+                                     val_to_num_pieces, val_to_piece_length});
 
-                if (!minimal_readout) {
-                    std::vector<GekkoFyre::GkTorrent::TorrentFile> files_vec;
-                    std::string tmp_str = "";
-                    int tmp_int = 0;
+            std::vector<GekkoFyre::GkTorrent::GeneralInfo> fin_output;
+            fin_output = process_db_map(map_output, {LEVELDB_KEY_TORRENT_FLOC, LEVELDB_KEY_TORRENT_INSERT_DATE, LEVELDB_KEY_TORRENT_COMPLT_DATE,
+                                        LEVELDB_KEY_TORRENT_CREATN_DATE, LEVELDB_KEY_TORRENT_DLSTATUS, LEVELDB_KEY_TORRENT_TORRNT_COMMENT,
+                                        LEVELDB_KEY_TORRENT_TORRNT_CREATOR, LEVELDB_KEY_TORRENT_MAGNET_URI, LEVELDB_KEY_TORRENT_TORRNT_NAME,
+                                        LEVELDB_KEY_TORRENT_NUM_FILES, LEVELDB_KEY_TORRENT_TORRNT_PIECES, LEVELDB_KEY_TORRENT_TORRNT_PIECE_LENGTH});
 
-                    /**
-                     * #########
-                     * # Nodes #
-                     * #########
-                     */
-                    // http://pugixml.org/docs/manual.html#access.nodedata
-                    std::vector<std::pair<std::string, int>> nodes;
-                    pugi::xml_node nodes_node = item.child(XML_CHILD_NODE_TORRENT_NODES);
-                    for (pugi::xml_node node_node = nodes_node.child(XML_CHILD_NODES_NAMES_TORRENT); node_node;
-                         node_node = node_node.next_sibling(XML_CHILD_NODES_NAMES_TORRENT)) {
-                        pugi::xml_node number_node = node_node.child(XML_CHILD_NODES_NUMBR_TORRENT);
+            std::string read_extraneous_xml;
+            s = db_struct.db->Get(leveldb::ReadOptions(), LEVELDB_KEY_TORRENT_EXTRANEOUS, &read_extraneous_xml);
 
-                        tmp_str = node_node.child_value();
-                        tmp_int = atoi(number_node.child_value());
-                        nodes.push_back(std::make_pair(tmp_str, tmp_int));
+            pugi::xml_node root;
+            std::unique_ptr<pugi::xml_document> doc = std::make_unique<pugi::xml_document>();
+            if (!read_extraneous_xml.empty() && read_extraneous_xml.size() > CFG_XML_MIN_PARSE_SIZE) {
+                pugi::xml_parse_result result = doc->load_string(read_extraneous_xml.c_str());
+                if (!result) {
+                    throw std::invalid_argument(tr("There has been an error reading information from the BitTorrent area of the database.\n\nParse error: %1, character pos = %2")
+                                                        .arg(result.description()).arg(result.offset).toStdString());
+                }
+
+                pugi::xml_node nodeParent = doc->child(LEVELDB_XML_CHILD_NODE);
+
+                //
+                // Files
+                //
+                QMap<std::string, GekkoFyre::GkTorrent::TorrentFile> files_map;
+                pugi::xml_node node_val_files = nodeParent.child(LEVELDB_CHILD_NODE_TORRENT_FILES);
+                std::string file_unique_id = nodeParent.child_value();
+                for (const auto &i: node_val_files.children(LEVELDB_CHILD_FILES_PATH_TORRENT)) {
+                    GekkoFyre::GkTorrent::TorrentFile tf;
+                    tf.file_path = i.child_value();
+                    tf.sha1_hash_hex = i.child_value(LEVELDB_CHILD_FILES_HASH_TORRENT);
+                    tf.mtime = strtoul(i.child_value(LEVELDB_CHILD_FILES_MTIME_TORRENT), nullptr, 10);
+                    tf.file_offset = atol(i.child_value(LEVELDB_CHILD_FILES_FILEOFFST_TORRENT));
+                    tf.content_length = atol(i.child_value(LEVELDB_CHILD_FILES_CONTLNGTH_TORRENT));
+                    tf.flags = atoi(i.child_value(LEVELDB_CHILD_FILES_FLAGS_TORRENT));
+                    tf.downloaded = atoi(i.child_value(LEVELDB_CHILD_FILES_DOWNBOOL_TORRENT));
+
+                    pugi::xml_node file_map_child_node = i.child(LEVELDB_CHILD_NODE_TORRENT_FILES_MAPFLEPCE);
+                    int map_int_one, map_int_two = { 0 };
+                    map_int_one = atoi(file_map_child_node.child_value(LEVELDB_CHILD_FILES_MAPFLEPCE_1_TORRENT));
+                    map_int_two = atoi(file_map_child_node.child_value(LEVELDB_CHILD_FILES_MAPFLEPCE_2_TORRENT));
+                    tf.map_file_piece.first = map_int_one;
+                    tf.map_file_piece.second = map_int_two;
+
+                    files_map.insert(file_unique_id, tf);
+                }
+
+                //
+                // Trackers
+                //
+                QMultiMap<std::string, GekkoFyre::GkTorrent::TorrentTrackers> trackers_map;
+                pugi::xml_node node_val_trackers = nodeParent.child(LEVELDB_CHILD_NODE_TORRENT_TRACKERS);
+                for (const auto &i: node_val_trackers.children(LEVELDB_CHILD_TRACKERS_TIER_TORRENT)) {
+                    pugi::xml_node url_node = i.child(LEVELDB_CHILD_TRACKERS_URL_TORRENT);
+                    pugi::xml_node avail_node = i.child(LEVELDB_CHILD_TRACKERS_AVAILABLE_TORRENT);
+                    GekkoFyre::GkTorrent::TorrentTrackers tracker;
+                    tracker.tier = atoi(i.child_value());
+                    tracker.url = url_node.child_value();
+                    tracker.enabled = atoi(avail_node.child_value());
+                    trackers_map.insert(file_unique_id, tracker);
+                }
+
+                for (size_t i = 0; i < fin_output.size(); ++i) {
+                    GekkoFyre::GkTorrent::TorrentInfo to_info;
+                    if (files_map.keys().size() > 0) {
+                        for (const auto &j: files_map.values(fin_output.at(i).unique_id)) {
+                            // Expand the values within 'files_map'
+                            GekkoFyre::GkTorrent::TorrentFile to_file;
+                            to_file.unique_id = fin_output.at(i).unique_id;
+                            to_file.file_path = j.file_path;
+                            to_file.sha1_hash_hex = j.sha1_hash_hex;
+                            to_file.flags = j.flags;
+                            to_file.content_length = j.content_length;
+                            to_file.file_offset = j.file_offset;
+                            to_file.mtime = j.mtime;
+                            to_file.map_file_piece = std::make_pair(j.map_file_piece.first, j.map_file_piece.second);
+                            to_file.downloaded = j.downloaded;
+                            to_info.files_vec.push_back(to_file);
+                        }
+                    } else {
+                        QMessageBox::warning(nullptr, tr("Problem!"),
+                                             tr("There is a BitTorrent item present that has no files to download. Deleting item..."),
+                                             QMessageBox::Ok);
+                        // TODO: Insert code for this action!
                     }
 
-                    /**
-                     * #########
-                     * # Files #
-                     * #########
-                     */
-                    pugi::xml_node files_node = item.child(XML_CHILD_NODE_TORRENT_FILES);
-                    for (pugi::xml_node file_node = files_node.child(XML_CHILD_FILES_PATH_TORRENT); file_node;
-                         file_node = file_node.next_sibling(XML_CHILD_FILES_PATH_TORRENT)) {
-
-                        GekkoFyre::GkTorrent::TorrentFile tf;
-                        tf.file_path = file_node.child_value();
-                        tf.sha1_hash_hex = file_node.child_value(XML_CHILD_FILES_HASH_TORRENT);
-                        tf.mtime = strtoul(file_node.child_value(XML_CHILD_FILES_MTIME_TORRENT), nullptr, 10);
-                        tf.file_offset = atol(file_node.child_value(XML_CHILD_FILES_FILEOFFST_TORRENT));
-                        tf.content_length = atol(file_node.child_value(XML_CHILD_FILES_CONTLNGTH_TORRENT));
-                        tf.flags = atoi(file_node.child_value(XML_CHILD_FILES_FLAGS_TORRENT));
-                        tf.downloaded = atoi(file_node.child_value(XML_CHILD_FILES_DOWNBOOL_TORRENT));
-
-                        pugi::xml_node file_map_child_node = file_node.child(XML_CHILD_NODE_TORRENT_FILES_MAPFLEPCE);
-                        int map_int_one, map_int_two = { 0 };
-                        map_int_one = atoi(file_map_child_node.child_value(XML_CHILD_FILES_MAPFLEPCE_1_TORRENT));
-                        map_int_two = atoi(file_map_child_node.child_value(XML_CHILD_FILES_MAPFLEPCE_2_TORRENT));
-                        tf.map_file_piece.first = map_int_one;
-                        tf.map_file_piece.second = map_int_two;
-
-                        files_vec.push_back(tf);
+                    if (trackers_map.keys().size() > 0) {
+                        for (const auto &j: trackers_map.values(fin_output.at(i).unique_id)) {
+                            // Expand the values within 'trackers_map'
+                            GekkoFyre::GkTorrent::TorrentTrackers to_tracker;
+                            to_tracker.unique_id = fin_output.at(i).unique_id;
+                            to_tracker.tier = j.tier;
+                            to_tracker.url = j.url;
+                            to_tracker.enabled = j.enabled;
+                            to_info.trackers.push_back(to_tracker);
+                        }
+                    } else {
+                        QMessageBox::warning(nullptr, tr("Problem!"),
+                                             tr("There is a BitTorrent item present that has no trackers. Deleting item..."),
+                                             QMessageBox::Ok);
+                        // TODO: Insert code for this action!
                     }
 
-                    /**
-                     * ############
-                     * # Trackers #
-                     * ############
-                     */
-                    std::vector<GekkoFyre::GkTorrent::TorrentTrackers> trackers;
-                    pugi::xml_node trackers_node = item.child(XML_CHILD_NODE_TORRENT_TRACKERS);
-                    for (pugi::xml_node tracker_node = trackers_node.child(XML_CHILD_TRACKERS_TIER_TORRENT); tracker_node;
-                         tracker_node = tracker_node.next_sibling(XML_CHILD_TRACKERS_TIER_TORRENT)) {
-                        pugi::xml_node url_node = tracker_node.child(XML_CHILD_TRACKERS_URL_TORRENT);
-                        pugi::xml_node avail_node = tracker_node.child(XML_CHILD_TRACKERS_AVAILABLE_TORRENT);
-                        GekkoFyre::GkTorrent::TorrentTrackers tracker;
-                        tracker.tier = atoi(tracker_node.child_value());
-                        tracker.url = url_node.child_value();
-                        tracker.enabled = atoi(avail_node.child_value());
-                        trackers.push_back(tracker);
-                    }
-
-                    i.nodes = nodes;
-                    i.files_vec = files_vec;
-                    i.trackers = trackers;
-                    gk_torrent_info_list.push_back(i);
-                } else {
-                    gk_torrent_info_list.push_back(i);
+                    to_info.general = fin_output.at(i);
+                    to_info_vec.push_back(to_info);
                 }
             }
+        } else {
+            // There is a problem with the database!
+            throw std::runtime_error(tr("There is an issue with the database! Error: %1").arg(QString::fromStdString(s.ToString())).toStdString());
         }
-
-        return gk_torrent_info_list;
+    } catch (const std::exception &e) {
+        QMessageBox::warning(nullptr, tr("Error!"), e.what(), QMessageBox::Ok);
+        return std::vector<GekkoFyre::GkTorrent::TorrentInfo>();
     }
 
-    return std::vector<GekkoFyre::GkTorrent::TorrentInfo>();
+    return to_info_vec;
 }
 
 bool GekkoFyre::CmnRoutines::delTorrentItem(const std::string &unique_id, const std::string &xmlCfgFile)
@@ -1277,7 +1806,7 @@ bool GekkoFyre::CmnRoutines::delTorrentItem(const std::string &unique_id, const 
     sys::error_code ec;
     if (fs::exists(xmlCfgFile_loc, ec) && fs::is_regular_file(xmlCfgFile_loc)) {
         std::vector<GekkoFyre::GkTorrent::TorrentInfo> gk_torrent_info;
-        gk_torrent_info = readTorrentInfo(false, xmlCfgFile);
+        gk_torrent_info = readTorrentInfo(false);
 
         pugi::xml_document doc;
 
@@ -1310,39 +1839,6 @@ bool GekkoFyre::CmnRoutines::delTorrentItem(const std::string &unique_id, const 
         throw std::invalid_argument(tr("XML config file does not exist! Location attempt: "
                                                "%1").arg(xmlCfgFile_loc.string().c_str()).toStdString());
     }
-}
-
-bool GekkoFyre::CmnRoutines::modifyTorrentItem(const GekkoFyre::GkTorrent::ModifyTorrentInfo &gk_mt,
-                                               const std::string &xmlCfgFile)
-{
-    fs::path xmlCfgFile_loc = findCfgFile(xmlCfgFile);
-    sys::error_code ec;
-    if (fs::exists(xmlCfgFile_loc, ec) && fs::is_regular_file(xmlCfgFile_loc)) {
-        pugi::xml_document doc;
-
-        // Load XML into memory
-        // Remark: to fully read declaration entries you have to specify, "pugi::parse_declaration"
-        pugi::xml_parse_result result = doc.load_file(xmlCfgFile_loc.string().c_str(),
-                                                      pugi::parse_default | pugi::parse_declaration);
-        if (!result) {
-            throw std::invalid_argument(tr("XML parse error: %1, character pos= %2")
-                                                .arg(result.description(),
-                                                     QString::number(result.offset)).toStdString());
-        }
-
-        /*
-        pugi::xml_node items = doc.child(XML_PARENT_NODE);
-        for (const auto& file: items.children(XML_CHILD_NODE_TORRENT)) {
-            for (const auto &item: file.children(XML_CHILD_ITEM_TORRENT)) {
-                if (file.find_child_by_attribute(XML_ITEM_ATTR_TORRENT_UNIQUE_ID, gk_mt.unique_id.c_str())) {
-
-                }
-            }
-        }
-         */
-    }
-
-    return false;
 }
 
 int GekkoFyre::CmnRoutines::convDlStat_toInt(const GekkoFyre::DownloadStatus &status)
@@ -1705,39 +2201,6 @@ short GekkoFyre::CmnRoutines::writeXmlSettings(const GekkoFyre::GkSettings::Fyre
     }
 
     return -1;
-}
-
-/**
- * @brief GekkoFyre::CmnRoutines::readXmlSettings reads an already pre-existing, XML configuration file for FyreDL.
- * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
- * @date 2016-12-06
- * @param xmlCfgFile The XML configuration file in question.
- * @return The data read from the XML configuration file.
- */
-GekkoFyre::GkSettings::FyreDL GekkoFyre::CmnRoutines::readXmlSettings(const std::string &xmlCfgFile)
-{
-    fs::path xmlCfgFile_loc = findCfgFile(xmlCfgFile);
-    sys::error_code ec;
-    GekkoFyre::GkSettings::FyreDL settings;
-    settings.main_win_x = 0;
-    settings.main_win_y = 0;
-    if (fs::exists(xmlCfgFile_loc, ec) && fs::is_regular_file(xmlCfgFile_loc)) {
-        pugi::xml_document doc;
-        pugi::xml_parse_result result = doc.load_file(xmlCfgFile_loc.string().c_str(), pugi::parse_default|pugi::parse_declaration);
-        if (!result) {
-            throw std::invalid_argument(tr("XML parse error: %1, character pos= %2")
-                                                .arg(result.description(),
-                                                     QString::number(result.offset)).toStdString());
-        }
-
-        pugi::xml_node items = doc.child(XML_PARENT_NODE);
-        const auto xml_settings_node = items.child(XML_CHILD_NODE_SETTINGS);
-        const auto xml_user_item = xml_settings_node.child(XML_CHILD_ITEM_SETTINGS);
-        settings.main_win_x = xml_user_item.attribute(XML_ITEM_ATTR_SETTINGS_WIN_X).as_int();
-        settings.main_win_y = xml_user_item.attribute(XML_ITEM_ATTR_SETTINGS_WIN_Y).as_int();
-    }
-
-    return settings;
 }
 
 /**

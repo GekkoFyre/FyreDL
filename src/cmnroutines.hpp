@@ -56,6 +56,8 @@
 #include <QStorageInfo>
 #include <QCryptographicHash>
 #include <QLayout>
+#include <QMultiMap>
+#include <initializer_list>
 
 extern "C" {
 #include <sys/stat.h>
@@ -108,6 +110,15 @@ public:
                                                       const int &item_limit = 500000,
                                                       const int &depth_limit = 1000);
 
+    GekkoFyre::GkFile::FileDb openDatabase(const std::string &dbFile);
+    bool batch_write_single_db(const std::string &key, const std::string &value, const std::string &unique_id,
+                               const GekkoFyre::GkFile::FileDb &file_db_struct);
+    GekkoFyre::GkFile::FileDbVal read_database(const std::string &key,
+                                               const std::string &unique_id,
+                                               const std::string &dbFileName = CFG_HISTORY_DB_FILE);
+    std::vector<GekkoFyre::GkFile::FileDbVal> read_db_vec(const std::string &key, const GekkoFyre::GkFile::FileDb &file_db_struct);
+    std::pair<std::string, std::string> read_db_min(const std::string &key, const GekkoFyre::GkFile::FileDb &file_db_struct);
+
     void clearLayout(QLayout *layout);
 
     std::vector<GekkoFyre::GkCurl::CurlDlInfo> readDownloadInfo(const std::string &xmlCfgFile = CFG_HISTORY_FILE, const bool &hashesOnly = false);
@@ -121,22 +132,24 @@ public:
                        const long long &complt_timestamp = 0,
                        const std::string &xmlCfgFile = CFG_HISTORY_FILE);
 
-    bool writeTorrentItem(GekkoFyre::GkTorrent::TorrentInfo &gk_ti, const std::string &xmlCfgFile = CFG_HISTORY_FILE);
-    static std::vector<GekkoFyre::GkTorrent::TorrentInfo> readTorrentInfo(const bool &minimal_readout = false,
-                                                                          const std::string &xmlCfgFile = CFG_HISTORY_FILE);
+    bool writeTorrentItem(GekkoFyre::GkTorrent::TorrentInfo &gk_ti);
+    bool writeTorrent_extra_data(const GekkoFyre::GkTorrent::TorrentInfo &gk_ti, const GekkoFyre::GkFile::FileDb &ext_db_struct);
+    std::vector<GekkoFyre::GkTorrent::TorrentInfo> readTorrentInfo(const bool &minimal_readout = false);
     bool delTorrentItem(const std::string &unique_id, const std::string &xmlCfgFile = CFG_HISTORY_FILE);
-    bool modifyTorrentItem(const GekkoFyre::GkTorrent::ModifyTorrentInfo &gk_mt,
-                           const std::string &xmlCfgFile = CFG_HISTORY_FILE);
 
     short writeXmlSettings(const GekkoFyre::GkSettings::FyreDL &settings,
                            const std::string &xmlCfgFile = CFG_SETTINGS_FILE);
-    GekkoFyre::GkSettings::FyreDL readXmlSettings(const std::string &xmlCfgFile = CFG_SETTINGS_FILE);
     bool modifyXmlSettings(const GekkoFyre::GkSettings::FyreDL &settings,
                            const std::string &xmlCfgFile = CFG_SETTINGS_FILE);
 
 private:
     int load_file(const std::string &filename, std::vector<char> &v,
                   libtorrent::error_code &ec, int limit = 8000000);
+
+    QMap<std::string, std::string> process_db(std::initializer_list<std::tuple<std::string, std::string>> args);
+    std::vector<GekkoFyre::GkTorrent::GeneralInfo> process_db_map(const QMap<std::string, std::string> &map,
+                                                                  std::initializer_list<std::string> args);
+    std::vector<std::pair<std::string, std::string>> process_db_xml(const std::string &xml_input);
 
     QMutex mutex;
 };

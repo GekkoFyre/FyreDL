@@ -122,17 +122,17 @@ GekkoFyre::GkTorrentClient::~GkTorrentClient()
  */
 void GekkoFyre::GkTorrentClient::startTorrentDl(const GekkoFyre::GkTorrent::TorrentInfo &item)
 {
-    QString torrent_error_name = QString::fromStdString(item.torrent_name);
+    QString torrent_error_name = QString::fromStdString(item.general.torrent_name);
 
     try {
-        std::string full_path = item.down_dest + fs::path::preferred_separator + item.torrent_name;
+        std::string full_path = item.general.down_dest + fs::path::preferred_separator + item.general.torrent_name;
         lt::add_torrent_params atp; // http://libtorrent.org/reference-Core.html#add-torrent-params
 
         // Load resume data from disk and pass it in as we add the magnet link
         std::ifstream ifs(FYREDL_TORRENT_RESUME_FILE_EXT, std::ios::binary);
         ifs.unsetf(std::ios::skipws);
         atp.resume_data.assign(std::istream_iterator<char>(ifs), std::istream_iterator<char>());
-        atp.url = item.magnet_uri;
+        atp.url = item.general.magnet_uri;
         atp.save_path = full_path;
         lt_ses->async_add_torrent(atp);
 

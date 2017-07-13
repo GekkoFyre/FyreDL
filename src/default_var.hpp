@@ -43,6 +43,7 @@
 #ifndef GK_DEFVAR_HPP
 #define GK_DEFVAR_HPP
 
+#include <leveldb/db.h>
 #include <boost/cstdint.hpp>
 #include <boost/optional.hpp>
 #include <libtorrent/session.hpp>
@@ -54,6 +55,8 @@
 #include <vector>
 #include <ctime>
 #include <cassert>
+#include <cstdlib>
+#include <tuple>
 #include <QString>
 #include <QtCharts>
 #include <QLineSeries>
@@ -82,7 +85,11 @@ extern "C" {
 #define FYREDL_FINGERPRINT "FyreDL"                      // Fingerprint for the client. Has to be no longer than 20-bytes or will be truncated otherwise.
 #define FYREDL_TORRENT_RESUME_FILE_EXT ".fyredl"         // The file extension used for 'resume data' by the BitTorrent side of the FyreDL application
 #define CFG_HISTORY_FILE "fyredl_history.xml"            // The history file-name used by FyreDL. Location is also set within the application's GUI.
+#define CFG_HISTORY_DB_FILE "history.db"
+#define CFG_FILES_DIR_LINUX ".fyredl"                    // The name of the settings directory under Linux systems. This can be found in the users home directory.
+#define CFG_FILES_DIR_WNDWS "FyreDL"                     // The name of the settings directory under Microsoft Windows. This can be found in the users home directory.
 #define CFG_SETTINGS_FILE "fyredl_settings.xml"          // The configuration file-name used by FyreDL. Location is also set within the application's GUI.
+#define CFG_XML_MIN_PARSE_SIZE 12
 #define ENBL_GUI_CHARTS false                            // Whether to enable charts/graphs within the GUI, to chart the progress of downloads.
 #define ENBL_GUI_CONTENTS_VIEW true                      // Whether to enable the contents view of inside BitTorrents (located at the bottom) within the GUI.
 #define FYREDL_LIBCURL_VERBOSE 1L                        // Set to '1L' if you want libcurl to tell you what it's up to!
@@ -108,6 +115,47 @@ extern "C" {
 #define WRITE_BUFFER_SIZE (CURL_MAX_WRITE_SIZE * 8) // Measured in bytes, see <https://curl.haxx.se/libcurl/c/CURLOPT_BUFFERSIZE.html>
 #define CURL_MAX_WAIT_MSECS (15 * 1000) // Measured in milliseconds
 #define FREE_DSK_SPACE_MULTIPLIER 3
+
+// LevelDB configuration
+#define LEVELDB_CFG_CACHE_SIZE 8UL * 1024UL * 1024UL
+
+#define LEVELDB_PARENT_NODE "fyredl-db"
+#define LEVELDB_CHILD_NODE_VERS "fyredl-xml"
+#define LEVELDB_CHILD_ITEM_VERS "version"
+#define LEVELDB_ITEM_ATTR_VERS_NO "supported"                 // The supported XML file version for this particular FyreDL build
+#define LEVELDB_XML_CHILD_NODE "item"
+#define LEVELDB_XML_CHILD_ITEM "dl-type"
+#define LEVELDB_XML_ATTR_ITEM_VALUE "value"
+#define LEVELDB_ITEM_ATTR_UNIQUE_ID "unique-id"
+
+#define LEVELDB_KEY_TORRENT_FLOC "to-dest"
+#define LEVELDB_KEY_TORRENT_INSERT_DATE "to-insert-date"
+#define LEVELDB_KEY_TORRENT_COMPLT_DATE "to-complt-date"
+#define LEVELDB_KEY_TORRENT_CREATN_DATE "to-creatn-date"
+#define LEVELDB_KEY_TORRENT_DLSTATUS "to-status"
+#define LEVELDB_KEY_TORRENT_TORRNT_COMMENT "to-comment"
+#define LEVELDB_KEY_TORRENT_TORRNT_CREATOR "to-creator"
+#define LEVELDB_KEY_TORRENT_MAGNET_URI "to-magnet-uri"
+#define LEVELDB_KEY_TORRENT_TORRNT_NAME "to-name"
+#define LEVELDB_KEY_TORRENT_NUM_FILES "num-files"
+#define LEVELDB_KEY_TORRENT_TORRNT_PIECES "num-pieces"
+#define LEVELDB_KEY_TORRENT_TORRNT_PIECE_LENGTH "piece-length"
+#define LEVELDB_CHILD_NODE_TORRENT_FILES "to-files"
+#define LEVELDB_CHILD_FILES_PATH_TORRENT "path"
+#define LEVELDB_CHILD_FILES_HASH_TORRENT "hash"
+#define LEVELDB_CHILD_FILES_CONTLNGTH_TORRENT "size"
+#define LEVELDB_CHILD_FILES_MTIME_TORRENT "mtime"
+#define LEVELDB_CHILD_NODE_TORRENT_FILES_MAPFLEPCE "map-file-piece"
+#define LEVELDB_CHILD_NODE_TORRENT_TRACKERS "to-trackers"
+#define LEVELDB_CHILD_TRACKERS_URL_TORRENT "url"
+#define LEVELDB_CHILD_TRACKERS_AVAILABLE_TORRENT "enabled"
+#define LEVELDB_CHILD_FILES_FLAGS_TORRENT "flags"
+#define LEVELDB_CHILD_FILES_FILEOFFST_TORRENT "offset"
+#define LEVELDB_CHILD_FILES_MAPFLEPCE_1_TORRENT "first"
+#define LEVELDB_CHILD_FILES_MAPFLEPCE_2_TORRENT "second"
+#define LEVELDB_CHILD_FILES_DOWNBOOL_TORRENT "dled"
+#define LEVELDB_CHILD_TRACKERS_TIER_TORRENT "tier"
+#define LEVELDB_KEY_TORRENT_EXTRANEOUS "extraneous-info"
 
 // XML configuration
 #define XML_PARENT_NODE "fyredl-db"
@@ -135,38 +183,7 @@ extern "C" {
 
 #define XML_CHILD_NODE_TORRENT "torrent"
 #define XML_CHILD_ITEM_TORRENT "item"
-#define XML_CHILD_NODE_TORRENT_NODES "nodes"
-#define XML_CHILD_NODE_TORRENT_FILES "files"
-#define XML_CHILD_NODE_TORRENT_FILES_MAPFLEPCE "map-file-piece"
-#define XML_CHILD_NODE_TORRENT_TRACKERS "trackers"
-#define XML_CHILD_NODES_NAMES_TORRENT "name"
-#define XML_CHILD_NODES_NUMBR_TORRENT "number"
-#define XML_CHILD_FILES_PATH_TORRENT "path"
-#define XML_CHILD_FILES_HASH_TORRENT "hash"
-#define XML_CHILD_FILES_FLAGS_TORRENT "flags"
-#define XML_CHILD_FILES_MTIME_TORRENT "mtime"
-#define XML_CHILD_FILES_MAPFLEPCE_1_TORRENT "first"
-#define XML_CHILD_FILES_MAPFLEPCE_2_TORRENT "second"
-#define XML_CHILD_FILES_CONTLNGTH_TORRENT "size"
-#define XML_CHILD_FILES_FILEOFFST_TORRENT "offset"
-#define XML_CHILD_FILES_DOWNBOOL_TORRENT "dled"
-#define XML_CHILD_TRACKERS_URL_TORRENT "url"
-#define XML_CHILD_TRACKERS_AVAILABLE_TORRENT "enabled"
-#define XML_CHILD_TRACKERS_TIER_TORRENT "tier"
-#define XML_ITEM_ATTR_TORRENT_CID "cid"
-#define XML_ITEM_ATTR_TORRENT_FLOC "destination"
 #define XML_ITEM_ATTR_TORRENT_UNIQUE_ID "unique-id"
-#define XML_ITEM_ATTR_TORRENT_INSERT_DATE "insert-date"
-#define XML_ITEM_ATTR_TORRENT_COMPLT_DATE "complt-date"
-#define XML_ITEM_ATTR_TORRENT_CREATN_DATE "creatn-date"
-#define XML_ITEM_ATTR_TORRENT_DLSTATUS "dl-status"
-#define XML_ITEM_ATTR_TORRENT_TORRNT_COMMENT "torrnt-comment"
-#define XML_ITEM_ATTR_TORRENT_TORRNT_CREATOR "torrnt-creator"
-#define XML_ITEM_ATTR_TORRENT_MAGNET_URI "magnet-uri"
-#define XML_ITEM_ATTR_TORRENT_TORRNT_NAME "torrnt-name"
-#define XML_ITEM_ATTR_TORRENT_NUM_FILES "num-files"
-#define XML_ITEM_ATTR_TORRENT_TORRNT_PIECES "torrnt-pieces"
-#define XML_ITEM_ATTR_TORRENT_TORRNT_PIECE_LENGTH "torrnt-piece-length"
 
 #define XML_CHILD_NODE_SETTINGS "settings"
 #define XML_CHILD_ITEM_SETTINGS "user"
@@ -263,11 +280,35 @@ namespace GekkoFyre {
         NotApplicable
     };
 
+    template<typename T>
+    T tuple_read(std::istream& is) {
+        T t;
+        is >> t;
+        return t;
+    }
+
+    template <typename... Args>
+    std::tuple<Args...> tuple_parse(std::istream& is) {
+        return std::make_tuple(tuple_read<Args>(is)...);
+    }
+
     namespace GkFile {
         struct FileHash {
             GekkoFyre::HashType hash_type;
             GekkoFyre::HashVerif hash_verif;
             QString checksum;
+        };
+
+        struct FileDb {
+            std::unique_ptr<leveldb::DB> db;
+            leveldb::Options options;
+        };
+
+        struct FileDbVal {
+            std::string key;
+            std::string value;
+            std::string unique_id;
+            DownloadType dl_type;
         };
     }
 
@@ -281,6 +322,7 @@ namespace GekkoFyre {
         };
 
         struct TorrentResumeInfo {
+            std::string unique_id;           // A unique identifier for this torrent
             std::string save_path;
             QString dl_state;
             boost::int64_t total_uploaded;   // These are saved in and restored from resume data to maintain totals across sessions.
@@ -292,6 +334,7 @@ namespace GekkoFyre {
         };
 
         struct TorrentFile {
+            std::string unique_id;              // A unique identifier for this torrent
             std::string file_path;              // The internal path of the file within the torrent
             std::string sha1_hash_hex;          // The SHA-1 hash of the file, if available, in hexadecimal
             int flags;
@@ -303,12 +346,14 @@ namespace GekkoFyre {
         };
 
         struct TorrentTrackers {
+            std::string unique_id;                  // A unique identifier for this torrent
             int tier;                               // The tier number of the tracker in question
             std::string url;                        // The <URL:port> of the tracker in question
             bool enabled;                           // Whether this tracker is active for transfers or not
         };
 
-        struct TorrentInfo {
+        struct GeneralInfo {
+            std::string unique_id;                  // A unique identifier for this torrent
             std::string down_dest;                  // The location of where the download is being streamed towards
             unsigned int cId;                       // Automatically incremented Content ID for each download/file
             long long insert_timestamp;             // The date/time of the download/file having been inserted into the history file
@@ -322,21 +367,13 @@ namespace GekkoFyre {
             int num_files;                          // How many files are contained within this torrent
             int num_pieces;                         // How many pieces are contained within this torrent
             int piece_length;                       // The length of each piece
-            std::string unique_id;                  // A unique identifier for this torrent
+        };
+
+        struct TorrentInfo {
+            GeneralInfo general;
             boost::optional<GekkoFyre::GkTorrent::TorrentResumeInfo> to_resume_info;
             std::vector<std::pair<std::string, int>> nodes;
             std::vector<TorrentTrackers> trackers;
-            std::vector<TorrentFile> files_vec;
-        };
-
-        struct ModifyTorrentInfo {
-            std::string down_dest;                  // The location of where the download is being streamed towards
-            std::string magnet_uri;                 // The 'BitTorrent Magnet Link' URI
-            long long complt_timestamp;             // The date/time of the download/file having completed transfer
-            std::string unique_id;                  // A unique identifier for this torrent
-            GekkoFyre::DownloadStatus dlStatus;     // Status of the downloading file(s) in question
-            std::string comment;                    // Any comments left by the author of the torrent file in question
-            std::vector<std::pair<int, std::string>> trackers;
             std::vector<TorrentFile> files_vec;
         };
     }
@@ -476,6 +513,8 @@ namespace GekkoFyre {
             boost::optional<GkTorrent::TorrentInfo> to_info; // Information relating to BitTorrent downloads
             boost::optional<GkCurl::CurlDlInfo> curl_info;   // Information relating to HTTP(S) or FTP(S) downloads
         };
+
+
     }
 }
 

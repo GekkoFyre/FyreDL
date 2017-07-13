@@ -358,8 +358,11 @@ void downloadDelegate::paint(QPainter *painter, const QStyleOptionViewItem &opti
         viewItemOption.font = QFont(option.font, painter->device());
         viewItemOption.palette = option.palette;
 
-        painter->drawText(viewItemOption.rect, index.data().toString());
+        QTextOption textOption;
+        textOption.setAlignment(Qt::AlignLeft);
+        textOption.setWrapMode(QTextOption::WrapMode::NoWrap);
 
+        painter->drawText(viewItemOption.rect, index.data().toString(), textOption);
         QApplication::style()->drawControl(QStyle::CE_ItemViewItem, &viewItemOption, painter);
         return;
     }
