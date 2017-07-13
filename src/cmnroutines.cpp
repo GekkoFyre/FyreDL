@@ -613,13 +613,13 @@ std::vector<GekkoFyre::GkTorrent::GeneralInfo> GekkoFyre::CmnRoutines::process_d
                                                                                       std::initializer_list<std::string> args)
 {
     QMultiMap<std::pair<std::string, std::string>, std::string> mmap_store;
-    QList<std::string> found_unique_keys;
+    QList<std::string> found_unique_id;
     for (const auto &arg_key: args) {
         // Expand the arguments
         std::string val = map.value(arg_key);
         if (!val.empty()) {
             std::vector<GekkoFyre::GkFile::FileDbVal> xml_data = process_db_xml(val);
-            if (xml_data.size() > 1) {
+            if (xml_data.size() > 0) {
                 for (const auto &j: xml_data) {
                     std::string tmp_val, tmp_unique_id;
                     if (!j.value.empty()) {
@@ -642,16 +642,17 @@ std::vector<GekkoFyre::GkTorrent::GeneralInfo> GekkoFyre::CmnRoutines::process_d
 
                             QMessageBox::warning(nullptr, tr("Error!"), tr("We have encountered some corrupt data! If this problem persists, please delete:\n\n\"%1\"")
                                     .arg(QString::fromStdString(oss.str())), QMessageBox::Ok);
+                            continue;
                         }
                     }
 
                     // Each key identified by something such as, 'LEVELDB_KEY_TORRENT_INSERT_DATE', will store MANY values
                     // whilst the Unique ID will be unique per 'GekkoFyre::GkTorrent::TorrentInfo' object.
-                    mmap_store.insertMulti(std::make_pair(arg_key, tmp_unique_id), tmp_val);
+                    mmap_store.insert(std::make_pair(arg_key, tmp_unique_id), tmp_val);
 
                     // This is for speeding up searches later on in the function
-                    if (!found_unique_keys.contains(tmp_unique_id)) {
-                        found_unique_keys.push_back(tmp_unique_id);
+                    if (!found_unique_id.contains(tmp_unique_id)) {
+                        found_unique_id.push_back(tmp_unique_id);
                     }
                 }
             } else {
@@ -668,39 +669,46 @@ std::vector<GekkoFyre::GkTorrent::GeneralInfo> GekkoFyre::CmnRoutines::process_d
     std::vector<GekkoFyre::GkTorrent::GeneralInfo> vec_output;
     for (const auto &i: mmap_store.keys()) {
         // Expand out the list of keys stored within the QMultiMap
-        for (const auto &j: found_unique_keys) {
+        for (const auto &j: found_unique_id) {
             if (i.second == j) {
-                GekkoFyre::GkTorrent::GeneralInfo tor_info;
-                if (i.first == LEVELDB_KEY_TORRENT_FLOC) {
-                    tor_info.down_dest = mmap_store.value(i);
-                } else if (i.first == LEVELDB_KEY_TORRENT_INSERT_DATE) {
-                    tor_info.insert_timestamp = atoll(mmap_store.value(i).c_str());
-                } else if (i.first == LEVELDB_KEY_TORRENT_COMPLT_DATE) {
-                    tor_info.complt_timestamp = atoll(mmap_store.value(i).c_str());
-                } else if (i.first == LEVELDB_KEY_TORRENT_CREATN_DATE) {
-                    tor_info.creatn_timestamp = atol(mmap_store.value(i).c_str());
-                } else if (i.first == LEVELDB_KEY_TORRENT_DLSTATUS) {
-                    tor_info.dlStatus = convDlStat_StringToEnum(QString::fromStdString(mmap_store.value(i)));
-                } else if (i.first == LEVELDB_KEY_TORRENT_TORRNT_COMMENT) {
-                    tor_info.comment = mmap_store.value(i);
-                } else if (i.first == LEVELDB_KEY_TORRENT_TORRNT_CREATOR) {
-                    tor_info.creator = mmap_store.value(i);
-                } else if (i.first == LEVELDB_KEY_TORRENT_MAGNET_URI) {
-                    tor_info.magnet_uri = mmap_store.value(i);
-                } else if (i.first == LEVELDB_KEY_TORRENT_TORRNT_NAME) {
-                    tor_info.torrent_name = mmap_store.value(i);
-                } else if (i.first == LEVELDB_KEY_TORRENT_NUM_FILES) {
-                    tor_info.num_files = atoi(mmap_store.value(i).c_str());
-                } else if (i.first == LEVELDB_KEY_TORRENT_TORRNT_PIECES) {
-                    tor_info.num_pieces = atoi(mmap_store.value(i).c_str());
-                } else if (i.first == LEVELDB_KEY_TORRENT_TORRNT_PIECE_LENGTH) {
-                    tor_info.piece_length = atoi(mmap_store.value(i).c_str());
-                }
 
-                tor_info.unique_id = j;
-                vec_output.push_back(tor_info);
             }
         }
+    }
+
+    for (auto i = 0; i < found_unique_id.size(); ++i) {
+        GekkoFyre::GkTorrent::GeneralInfo tor_info;
+        for (const auto &j: args) {
+            std::pair<std::string, std::string> key_pair = std::make_pair(j, found_unique_id.at(i));
+            if (j == LEVELDB_KEY_TORRENT_FLOC) {
+                tor_info.down_dest = mmap_store.value(key_pair);
+            } else if (j == LEVELDB_KEY_TORRENT_INSERT_DATE) {
+                tor_info.insert_timestamp = atoll(mmap_store.value(key_pair).c_str());
+            } else if (j == LEVELDB_KEY_TORRENT_COMPLT_DATE) {
+                tor_info.complt_timestamp = atoll(mmap_store.value(key_pair).c_str());
+            } else if (j == LEVELDB_KEY_TORRENT_CREATN_DATE) {
+                tor_info.creatn_timestamp = atol(mmap_store.value(key_pair).c_str());
+            } else if (j == LEVELDB_KEY_TORRENT_DLSTATUS) {
+                tor_info.dlStatus = convDlStat_StringToEnum(QString::fromStdString(mmap_store.value(key_pair)));
+            } else if (j == LEVELDB_KEY_TORRENT_TORRNT_COMMENT) {
+                tor_info.comment = mmap_store.value(key_pair);
+            } else if (j == LEVELDB_KEY_TORRENT_TORRNT_CREATOR) {
+                tor_info.creator = mmap_store.value(key_pair);
+            } else if (j == LEVELDB_KEY_TORRENT_MAGNET_URI) {
+                tor_info.magnet_uri = mmap_store.value(key_pair);
+            } else if (j == LEVELDB_KEY_TORRENT_TORRNT_NAME) {
+                tor_info.torrent_name = mmap_store.value(key_pair);
+            } else if (j == LEVELDB_KEY_TORRENT_NUM_FILES) {
+                tor_info.num_files = atoi(mmap_store.value(key_pair).c_str());
+            } else if (j == LEVELDB_KEY_TORRENT_TORRNT_PIECES) {
+                tor_info.num_pieces = atoi(mmap_store.value(key_pair).c_str());
+            } else if (j == LEVELDB_KEY_TORRENT_TORRNT_PIECE_LENGTH) {
+                tor_info.piece_length = atoi(mmap_store.value(key_pair).c_str());
+            }
+        }
+
+        tor_info.unique_id = found_unique_id.at(i);
+        vec_output.push_back(tor_info);
     }
 
     if (vec_output.size() > 0) {
