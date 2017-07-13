@@ -187,17 +187,8 @@ void MainWindow::readFromHistoryFile()
 {
     std::vector<GekkoFyre::GkCurl::CurlDlInfo> dl_history;
     std::vector<GekkoFyre::GkTorrent::TorrentInfo> gk_torrent_history;
-    if (fs::exists(routines->findCfgFile(CFG_HISTORY_FILE)) &&
-            fs::is_regular_file(routines->findCfgFile(CFG_HISTORY_FILE))) {
-        try {
-            dl_history = routines->readDownloadInfo(CFG_HISTORY_FILE);
-            gk_torrent_history = routines->readTorrentInfo(true);
-        } catch (const std::exception &e) {
-            QMessageBox::warning(this, tr("Error!"), QString("%1").arg(e.what()), QMessageBox::Ok);
-        }
-    } else {
-        return;
-    }
+    dl_history = routines->readDownloadInfo(CFG_HISTORY_FILE);
+    gk_torrent_history = routines->readTorrentInfo(true);
 
     dlModel->removeRows(0, (int)dl_history.size(), QModelIndex());
     for (size_t i = 0; i < dl_history.size(); ++i) {
@@ -1255,13 +1246,18 @@ void MainWindow::general_extraDetails()
                     } else if (gk_dl_info_cache.at(i).dl_type == GekkoFyre::DownloadType::Torrent ||
                             gk_dl_info_cache.at(i).dl_type == GekkoFyre::DownloadType::TorrentMagnetLink) {
                         // This is a BitTorrent download!
-                        insert_time = gk_dl_info_cache.at(i).to_info.get().general.insert_timestamp;
-                        complt_time = gk_dl_info_cache.at(i).to_info.get().general.complt_timestamp;
-                        content_length = ((double)gk_dl_info_cache.at(i).to_info.get().general.num_pieces *
-                                (double)gk_dl_info_cache.at(i).to_info.get().general.piece_length);
-                        hash_val_given = tr("N/A").toStdString();
-                        hash_val_calc = tr("N/A").toStdString();
-                        hashType = tr("Unknown");
+                        if (gk_dl_info_cache.at(i).to_info.is_initialized()) {
+                            insert_time = gk_dl_info_cache.at(i).to_info.get().general.insert_timestamp;
+                            complt_time = gk_dl_info_cache.at(i).to_info.get().general.complt_timestamp;
+                            content_length = ((double)gk_dl_info_cache.at(i).to_info.get().general.num_pieces *
+                                              (double)gk_dl_info_cache.at(i).to_info.get().general.piece_length);
+                            hash_val_given = tr("N/A").toStdString();
+                            hash_val_calc = tr("N/A").toStdString();
+                            hashType = tr("Unknown");
+                        } else {
+                            QMessageBox::warning(this, tr("Warning!"), tr("Unable to initialize the BitTorrent values with the right data, it seems to be unavailable."),
+                                                 QMessageBox::Ok);
+                        }
                     } else {
                         // Throw an exception!
                         throw std::invalid_argument(tr("An invalid download-type has been given! It must be either a "

@@ -124,7 +124,7 @@ extern "C" {
 #define LEVELDB_CHILD_ITEM_VERS "version"
 #define LEVELDB_ITEM_ATTR_VERS_NO "supported"                 // The supported XML file version for this particular FyreDL build
 #define LEVELDB_XML_CHILD_NODE "item"
-#define LEVELDB_XML_CHILD_ITEM "dl-type"
+#define LEVELDB_XML_ATTR_DL_TYPE "dl-type"
 #define LEVELDB_XML_ATTR_ITEM_VALUE "value"
 #define LEVELDB_ITEM_ATTR_UNIQUE_ID "unique-id"
 

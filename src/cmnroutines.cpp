@@ -398,11 +398,10 @@ bool GekkoFyre::CmnRoutines::batch_write_single_db(const std::string &key, const
             xml_version_child.append_attribute(LEVELDB_ITEM_ATTR_VERS_NO) = FYREDL_PROG_VERS;
         }
 
-        root = doc->document_element();
         pugi::xml_node nodeParent = root.append_child(LEVELDB_XML_CHILD_NODE);
-        pugi::xml_node nodeChild = nodeParent.append_child(LEVELDB_XML_CHILD_ITEM);
-        nodeChild.append_attribute(LEVELDB_XML_ATTR_ITEM_VALUE) = value.c_str();
-        nodeChild.append_attribute(LEVELDB_ITEM_ATTR_UNIQUE_ID) = unique_id.c_str();
+        nodeParent.append_attribute(LEVELDB_XML_ATTR_DL_TYPE) = convDownType_toInt(GekkoFyre::DownloadType::Torrent); // TODO: Fix this immediately!
+        nodeParent.append_attribute(LEVELDB_XML_ATTR_ITEM_VALUE) = value.c_str();
+        nodeParent.append_attribute(LEVELDB_ITEM_ATTR_UNIQUE_ID) = unique_id.c_str();
 
         // Save XML tree to file.
         // Remark: second optional param is indent string to be used;
@@ -455,14 +454,13 @@ GekkoFyre::GkFile::FileDbVal GekkoFyre::CmnRoutines::read_database(const std::st
         }
 
         std::vector<GekkoFyre::GkFile::FileDbVal> file_db_vec;
-        pugi::xml_node items = doc->child(LEVELDB_XML_CHILD_NODE);
-        for (const auto &file: items.children(LEVELDB_XML_CHILD_ITEM)) {
-            GekkoFyre::GkFile::FileDbVal v;
-            v.dl_type = convDownType_StringToEnum(file.child_value());
-            v.value = file.attribute(LEVELDB_XML_ATTR_ITEM_VALUE).as_string();
-            v.unique_id = file.attribute(LEVELDB_ITEM_ATTR_UNIQUE_ID).as_string();
-            v.key = key;
-            file_db_vec.push_back(v);
+        pugi::xml_node items = doc->child(LEVELDB_PARENT_NODE);
+        for (const auto &file: items.children(LEVELDB_XML_CHILD_NODE)) {
+            GekkoFyre::GkFile::FileDbVal file_db_val;
+            file_db_val.dl_type = convDownType_StringToEnum(file.attribute(LEVELDB_XML_ATTR_DL_TYPE).as_string()); // TODO: Fix this immediately! Should be 'IntToEnum'.
+            file_db_val.value = file.attribute(LEVELDB_XML_ATTR_ITEM_VALUE).as_string();
+            file_db_val.unique_id = file.attribute(LEVELDB_ITEM_ATTR_UNIQUE_ID).as_string();
+            file_db_vec.push_back(file_db_val);
         }
 
         if (file_db_vec.size() > 0) {
@@ -509,14 +507,13 @@ std::vector<GekkoFyre::GkFile::FileDbVal> GekkoFyre::CmnRoutines::read_db_vec(co
         }
 
         std::vector<GekkoFyre::GkFile::FileDbVal> file_db_vec;
-        pugi::xml_node items = doc->child(LEVELDB_XML_CHILD_NODE);
-        for (const auto &file: items.children(LEVELDB_XML_CHILD_ITEM)) {
-            GekkoFyre::GkFile::FileDbVal v;
-            v.dl_type = convDownType_StringToEnum(file.child_value());
-            v.value = file.attribute(LEVELDB_XML_ATTR_ITEM_VALUE).as_string();
-            v.unique_id = file.attribute(LEVELDB_ITEM_ATTR_UNIQUE_ID).as_string();
-            v.key = key;
-            file_db_vec.push_back(v);
+        pugi::xml_node items = doc->child(LEVELDB_PARENT_NODE);
+        for (const auto &file: items.children(LEVELDB_XML_CHILD_NODE)) {
+            GekkoFyre::GkFile::FileDbVal file_db_val;
+            file_db_val.dl_type = convDownType_StringToEnum(file.attribute(LEVELDB_XML_ATTR_DL_TYPE).as_string()); // TODO: Fix this immediately! Should be 'IntToEnum'.
+            file_db_val.value = file.attribute(LEVELDB_XML_ATTR_ITEM_VALUE).as_string();
+            file_db_val.unique_id = file.attribute(LEVELDB_ITEM_ATTR_UNIQUE_ID).as_string();
+            file_db_vec.push_back(file_db_val);
         }
 
         if (file_db_vec.size() > 0) {
@@ -540,7 +537,7 @@ std::pair<std::string, std::string> GekkoFyre::CmnRoutines::read_db_min(const st
 }
 
 /**
- * @brief GekkoFyre::CmnRoutines::process_db_map processes raw database output into a slightly more readable 'QMap<std::string, std::string>', that's
+ * @brief GekkoFyre::CmnRoutines::process_db processes raw database output into a slightly more readable 'QMap<std::string, std::string>', that's
  * ready for further processing.
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
  * @date 2017-07-09
@@ -603,71 +600,66 @@ QMap<std::string, std::string> GekkoFyre::CmnRoutines::process_db(std::initializ
 }
 
 /**
- * @brief GekkoFyre::CmnRoutines::process_db_xml process a 'QMap<std::string, std::string>' into a pre-defined struct
+ * @brief GekkoFyre::CmnRoutines::process_db_map process a 'QMap<std::string, std::string>' into a pre-defined struct
  * that is far more readable and easily accessed.
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
  * @date 2017-07-12
  * @param map The container with the XML data to process.
  * @param args The keys required to access the values within the container.
  * @return A pre-defined struct that is far more readable and easily accessed, specifically, 'GekkoFyre::GkTorrent::TorrentInfo'.
- * @see GekkoFyre::CmnRoutines::process_db_map(), GekkoFyre::CmnRoutines::process_db_xml()
+ * @see GekkoFyre::CmnRoutines::process_db(), GekkoFyre::CmnRoutines::process_db_xml()
  */
 std::vector<GekkoFyre::GkTorrent::GeneralInfo> GekkoFyre::CmnRoutines::process_db_map(const QMap<std::string, std::string> &map,
                                                                                       std::initializer_list<std::string> args)
 {
     QMultiMap<std::pair<std::string, std::string>, std::string> mmap_store;
     QList<std::string> found_unique_keys;
-    for (const auto &i: args) {
-        std::string val;
-        for (const auto &j: map.keys()) {
-            if (i == j) {
-                val = map.value(i);
+    for (const auto &arg_key: args) {
+        // Expand the arguments
+        std::string val = map.value(arg_key);
+        if (!val.empty()) {
+            std::vector<GekkoFyre::GkFile::FileDbVal> xml_data = process_db_xml(val);
+            if (xml_data.size() > 1) {
+                for (const auto &j: xml_data) {
+                    std::string tmp_val, tmp_unique_id;
+                    if (!j.value.empty()) {
+                        // Value
+                        tmp_val = j.value;
 
-                if (!val.empty()) {
-                    std::vector<std::pair<std::string, std::string>> xml_data = process_db_xml(val);
-                    if (xml_data.size() > 1) {
-                        for (const auto &k: xml_data) {
-                            std::string tmp_val, tmp_unique_id;
-                            if (!k.first.empty()) {
-                                // Value
-                                tmp_val = k.first;
+                        if (!j.unique_id.empty()) {
+                            // Unique ID
+                            tmp_unique_id = j.unique_id;
+                        } else {
+                            // Determine the home directory and where to put the database files, depending on
+                            // whether this is a Linux or Microsoft Windows operating system that FyreDL is running on.
+                            fs::path home_dir(QDir::homePath().toStdString());
+                            std::ostringstream oss;
+                            #ifdef __linux__
+                            oss << home_dir.string() << fs::path::preferred_separator << CFG_FILES_DIR_LINUX << fs::path::preferred_separator << CFG_HISTORY_DB_FILE;
+                            #elif _WIN32
+                            oss << home_dir.string() << fs::path::preferred_separator << CFG_FILES_DIR_WNDWS << fs::path::preferred_separator << CFG_HISTORY_DB_FILE;
+                            #endif
 
-                                if (!k.second.empty()) {
-                                    // Unique ID
-                                    tmp_unique_id = k.second;
-                                } else {
-                                    // Determine the home directory and where to put the database files, depending on
-                                    // whether this is a Linux or Microsoft Windows operating system that FyreDL is running on.
-                                    fs::path home_dir(QDir::homePath().toStdString());
-                                    std::ostringstream oss;
-                                    #ifdef __linux__
-                                    oss << home_dir.string() << fs::path::preferred_separator << CFG_FILES_DIR_LINUX << fs::path::preferred_separator << CFG_HISTORY_DB_FILE;
-                                    #elif _WIN32
-                                    oss << home_dir.string() << fs::path::preferred_separator << CFG_FILES_DIR_WNDWS << fs::path::preferred_separator << CFG_HISTORY_DB_FILE;
-                                    #endif
-
-                                    QMessageBox::warning(nullptr, tr("Error!"), tr("We have encountered some corrupt data! If this problem persists, please delete:\n\n\"%1\"")
-                                            .arg(QString::fromStdString(oss.str())), QMessageBox::Ok);
-                                }
-                            }
-
-                            // Each key identified by something such as, 'LEVELDB_KEY_TORRENT_INSERT_DATE', will store MANY values
-                            // whilst the Unique ID will be unique per 'GekkoFyre::GkTorrent::TorrentInfo' object.
-                            mmap_store.insertMulti(std::make_pair(i, tmp_unique_id), tmp_val);
-
-                            // This is for speeding up searches later on in the function
-                            if (!found_unique_keys.contains(tmp_unique_id)) {
-                                found_unique_keys.push_back(tmp_unique_id);
-                            }
+                            QMessageBox::warning(nullptr, tr("Error!"), tr("We have encountered some corrupt data! If this problem persists, please delete:\n\n\"%1\"")
+                                    .arg(QString::fromStdString(oss.str())), QMessageBox::Ok);
                         }
-                    } else {
-                        break;
                     }
-                } else {
-                    // There is no XML data present
-                    continue;
+
+                    // Each key identified by something such as, 'LEVELDB_KEY_TORRENT_INSERT_DATE', will store MANY values
+                    // whilst the Unique ID will be unique per 'GekkoFyre::GkTorrent::TorrentInfo' object.
+                    mmap_store.insertMulti(std::make_pair(arg_key, tmp_unique_id), tmp_val);
+
+                    // This is for speeding up searches later on in the function
+                    if (!found_unique_keys.contains(tmp_unique_id)) {
+                        found_unique_keys.push_back(tmp_unique_id);
+                    }
                 }
+            } else {
+                break;
             }
+        } else {
+            // There is no XML data present
+            continue;
         }
     }
 
@@ -727,10 +719,10 @@ std::vector<GekkoFyre::GkTorrent::GeneralInfo> GekkoFyre::CmnRoutines::process_d
  * and the Unique ID relating to that value so that it maybe identified as part of a larger object.
  * @see GekkoFyre::CmnRoutines::batch_write_single_db()
  */
-std::vector<std::pair<std::string, std::string>> GekkoFyre::CmnRoutines::process_db_xml(const std::string &xml_input)
+std::vector<GekkoFyre::GkFile::FileDbVal> GekkoFyre::CmnRoutines::process_db_xml(const std::string &xml_input)
 {
     if (!xml_input.empty() && xml_input.size() > CFG_XML_MIN_PARSE_SIZE) {
-        std::vector<std::pair<std::string, std::string>> ret_data;
+        std::vector<GekkoFyre::GkFile::FileDbVal> ret_data;
         pugi::xml_node root;
         std::unique_ptr<pugi::xml_document> doc = std::make_unique<pugi::xml_document>();
         pugi::xml_parse_result result = doc->load_string(xml_input.c_str());
@@ -739,12 +731,13 @@ std::vector<std::pair<std::string, std::string>> GekkoFyre::CmnRoutines::process
                                                 .arg(result.description()).arg(result.offset).toStdString());
         }
 
-        pugi::xml_node items = doc->child(LEVELDB_XML_CHILD_NODE);
-        for (const auto &file: items.children(LEVELDB_XML_CHILD_ITEM)) {
-            std::string tmp_val, tmp_unique_id;
-            tmp_val = file.attribute(LEVELDB_XML_ATTR_ITEM_VALUE).as_string();
-            tmp_unique_id = file.attribute(LEVELDB_ITEM_ATTR_UNIQUE_ID).as_string();
-            ret_data.push_back(std::make_pair(tmp_val, tmp_unique_id));
+        pugi::xml_node items = doc->child(LEVELDB_PARENT_NODE);
+        for (const auto &file: items.children(LEVELDB_XML_CHILD_NODE)) {
+            GekkoFyre::GkFile::FileDbVal file_db_val;
+            file_db_val.dl_type = convDownType_StringToEnum(file.attribute(LEVELDB_XML_ATTR_DL_TYPE).as_string()); // TODO: Fix this immediately! Should be 'IntToEnum'.
+            file_db_val.value = file.attribute(LEVELDB_XML_ATTR_ITEM_VALUE).as_string();
+            file_db_val.unique_id = file.attribute(LEVELDB_ITEM_ATTR_UNIQUE_ID).as_string();
+            ret_data.push_back(file_db_val);
         }
 
         if (ret_data.size() > 0) {
@@ -752,7 +745,7 @@ std::vector<std::pair<std::string, std::string>> GekkoFyre::CmnRoutines::process
         }
     }
 
-    return std::vector<std::pair<std::string, std::string>>();
+    return std::vector<GekkoFyre::GkFile::FileDbVal>();
 }
 
 /**
