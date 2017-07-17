@@ -133,7 +133,6 @@ public:
                        const std::string &xmlCfgFile = CFG_HISTORY_FILE);
 
     bool writeTorrentItem(GekkoFyre::GkTorrent::TorrentInfo &gk_ti);
-    bool writeTorrent_extra_data(const GekkoFyre::GkTorrent::TorrentInfo &gk_ti, const GekkoFyre::GkFile::FileDb &ext_db_struct);
     std::vector<GekkoFyre::GkTorrent::TorrentInfo> readTorrentInfo(const bool &minimal_readout = false);
     bool delTorrentItem(const std::string &unique_id, const std::string &xmlCfgFile = CFG_HISTORY_FILE);
 
@@ -145,6 +144,11 @@ public:
 private:
     int load_file(const std::string &filename, std::vector<char> &v,
                   libtorrent::error_code &ec, int limit = 8000000);
+    std::string multipart_key(const std::initializer_list<std::string> args);
+
+    bool writeTorrent_extra_data(const GekkoFyre::GkTorrent::TorrentInfo &gk_ti, const GekkoFyre::GkFile::FileDb &ext_db_struct);
+    void batch_write_to_file_db(const std::vector<GekkoFyre::GkTorrent::TorrentFile> &to_files_vec,
+                                const GekkoFyre::GkFile::FileDb &ext_db_struct);
 
     QMap<std::string, std::string> process_db(std::initializer_list<std::tuple<std::string, std::string>> args);
     std::vector<GekkoFyre::GkTorrent::GeneralInfo> process_db_map(const QMap<std::string, std::string> &map,

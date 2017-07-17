@@ -140,7 +140,7 @@ extern "C" {
 #define LEVELDB_KEY_TORRENT_NUM_FILES "num-files"
 #define LEVELDB_KEY_TORRENT_TORRNT_PIECES "num-pieces"
 #define LEVELDB_KEY_TORRENT_TORRNT_PIECE_LENGTH "piece-length"
-#define LEVELDB_CHILD_NODE_TORRENT_FILES "to-files"
+#define LEVELDB_KEY_TORRENT_TORRENT_FILES "to-files"
 #define LEVELDB_CHILD_FILES_PATH_TORRENT "path"
 #define LEVELDB_CHILD_FILES_HASH_TORRENT "hash"
 #define LEVELDB_CHILD_FILES_CONTLNGTH_TORRENT "size"
@@ -155,7 +155,7 @@ extern "C" {
 #define LEVELDB_CHILD_FILES_MAPFLEPCE_2_TORRENT "second"
 #define LEVELDB_CHILD_FILES_DOWNBOOL_TORRENT "dled"
 #define LEVELDB_CHILD_TRACKERS_TIER_TORRENT "tier"
-#define LEVELDB_KEY_TORRENT_EXTRANEOUS "extraneous-info"
+#define LEVELDB_KEY_TORRENT_TRACKERS "to-extra-trackers"
 
 // XML configuration
 #define XML_PARENT_NODE "fyredl-db"
@@ -512,8 +512,6 @@ namespace GekkoFyre {
             boost::optional<GkTorrent::TorrentInfo> to_info; // Information relating to BitTorrent downloads
             boost::optional<GkCurl::CurlDlInfo> curl_info;   // Information relating to HTTP(S) or FTP(S) downloads
         };
-
-
     }
 }
 

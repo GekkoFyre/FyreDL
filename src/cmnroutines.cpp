@@ -755,6 +755,97 @@ std::vector<GekkoFyre::GkFile::FileDbVal> GekkoFyre::CmnRoutines::process_db_xml
     return std::vector<GekkoFyre::GkFile::FileDbVal>();
 }
 
+void GekkoFyre::CmnRoutines::batch_write_to_file_db(const std::vector<GekkoFyre::GkTorrent::TorrentFile> &to_files_vec,
+                                                    const GekkoFyre::GkFile::FileDb &ext_db_struct)
+{
+    std::string existing_value, key;
+    leveldb::ReadOptions read_opt;
+    leveldb::WriteOptions write_opt;
+    leveldb::Status s;
+    leveldb::WriteBatch batch;
+    read_opt.verify_checksums = true;
+    write_opt.sync = true;
+    static int counter;
+    counter = 0;
+    if (to_files_vec.size() > 0) {
+        for (const auto &files: to_files_vec) {
+            ++counter;
+            key = multipart_key({LEVELDB_KEY_TORRENT_TORRENT_FILES, std::to_string(counter), files.unique_id});
+            s = ext_db_struct.db->Get(read_opt, key, &existing_value);
+            pugi::xml_node root;
+            std::unique_ptr<pugi::xml_document> doc = std::make_unique<pugi::xml_document>();
+            if (!existing_value.empty() && existing_value.size() > CFG_XML_MIN_PARSE_SIZE) {
+                // TODO: Do something with this data, urgently! The program cannot function correctly otherwise.
+                batch.Delete(key);
+            } else {
+                // Generate XML declaration
+                auto declarNode = doc->append_child(pugi::node_declaration);
+                declarNode.append_attribute("version") = "1.0";
+                declarNode.append_attribute("encoding") = "UTF-8";;
+                declarNode.append_attribute("standalone") = "yes";
+
+                // A valid XML doc must contain a single root node of any name
+                root = doc->append_child(LEVELDB_PARENT_NODE);
+                pugi::xml_node xml_version_node = root.append_child(LEVELDB_CHILD_NODE_VERS);
+                pugi::xml_node xml_version_child = xml_version_node.append_child(LEVELDB_CHILD_ITEM_VERS);
+                xml_version_child.append_attribute(LEVELDB_ITEM_ATTR_VERS_NO) = FYREDL_PROG_VERS;
+            }
+
+            //
+            // Files
+            //
+            pugi::xml_node nodeFilesPath = root.append_child(LEVELDB_CHILD_FILES_PATH_TORRENT);
+            nodeFilesPath.append_child(pugi::node_pcdata)
+                    .set_value(files.file_path.c_str());
+
+            //
+            // Sub-nodes
+            //
+            pugi::xml_node nodeFilesHash = nodeFilesPath.append_child(LEVELDB_CHILD_FILES_HASH_TORRENT);
+            nodeFilesHash.append_child(pugi::node_pcdata)
+                    .set_value(files.sha1_hash_hex.c_str());
+
+            pugi::xml_node nodeFilesFlags = nodeFilesPath.append_child(LEVELDB_CHILD_FILES_FLAGS_TORRENT);
+            nodeFilesFlags.append_child(pugi::node_pcdata).set_value(std::to_string(files.flags).data());
+
+            pugi::xml_node nodeFilesContentLength = nodeFilesPath.append_child(LEVELDB_CHILD_FILES_CONTLNGTH_TORRENT);
+            nodeFilesContentLength.append_child(pugi::node_pcdata)
+                    .set_value(std::to_string(files.content_length).data());
+
+            pugi::xml_node nodeFilesFileOffset = nodeFilesPath.append_child(LEVELDB_CHILD_FILES_FILEOFFST_TORRENT);
+            nodeFilesFileOffset.append_child(pugi::node_pcdata)
+                    .set_value(std::to_string(files.file_offset).data());
+
+            pugi::xml_node nodeFilesMTime = nodeFilesPath.append_child(LEVELDB_CHILD_FILES_MTIME_TORRENT);
+            nodeFilesMTime.append_child(pugi::node_pcdata).set_value(std::to_string(files.mtime).data());
+
+            pugi::xml_node nodeFilesMapFilePiece = nodeFilesPath.append_child(LEVELDB_CHILD_NODE_TORRENT_FILES_MAPFLEPCE);
+            pugi::xml_node nodeFilesMapFilePiece_first = nodeFilesMapFilePiece
+                    .append_child(LEVELDB_CHILD_FILES_MAPFLEPCE_1_TORRENT);
+            pugi::xml_node nodeFilesMapFilePiece_second = nodeFilesMapFilePiece
+                    .append_child(LEVELDB_CHILD_FILES_MAPFLEPCE_2_TORRENT);
+            nodeFilesMapFilePiece_first.append_child(pugi::node_pcdata)
+                    .set_value(std::to_string(files.map_file_piece.first).data());
+            nodeFilesMapFilePiece_second.append_child(pugi::node_pcdata)
+                    .set_value(std::to_string(files.map_file_piece.second).data());
+
+            pugi::xml_node nodeFilesDownBool = nodeFilesPath.append_child(LEVELDB_CHILD_FILES_DOWNBOOL_TORRENT);
+            nodeFilesDownBool.append_child(pugi::node_pcdata)
+                    .set_value(std::to_string(files.downloaded).data());
+            std::stringstream ss;
+            doc->save(ss, PUGIXML_TEXT("    "));
+            batch.Put(key, ss.str());
+        }
+
+        s = ext_db_struct.db->Write(write_opt, &batch);
+        if (s.ok()) {
+            return;
+        } else {
+            throw std::runtime_error(s.ToString());
+        }
+    }
+}
+
 /**
  * @brief GekkoFyre::CmnRoutines::getFileSize finds the size of a file /without/ having to 'open' it. Portable
  * under both Linux, Apple Macintosh and Microsoft Windows.
@@ -975,6 +1066,23 @@ int GekkoFyre::CmnRoutines::load_file(const std::string &filename, std::vector<c
     return 0;
 }
 
+std::string GekkoFyre::CmnRoutines::multipart_key(const std::initializer_list<std::string> args)
+{
+    std::ostringstream ret_val;
+    static int counter;
+    counter = 0;
+    for (const auto &arg: args) {
+        ++counter;
+        if (counter == 1) {
+            ret_val << arg;
+        } else {
+            ret_val << "_" << arg;
+        }
+    }
+
+    return ret_val.str();
+}
+
 /**
  * @note <http://www.rasterbar.com/products/libtorrent/examples.html>
  * @param file_dest
@@ -1057,6 +1165,7 @@ GekkoFyre::GkTorrent::TorrentInfo GekkoFyre::CmnRoutines::torrentFileInfo(const 
     // to_hex((char const*)&t.info_hash()[0], 20, ih);
     // ih << std::hex << t.info_hash();
 
+    std::string unique_id = createId(FYREDL_UNIQUE_ID_DIGIT_COUNT);
     gk_torrent_struct.general.num_pieces = t.num_pieces();
     gk_torrent_struct.general.piece_length = t.piece_length();
     gk_torrent_struct.general.comment = t.comment();
@@ -1065,7 +1174,7 @@ GekkoFyre::GkTorrent::TorrentInfo GekkoFyre::CmnRoutines::torrentFileInfo(const 
     gk_torrent_struct.general.num_files = t.num_files();
     // gk_torrent_struct.creatn_timestamp = t.creation_date().get();
     gk_torrent_struct.general.torrent_name = t.name();
-    gk_torrent_struct.general.unique_id = createId(FYREDL_UNIQUE_ID_DIGIT_COUNT);
+    gk_torrent_struct.general.unique_id = unique_id;
 
     const file_storage &st = t.files();
     for (int i = 0; i < st.num_files(); ++i) {
@@ -1079,6 +1188,7 @@ GekkoFyre::GkTorrent::TorrentInfo GekkoFyre::CmnRoutines::torrentFileInfo(const 
         GekkoFyre::GkTorrent::TorrentFile gk_tf;
         std::ostringstream sha1_hex;
         sha1_hex << std::hex << st.hash(i).to_string();
+        gk_tf.unique_id = unique_id;
         gk_tf.sha1_hash_hex = sha1_hex.str();
         gk_tf.file_path = st.file_path(i);
         gk_tf.file_offset = file_offset;
@@ -1520,7 +1630,7 @@ bool GekkoFyre::CmnRoutines::writeTorrent_extra_data(const GekkoFyre::GkTorrent:
         pugi::xml_node root;
         std::unique_ptr<pugi::xml_document> doc = std::make_unique<pugi::xml_document>();
 
-        const std::string key = LEVELDB_KEY_TORRENT_EXTRANEOUS;
+        const std::string key = multipart_key({LEVELDB_KEY_TORRENT_TRACKERS, gk_ti.general.unique_id});
         std::string existing_value;
         leveldb::ReadOptions read_opt;
         leveldb::WriteOptions write_opt;
@@ -1530,15 +1640,7 @@ bool GekkoFyre::CmnRoutines::writeTorrent_extra_data(const GekkoFyre::GkTorrent:
         write_opt.sync = true;
         s = ext_db_struct.db->Get(read_opt, key, &existing_value);
         if (!existing_value.empty() && existing_value.size() > CFG_XML_MIN_PARSE_SIZE) { // Check if previous XML data exists or not
-            //
-            // There is previous XML data, which we will build on
-            //
-            pugi::xml_parse_result result = doc->load_string(existing_value.c_str());
-            if (!result) {
-                throw std::invalid_argument(tr("There has been an error whilst reading extraneous information about a BitTorrent item from the database.\n\nParse error: %1, character pos = %2")
-                                                    .arg(result.description()).arg(result.offset).toStdString());
-            }
-
+            // TODO: Do something with this data, urgently! The program cannot function correctly otherwise.
             batch.Delete(key);
         } else {
             //
@@ -1558,72 +1660,26 @@ bool GekkoFyre::CmnRoutines::writeTorrent_extra_data(const GekkoFyre::GkTorrent:
             xml_version_child.append_attribute(LEVELDB_ITEM_ATTR_VERS_NO) = FYREDL_PROG_VERS;
         }
 
-        root = doc->document_element();
-        pugi::xml_node nodeParent = root.append_child(LEVELDB_XML_CHILD_NODE);
-        nodeParent.append_child(pugi::node_pcdata).set_value(gk_ti.general.unique_id.c_str());
-        pugi::xml_node node_val_files = nodeParent.append_child(LEVELDB_CHILD_NODE_TORRENT_FILES);
-        for (size_t i = 0; i < gk_ti.files_vec.size(); ++i) {
-            //
-            // Files
-            //
-            pugi::xml_node nodeFilesPath = node_val_files.append_child(LEVELDB_CHILD_FILES_PATH_TORRENT);
-            nodeFilesPath.append_child(pugi::node_pcdata)
-                    .set_value(gk_ti.files_vec.at(i).file_path.c_str());
-
-            // Sub-nodes
-            pugi::xml_node nodeFilesHash = nodeFilesPath.append_child(LEVELDB_CHILD_FILES_HASH_TORRENT);
-            nodeFilesHash.append_child(pugi::node_pcdata)
-                    .set_value(gk_ti.files_vec.at(i).sha1_hash_hex.c_str());
-
-            pugi::xml_node nodeFilesFlags = nodeFilesPath.append_child(LEVELDB_CHILD_FILES_FLAGS_TORRENT);
-            nodeFilesFlags.append_child(pugi::node_pcdata).set_value(std::to_string(gk_ti.files_vec.at(i).flags).data());
-
-            pugi::xml_node nodeFilesContentLength = nodeFilesPath.append_child(LEVELDB_CHILD_FILES_CONTLNGTH_TORRENT);
-            nodeFilesContentLength.append_child(pugi::node_pcdata)
-                    .set_value(std::to_string(gk_ti.files_vec.at(i).content_length).data());
-
-            pugi::xml_node nodeFilesFileOffset = nodeFilesPath.append_child(LEVELDB_CHILD_FILES_FILEOFFST_TORRENT);
-            nodeFilesFileOffset.append_child(pugi::node_pcdata)
-                    .set_value(std::to_string(gk_ti.files_vec.at(i).file_offset).data());
-
-            pugi::xml_node nodeFilesMTime = nodeFilesPath.append_child(LEVELDB_CHILD_FILES_MTIME_TORRENT);
-            nodeFilesMTime.append_child(pugi::node_pcdata).set_value(std::to_string(gk_ti.files_vec.at(i).mtime).data());
-
-            pugi::xml_node nodeFilesMapFilePiece = nodeFilesPath.append_child(LEVELDB_CHILD_NODE_TORRENT_FILES_MAPFLEPCE);
-            pugi::xml_node nodeFilesMapFilePiece_first = nodeFilesMapFilePiece
-                    .append_child(LEVELDB_CHILD_FILES_MAPFLEPCE_1_TORRENT);
-            pugi::xml_node nodeFilesMapFilePiece_second = nodeFilesMapFilePiece
-                    .append_child(LEVELDB_CHILD_FILES_MAPFLEPCE_2_TORRENT);
-            nodeFilesMapFilePiece_first.append_child(pugi::node_pcdata)
-                    .set_value(std::to_string(gk_ti.files_vec.at(i).map_file_piece.first).data());
-            nodeFilesMapFilePiece_second.append_child(pugi::node_pcdata)
-                    .set_value(std::to_string(gk_ti.files_vec.at(i).map_file_piece.second).data());
-
-            pugi::xml_node nodeFilesDownBool = nodeFilesPath.append_child(LEVELDB_CHILD_FILES_DOWNBOOL_TORRENT);
-            nodeFilesDownBool.append_child(pugi::node_pcdata)
-                    .set_value(std::to_string(gk_ti.files_vec.at(i).downloaded).data());
-        }
-
-        pugi::xml_node node_val_trackers = nodeParent.append_child(LEVELDB_CHILD_NODE_TORRENT_TRACKERS);
-        for (size_t i = 0; i < gk_ti.trackers.size(); ++i) {
+        batch_write_to_file_db(gk_ti.files_vec, ext_db_struct);
+        pugi::xml_node node_val_trackers = root.append_child(LEVELDB_CHILD_NODE_TORRENT_TRACKERS);
+        for (const auto &trackers: gk_ti.trackers) {
             //
             // Trackers
             //
             pugi::xml_node nodeTrackersTier = node_val_trackers.append_child(LEVELDB_CHILD_TRACKERS_TIER_TORRENT);
-            nodeTrackersTier.append_child(pugi::node_pcdata).set_value(std::to_string(gk_ti.trackers.at(i).tier).data());
+            nodeTrackersTier.append_child(pugi::node_pcdata).set_value(std::to_string(trackers.tier).data());
 
             // Sub-node
             pugi::xml_node nodeTrackersUrl = nodeTrackersTier.append_child(LEVELDB_CHILD_TRACKERS_URL_TORRENT);
-            nodeTrackersUrl.append_child(pugi::node_pcdata).set_value(gk_ti.trackers.at(i).url.c_str());
+            nodeTrackersUrl.append_child(pugi::node_pcdata).set_value(trackers.url.c_str());
 
             pugi::xml_node nodeTrackersAvailable = nodeTrackersTier.append_child(LEVELDB_CHILD_TRACKERS_AVAILABLE_TORRENT);
-            nodeTrackersAvailable.append_child(pugi::node_pcdata).set_value(std::to_string(gk_ti.trackers.at(i).enabled).data());
+            nodeTrackersAvailable.append_child(pugi::node_pcdata).set_value(std::to_string(trackers.enabled).data());
         }
 
         std::stringstream ss;
         doc->save(ss, PUGIXML_TEXT("    "));
-
-        batch.Put(LEVELDB_KEY_TORRENT_EXTRANEOUS, ss.str());
+        batch.Put(key, ss.str());
         s = ext_db_struct.db->Write(write_opt, &batch);
         if (s.ok()) {
             return true;
@@ -1687,105 +1743,103 @@ std::vector<GekkoFyre::GkTorrent::TorrentInfo> GekkoFyre::CmnRoutines::readTorre
                                         LEVELDB_KEY_TORRENT_TORRNT_CREATOR, LEVELDB_KEY_TORRENT_MAGNET_URI, LEVELDB_KEY_TORRENT_TORRNT_NAME,
                                         LEVELDB_KEY_TORRENT_NUM_FILES, LEVELDB_KEY_TORRENT_TORRNT_PIECES, LEVELDB_KEY_TORRENT_TORRNT_PIECE_LENGTH});
 
-            std::string read_extraneous_xml;
-            s = db_struct.db->Get(leveldb::ReadOptions(), LEVELDB_KEY_TORRENT_EXTRANEOUS, &read_extraneous_xml);
-
-            pugi::xml_node root;
             std::unique_ptr<pugi::xml_document> doc = std::make_unique<pugi::xml_document>();
-            if (!read_extraneous_xml.empty() && read_extraneous_xml.size() > CFG_XML_MIN_PARSE_SIZE) {
-                pugi::xml_parse_result result = doc->load_string(read_extraneous_xml.c_str());
-                if (!result) {
-                    throw std::invalid_argument(tr("There has been an error reading information from the BitTorrent area of the database.\n\nParse error: %1, character pos = %2")
-                                                        .arg(result.description()).arg(result.offset).toStdString());
-                }
-
-                pugi::xml_node nodeParent = doc->child(LEVELDB_XML_CHILD_NODE);
-
-                //
-                // Files
-                //
-                QMap<std::string, GekkoFyre::GkTorrent::TorrentFile> files_map;
-                pugi::xml_node node_val_files = nodeParent.child(LEVELDB_CHILD_NODE_TORRENT_FILES);
-                std::string file_unique_id = nodeParent.child_value();
-                for (const auto &i: node_val_files.children(LEVELDB_CHILD_FILES_PATH_TORRENT)) {
-                    GekkoFyre::GkTorrent::TorrentFile tf;
-                    tf.file_path = i.child_value();
-                    tf.sha1_hash_hex = i.child_value(LEVELDB_CHILD_FILES_HASH_TORRENT);
-                    tf.mtime = strtoul(i.child_value(LEVELDB_CHILD_FILES_MTIME_TORRENT), nullptr, 10);
-                    tf.file_offset = atol(i.child_value(LEVELDB_CHILD_FILES_FILEOFFST_TORRENT));
-                    tf.content_length = atol(i.child_value(LEVELDB_CHILD_FILES_CONTLNGTH_TORRENT));
-                    tf.flags = atoi(i.child_value(LEVELDB_CHILD_FILES_FLAGS_TORRENT));
-                    tf.downloaded = atoi(i.child_value(LEVELDB_CHILD_FILES_DOWNBOOL_TORRENT));
-
-                    pugi::xml_node file_map_child_node = i.child(LEVELDB_CHILD_NODE_TORRENT_FILES_MAPFLEPCE);
-                    int map_int_one, map_int_two = { 0 };
-                    map_int_one = atoi(file_map_child_node.child_value(LEVELDB_CHILD_FILES_MAPFLEPCE_1_TORRENT));
-                    map_int_two = atoi(file_map_child_node.child_value(LEVELDB_CHILD_FILES_MAPFLEPCE_2_TORRENT));
-                    tf.map_file_piece.first = map_int_one;
-                    tf.map_file_piece.second = map_int_two;
-
-                    files_map.insert(file_unique_id, tf);
-                }
-
-                //
-                // Trackers
-                //
-                QMultiMap<std::string, GekkoFyre::GkTorrent::TorrentTrackers> trackers_map;
-                pugi::xml_node node_val_trackers = nodeParent.child(LEVELDB_CHILD_NODE_TORRENT_TRACKERS);
-                for (const auto &i: node_val_trackers.children(LEVELDB_CHILD_TRACKERS_TIER_TORRENT)) {
-                    pugi::xml_node url_node = i.child(LEVELDB_CHILD_TRACKERS_URL_TORRENT);
-                    pugi::xml_node avail_node = i.child(LEVELDB_CHILD_TRACKERS_AVAILABLE_TORRENT);
-                    GekkoFyre::GkTorrent::TorrentTrackers tracker;
-                    tracker.tier = atoi(i.child_value());
-                    tracker.url = url_node.child_value();
-                    tracker.enabled = atoi(avail_node.child_value());
-                    trackers_map.insert(file_unique_id, tracker);
-                }
-
-                for (size_t i = 0; i < fin_output.size(); ++i) {
-                    GekkoFyre::GkTorrent::TorrentInfo to_info;
-                    if (files_map.keys().size() > 0) {
-                        for (const auto &j: files_map.values(fin_output.at(i).unique_id)) {
-                            // Expand the values within 'files_map'
-                            GekkoFyre::GkTorrent::TorrentFile to_file;
-                            to_file.unique_id = fin_output.at(i).unique_id;
-                            to_file.file_path = j.file_path;
-                            to_file.sha1_hash_hex = j.sha1_hash_hex;
-                            to_file.flags = j.flags;
-                            to_file.content_length = j.content_length;
-                            to_file.file_offset = j.file_offset;
-                            to_file.mtime = j.mtime;
-                            to_file.map_file_piece = std::make_pair(j.map_file_piece.first, j.map_file_piece.second);
-                            to_file.downloaded = j.downloaded;
-                            to_info.files_vec.push_back(to_file);
+            leveldb::ReadOptions read_opt;
+            read_opt.verify_checksums = true;
+            std::vector<GekkoFyre::GkTorrent::TorrentFile> tor_file_vec;
+            std::vector<GekkoFyre::GkTorrent::TorrentTrackers> tor_tracker_vec;
+            for (const auto &info: fin_output) {
+                for (int i = 0; i < info.num_files; ++i) {
+                    int final_count = (i + 1);
+                    std::string file_key, file_value;
+                    file_key = multipart_key({LEVELDB_KEY_TORRENT_TORRENT_FILES, std::to_string(final_count), info.unique_id});
+                    s = db_struct.db->Get(read_opt, file_key, &file_value);
+                    if (!s.ok()) { throw std::runtime_error(tr("Problem whilst reading database. Details:\n\n%1").arg(QString::fromStdString(s.ToString())).toStdString()); }
+                    if (!file_value.empty() && file_value.size() > CFG_XML_MIN_PARSE_SIZE) {
+                        // There is data present!
+                        pugi::xml_parse_result result = doc->load_string(file_value.c_str());
+                        if (!result) {
+                            throw std::invalid_argument(tr("There has been an error whilst processing the XML from the database for BitTorrent download, \"%1\".\n\nParse error: %2, character pos = %3")
+                                                                .arg(QString::fromStdString(info.torrent_name)).arg(result.description())
+                                                                .arg(result.offset).toStdString());
                         }
-                    } else {
-                        QMessageBox::warning(nullptr, tr("Problem!"),
-                                             tr("There is a BitTorrent item present that has no files to download. Deleting item..."),
-                                             QMessageBox::Ok);
-                        // TODO: Insert code for this action!
+
+                        // Parse the rest of the XML
+                        GekkoFyre::GkTorrent::TorrentFile tor_file;
+                        tor_file.unique_id = info.unique_id;
+
+                        //
+                        // Files
+                        //
+                        pugi::xml_node nodeParent = doc->child(LEVELDB_PARENT_NODE);
+                        pugi::xml_node nodeFilesPath = nodeParent.child(LEVELDB_CHILD_FILES_PATH_TORRENT);
+
+                        // Sub-nodes
+                        tor_file.file_path = nodeFilesPath.child_value();
+                        tor_file.sha1_hash_hex = nodeFilesPath.child_value(LEVELDB_CHILD_FILES_HASH_TORRENT);
+                        tor_file.flags = atoi(nodeFilesPath.child_value(LEVELDB_CHILD_FILES_FLAGS_TORRENT));
+                        tor_file.content_length = atoi(nodeFilesPath.child_value(LEVELDB_CHILD_FILES_CONTLNGTH_TORRENT));
+                        tor_file.file_offset = atoi(nodeFilesPath.child_value(LEVELDB_CHILD_FILES_FILEOFFST_TORRENT));
+                        std::stringstream mtime_ss;
+                        mtime_ss << nodeFilesPath.child_value(LEVELDB_CHILD_FILES_MTIME_TORRENT);
+                        mtime_ss >> tor_file.mtime;
+                        tor_file.downloaded = atoi(nodeFilesPath.child_value());
+                        pugi::xml_node map_file_piece = nodeFilesPath.child(LEVELDB_CHILD_NODE_TORRENT_FILES_MAPFLEPCE);
+                        tor_file.map_file_piece.first = atoi(map_file_piece.child_value(LEVELDB_CHILD_FILES_MAPFLEPCE_1_TORRENT));
+                        tor_file.map_file_piece.second = atoi(map_file_piece.child_value(LEVELDB_CHILD_FILES_MAPFLEPCE_2_TORRENT));
+
+                        tor_file_vec.push_back(tor_file);
+                    }
+                }
+
+                std::string tracker_key, tracker_value;
+                tracker_key = multipart_key({LEVELDB_KEY_TORRENT_TRACKERS, info.unique_id});
+                s = db_struct.db->Get(read_opt, tracker_key, &tracker_value);
+                if (!s.ok()) { throw std::runtime_error(tr("Problem whilst reading database. Details:\n\n%1").arg(QString::fromStdString(s.ToString())).toStdString()); }
+                if (!tracker_value.empty() && tracker_value.size() > CFG_XML_MIN_PARSE_SIZE) {
+                    // There is data present!
+                    pugi::xml_parse_result result = doc->load_string(tracker_value.c_str());
+                    if (!result) {
+                        throw std::invalid_argument(tr("There has been an error whilst processing the XML from the database for BitTorrent download, \"%1\".\n\nParse error: %2, character pos = %3")
+                                                            .arg(QString::fromStdString(info.torrent_name)).arg(result.description())
+                                                            .arg(result.offset).toStdString());
                     }
 
-                    if (trackers_map.keys().size() > 0) {
-                        for (const auto &j: trackers_map.values(fin_output.at(i).unique_id)) {
-                            // Expand the values within 'trackers_map'
-                            GekkoFyre::GkTorrent::TorrentTrackers to_tracker;
-                            to_tracker.unique_id = fin_output.at(i).unique_id;
-                            to_tracker.tier = j.tier;
-                            to_tracker.url = j.url;
-                            to_tracker.enabled = j.enabled;
-                            to_info.trackers.push_back(to_tracker);
-                        }
-                    } else {
-                        QMessageBox::warning(nullptr, tr("Problem!"),
-                                             tr("There is a BitTorrent item present that has no trackers. Deleting item..."),
-                                             QMessageBox::Ok);
-                        // TODO: Insert code for this action!
+                    //
+                    // Trackers
+                    //
+                    pugi::xml_node nodeParent = doc->child(LEVELDB_PARENT_NODE);
+                    pugi::xml_node nodeTrackers = nodeParent.child(LEVELDB_CHILD_NODE_TORRENT_TRACKERS);
+                    for (pugi::xml_node tracker = nodeTrackers.child(LEVELDB_CHILD_TRACKERS_TIER_TORRENT); tracker;
+                         tracker = tracker.next_sibling(LEVELDB_CHILD_TRACKERS_TIER_TORRENT)) {
+                        // Sub-nodes
+                        GekkoFyre::GkTorrent::TorrentTrackers tor_trackers;
+                        tor_trackers.unique_id = info.unique_id;
+                        tor_trackers.url = tracker.child_value(LEVELDB_CHILD_TRACKERS_URL_TORRENT);
+                        tor_trackers.tier = atoi(tracker.child_value());
+                        tor_trackers.enabled = atoi(tracker.child_value(LEVELDB_CHILD_TRACKERS_AVAILABLE_TORRENT));
+                        tor_tracker_vec.push_back(tor_trackers);
                     }
-
-                    to_info.general = fin_output.at(i);
-                    to_info_vec.push_back(to_info);
                 }
+
+                // Process all the data now that we have accumulated it all!
+                GekkoFyre::GkTorrent::TorrentInfo tor_info;
+                tor_info.general.unique_id = info.unique_id;
+                tor_info.general.down_dest = info.down_dest;
+                tor_info.general.insert_timestamp = info.insert_timestamp;
+                tor_info.general.complt_timestamp = info.complt_timestamp;
+                tor_info.general.creatn_timestamp = info.creatn_timestamp;
+                tor_info.general.dlStatus = info.dlStatus;
+                tor_info.general.comment = info.comment;
+                tor_info.general.creator = info.creator;
+                tor_info.general.magnet_uri = info.magnet_uri;
+                tor_info.general.torrent_name = info.torrent_name;
+                tor_info.general.num_files = info.num_files;
+                tor_info.general.num_pieces = info.num_pieces;
+                tor_info.general.piece_length = info.piece_length;
+                tor_info.files_vec = tor_file_vec;
+                tor_info.trackers = tor_tracker_vec;
+                to_info_vec.push_back(tor_info);
             }
         } else {
             // There is a problem with the database!
