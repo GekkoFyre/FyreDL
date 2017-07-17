@@ -355,7 +355,6 @@ namespace GekkoFyre {
         struct GeneralInfo {
             std::string unique_id;                  // A unique identifier for this torrent
             std::string down_dest;                  // The location of where the download is being streamed towards
-            unsigned int cId;                       // Automatically incremented Content ID for each download/file
             long long insert_timestamp;             // The date/time of the download/file having been inserted into the history file
             long long complt_timestamp;             // The date/time of the download/file having completed transfer
             long creatn_timestamp;                  // The date/time that the torrent file was authored

@@ -646,17 +646,17 @@ std::vector<GekkoFyre::GkTorrent::GeneralInfo> GekkoFyre::CmnRoutines::process_d
                         }
                     }
 
-                    // Each key identified by something such as, 'LEVELDB_KEY_TORRENT_INSERT_DATE', will store MANY values
-                    // whilst the Unique ID will be unique per 'GekkoFyre::GkTorrent::TorrentInfo' object.
-                    mmap_store.insert(std::make_pair(arg_key, tmp_unique_id), tmp_val);
+                    if (!tmp_unique_id.empty()) {
+                        // Each key identified by something such as, 'LEVELDB_KEY_TORRENT_INSERT_DATE', will store MANY values
+                        // whilst the Unique ID will be unique per 'GekkoFyre::GkTorrent::TorrentInfo' object.
+                        mmap_store.insert(std::make_pair(arg_key, tmp_unique_id), tmp_val);
 
-                    // This is for speeding up searches later on in the function
-                    if (!found_unique_id.contains(tmp_unique_id)) {
-                        found_unique_id.push_back(tmp_unique_id);
+                        // This is for speeding up searches later on in the function
+                        if (!found_unique_id.contains(tmp_unique_id)) {
+                            found_unique_id.push_back(tmp_unique_id);
+                        }
                     }
                 }
-            } else {
-                break;
             }
         } else {
             // There is no XML data present
@@ -731,7 +731,6 @@ std::vector<GekkoFyre::GkFile::FileDbVal> GekkoFyre::CmnRoutines::process_db_xml
 {
     if (!xml_input.empty() && xml_input.size() > CFG_XML_MIN_PARSE_SIZE) {
         std::vector<GekkoFyre::GkFile::FileDbVal> ret_data;
-        pugi::xml_node root;
         std::unique_ptr<pugi::xml_document> doc = std::make_unique<pugi::xml_document>();
         pugi::xml_parse_result result = doc->load_string(xml_input.c_str());
         if (!result) {
@@ -988,7 +987,6 @@ GekkoFyre::GkTorrent::TorrentInfo GekkoFyre::CmnRoutines::torrentFileInfo(const 
                                                                           const int &depth_limit)
 {
     GekkoFyre::GkTorrent::TorrentInfo gk_torrent_struct;
-    gk_torrent_struct.general.cId = 0;
     gk_torrent_struct.general.comment = "";
     gk_torrent_struct.general.complt_timestamp = 0;
     gk_torrent_struct.general.creatn_timestamp = 0;
