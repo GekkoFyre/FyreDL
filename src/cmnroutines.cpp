@@ -365,6 +365,7 @@ bool GekkoFyre::CmnRoutines::batch_write_single_db(const std::string &key, const
     leveldb::Status s;
     if (s.ok()) {
         std::string existing_value;
+        std::vector<GekkoFyre::GkFile::FileDbVal> ret_val;
         leveldb::ReadOptions read_opt;
         read_opt.verify_checksums = true;
 
@@ -376,32 +377,42 @@ bool GekkoFyre::CmnRoutines::batch_write_single_db(const std::string &key, const
         pugi::xml_node root;
         std::unique_ptr<pugi::xml_document> doc = std::make_unique<pugi::xml_document>();
         if (!existing_value.empty() && existing_value.size() > CFG_XML_MIN_PARSE_SIZE) {
-            pugi::xml_parse_result result = doc->load_string(existing_value.c_str());
-            if (!result) {
-                throw std::invalid_argument(tr("There has been an error within the database batch writer routine.\n\nParse error: %1, character pos = %2")
-                                                    .arg(result.description()).arg(result.offset).toStdString());
-            }
-
+            ret_val = process_db_xml(existing_value);
             batch.Delete(key);
-        } else {
-            std::stringstream new_xml_data;
-            // Generate XML declaration
-            auto declarNode = doc->append_child(pugi::node_declaration);
-            declarNode.append_attribute("version") = "1.0";
-            declarNode.append_attribute("encoding") = "UTF-8";;
-            declarNode.append_attribute("standalone") = "yes";
-
-            // A valid XML doc must contain a single root node of any name
-            root = doc->append_child(LEVELDB_PARENT_NODE);
-            pugi::xml_node xml_version_node = root.append_child(LEVELDB_CHILD_NODE_VERS);
-            pugi::xml_node xml_version_child = xml_version_node.append_child(LEVELDB_CHILD_ITEM_VERS);
-            xml_version_child.append_attribute(LEVELDB_ITEM_ATTR_VERS_NO) = FYREDL_PROG_VERS;
         }
 
-        pugi::xml_node nodeParent = root.append_child(LEVELDB_XML_CHILD_NODE);
-        nodeParent.append_attribute(LEVELDB_XML_ATTR_DL_TYPE) = convDownType_toInt(GekkoFyre::DownloadType::Torrent); // TODO: Fix this immediately!
-        nodeParent.append_attribute(LEVELDB_XML_ATTR_ITEM_VALUE) = value.c_str();
-        nodeParent.append_attribute(LEVELDB_ITEM_ATTR_UNIQUE_ID) = unique_id.c_str();
+        std::stringstream new_xml_data;
+        // Generate XML declaration
+        auto declarNode = doc->append_child(pugi::node_declaration);
+        declarNode.append_attribute("version") = "1.0";
+        declarNode.append_attribute("encoding") = "UTF-8";;
+        declarNode.append_attribute("standalone") = "yes";
+
+        // A valid XML doc must contain a single root node of any name
+        root = doc->append_child(LEVELDB_PARENT_NODE);
+        pugi::xml_node xml_version_node = root.append_child(LEVELDB_CHILD_NODE_VERS);
+        pugi::xml_node xml_version_child = xml_version_node.append_child(LEVELDB_CHILD_ITEM_VERS);
+        xml_version_child.append_attribute(LEVELDB_ITEM_ATTR_VERS_NO) = FYREDL_PROG_VERS;
+
+        if (ret_val.size() > 0) {
+            GekkoFyre::GkFile::FileDbVal file_db_val;
+            file_db_val.dl_type = GekkoFyre::DownloadType::Torrent;
+            file_db_val.value = value;
+            file_db_val.unique_id = unique_id;
+            ret_val.push_back(file_db_val);
+
+            for (const auto &val: ret_val) {
+                pugi::xml_node nodeExtraItems = root.append_child(LEVELDB_XML_CHILD_NODE);
+                nodeExtraItems.append_attribute(LEVELDB_XML_ATTR_DL_TYPE) = convDownType_toInt(val.dl_type); // TODO: Fix this immediately!
+                nodeExtraItems.append_attribute(LEVELDB_XML_ATTR_ITEM_VALUE) = val.value.c_str();
+                nodeExtraItems.append_attribute(LEVELDB_ITEM_ATTR_UNIQUE_ID) = val.unique_id.c_str();
+            }
+        } else {
+            pugi::xml_node nodeFirstItem = root.append_child(LEVELDB_XML_CHILD_NODE);
+            nodeFirstItem.append_attribute(LEVELDB_XML_ATTR_DL_TYPE) = convDownType_toInt(GekkoFyre::DownloadType::Torrent); // TODO: Fix this immediately!
+            nodeFirstItem.append_attribute(LEVELDB_XML_ATTR_ITEM_VALUE) = value.c_str();
+            nodeFirstItem.append_attribute(LEVELDB_ITEM_ATTR_UNIQUE_ID) = unique_id.c_str();
+        }
 
         // Save XML tree to file.
         // Remark: second optional param is indent string to be used;
@@ -775,21 +786,20 @@ void GekkoFyre::CmnRoutines::batch_write_to_file_db(const std::vector<GekkoFyre:
             pugi::xml_node root;
             std::unique_ptr<pugi::xml_document> doc = std::make_unique<pugi::xml_document>();
             if (!existing_value.empty() && existing_value.size() > CFG_XML_MIN_PARSE_SIZE) {
-                // TODO: Do something with this data, urgently! The program cannot function correctly otherwise.
                 batch.Delete(key);
-            } else {
-                // Generate XML declaration
-                auto declarNode = doc->append_child(pugi::node_declaration);
-                declarNode.append_attribute("version") = "1.0";
-                declarNode.append_attribute("encoding") = "UTF-8";;
-                declarNode.append_attribute("standalone") = "yes";
-
-                // A valid XML doc must contain a single root node of any name
-                root = doc->append_child(LEVELDB_PARENT_NODE);
-                pugi::xml_node xml_version_node = root.append_child(LEVELDB_CHILD_NODE_VERS);
-                pugi::xml_node xml_version_child = xml_version_node.append_child(LEVELDB_CHILD_ITEM_VERS);
-                xml_version_child.append_attribute(LEVELDB_ITEM_ATTR_VERS_NO) = FYREDL_PROG_VERS;
             }
+
+            // Generate XML declaration
+            auto declarNode = doc->append_child(pugi::node_declaration);
+            declarNode.append_attribute("version") = "1.0";
+            declarNode.append_attribute("encoding") = "UTF-8";;
+            declarNode.append_attribute("standalone") = "yes";
+
+            // A valid XML doc must contain a single root node of any name
+            root = doc->append_child(LEVELDB_PARENT_NODE);
+            pugi::xml_node xml_version_node = root.append_child(LEVELDB_CHILD_NODE_VERS);
+            pugi::xml_node xml_version_child = xml_version_node.append_child(LEVELDB_CHILD_ITEM_VERS);
+            xml_version_child.append_attribute(LEVELDB_ITEM_ATTR_VERS_NO) = FYREDL_PROG_VERS;
 
             //
             // Files
@@ -839,6 +849,7 @@ void GekkoFyre::CmnRoutines::batch_write_to_file_db(const std::vector<GekkoFyre:
 
         s = ext_db_struct.db->Write(write_opt, &batch);
         if (s.ok()) {
+            std::cout << tr("Deleted key: %1").arg(QString::fromStdString(key)).toStdString();
             return;
         } else {
             throw std::runtime_error(s.ToString());
@@ -1640,25 +1651,24 @@ bool GekkoFyre::CmnRoutines::writeTorrent_extra_data(const GekkoFyre::GkTorrent:
         write_opt.sync = true;
         s = ext_db_struct.db->Get(read_opt, key, &existing_value);
         if (!existing_value.empty() && existing_value.size() > CFG_XML_MIN_PARSE_SIZE) { // Check if previous XML data exists or not
-            // TODO: Do something with this data, urgently! The program cannot function correctly otherwise.
             batch.Delete(key);
-        } else {
-            //
-            // No previous records exist, therefore create a new XML document from scratch!
-            //
-            std::stringstream new_xml_data;
-            // Generate XML declaration
-            auto declarNode = doc->append_child(pugi::node_declaration);
-            declarNode.append_attribute("version") = "1.0";
-            declarNode.append_attribute("encoding") = "UTF-8";;
-            declarNode.append_attribute("standalone") = "yes";
-
-            // A valid XML doc must contain a single root node of any name
-            root = doc->append_child(LEVELDB_PARENT_NODE);
-            pugi::xml_node xml_version_node = root.append_child(LEVELDB_CHILD_NODE_VERS);
-            pugi::xml_node xml_version_child = xml_version_node.append_child(LEVELDB_CHILD_ITEM_VERS);
-            xml_version_child.append_attribute(LEVELDB_ITEM_ATTR_VERS_NO) = FYREDL_PROG_VERS;
         }
+
+        //
+        // No previous records exist, therefore create a new XML document from scratch!
+        //
+        std::stringstream new_xml_data;
+        // Generate XML declaration
+        auto declarNode = doc->append_child(pugi::node_declaration);
+        declarNode.append_attribute("version") = "1.0";
+        declarNode.append_attribute("encoding") = "UTF-8";;
+        declarNode.append_attribute("standalone") = "yes";
+
+        // A valid XML doc must contain a single root node of any name
+        root = doc->append_child(LEVELDB_PARENT_NODE);
+        pugi::xml_node xml_version_node = root.append_child(LEVELDB_CHILD_NODE_VERS);
+        pugi::xml_node xml_version_child = xml_version_node.append_child(LEVELDB_CHILD_ITEM_VERS);
+        xml_version_child.append_attribute(LEVELDB_ITEM_ATTR_VERS_NO) = FYREDL_PROG_VERS;
 
         batch_write_to_file_db(gk_ti.files_vec, ext_db_struct);
         pugi::xml_node node_val_trackers = root.append_child(LEVELDB_CHILD_NODE_TORRENT_TRACKERS);
@@ -1682,6 +1692,7 @@ bool GekkoFyre::CmnRoutines::writeTorrent_extra_data(const GekkoFyre::GkTorrent:
         batch.Put(key, ss.str());
         s = ext_db_struct.db->Write(write_opt, &batch);
         if (s.ok()) {
+            std::cout << tr("Deleted key: %1").arg(QString::fromStdString(key)).toStdString();
             return true;
         } else {
             throw std::runtime_error(s.ToString());
@@ -1746,9 +1757,9 @@ std::vector<GekkoFyre::GkTorrent::TorrentInfo> GekkoFyre::CmnRoutines::readTorre
             std::unique_ptr<pugi::xml_document> doc = std::make_unique<pugi::xml_document>();
             leveldb::ReadOptions read_opt;
             read_opt.verify_checksums = true;
-            std::vector<GekkoFyre::GkTorrent::TorrentFile> tor_file_vec;
-            std::vector<GekkoFyre::GkTorrent::TorrentTrackers> tor_tracker_vec;
             for (const auto &info: fin_output) {
+                std::vector<GekkoFyre::GkTorrent::TorrentFile> tor_file_vec;
+                std::vector<GekkoFyre::GkTorrent::TorrentTrackers> tor_tracker_vec;
                 for (int i = 0; i < info.num_files; ++i) {
                     int final_count = (i + 1);
                     std::string file_key, file_value;
