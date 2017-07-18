@@ -151,8 +151,8 @@ private:
                                 const GekkoFyre::GkFile::FileDb &ext_db_struct);
 
     QMap<std::string, std::string> process_db(std::initializer_list<std::tuple<std::string, std::string>> args);
-    std::vector<GekkoFyre::GkTorrent::GeneralInfo> process_db_map(const QMap<std::string, std::string> &map,
-                                                                  std::initializer_list<std::string> args);
+    GekkoFyre::Global::ProcessDbMap process_db_map(const QMap<std::string, std::string> &map,
+                                                   std::initializer_list<std::string> args);
     std::vector<GekkoFyre::GkFile::FileDbVal> process_db_xml(const std::string &xml_input);
 
     QMutex mutex;

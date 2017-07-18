@@ -128,19 +128,19 @@ extern "C" {
 #define LEVELDB_XML_ATTR_ITEM_VALUE "value"
 #define LEVELDB_ITEM_ATTR_UNIQUE_ID "unique-id"
 
-#define LEVELDB_KEY_CURL_FLOC "curl-floc"
-#define LEVELDB_KEY_CURL_STAT "curl-stat"
-#define LEVELDB_KEY_CURL_INSERT_DATE "curl-insrt-date"
-#define LEVELDB_KEY_CURL_COMPLT_DATE "curl-complt-date"
-#define LEVELDB_KEY_CURL_STATMSG "curl-statmsg"
-#define LEVELDB_KEY_CURL_EFFEC_URL "curl-effec-url"
-#define LEVELDB_KEY_CURL_RESP_CODE "curl-resp-code"
-#define LEVELDB_KEY_CURL_CONT_LNGTH "curl-cont-lngth"
+#define LEVELDB_KEY_CURL_FLOC "curl-floc"                     // Location of the file on user's storage disk
+#define LEVELDB_KEY_CURL_STAT "curl-stat"                     // The download status (i.e., downloading, completed, unknown, etc.)
+#define LEVELDB_KEY_CURL_INSERT_DATE "curl-insrt-date"        // Date and time upon which the download was added to the XML history file
+#define LEVELDB_KEY_CURL_COMPLT_DATE "curl-complt-date"       // Date and time upon which the download was completed
+#define LEVELDB_KEY_CURL_STATMSG "curl-statmsg"               // Status message returned by the libcurl library
+#define LEVELDB_KEY_CURL_EFFEC_URL "curl-effec-url"           // Given, proper URL returned from the (source) web-server
+#define LEVELDB_KEY_CURL_RESP_CODE "curl-resp-code"           // Given return-code returned from the (source) web-server
+#define LEVELDB_KEY_CURL_CONT_LNGTH "curl-cont-lngth"         // The size of the download returned from the (source) web-server
 #define LEVELDB_KEY_CURL_UNIQUE_ID "curl-unique-id"
-#define LEVELDB_KEY_CURL_HASH_TYPE "curl-hash-type"
-#define LEVELDB_KEY_CURL_HASH_VAL_GIVEN "curl-hash-val-given"
-#define LEVELDB_KEY_CURL_HASH_VAL_RTRND "curl-hash-val-rtrnd"
-#define LEVELDB_KEY_CURL_HASH_SUCC_TYPE "curl-hash-succ-type"
+#define LEVELDB_KEY_CURL_HASH_TYPE "curl-hash-type"           // The type of hash employed (i.e, SHA1, SHA3-256/512, MD5, etc.)
+#define LEVELDB_KEY_CURL_HASH_VAL_GIVEN "curl-hash-val-given" // The hash-value that was given by the user
+#define LEVELDB_KEY_CURL_HASH_VAL_RTRND "curl-hash-val-rtrnd" // The hash-value that was calculated after the download (presumably) succeeded
+#define LEVELDB_KEY_CURL_HASH_SUCC_TYPE "curl-hash-succ-type" // Whether the calculated hash of the download matched the given hash or not
 
 #define LEVELDB_KEY_TORRENT_FLOC "to-dest"
 #define LEVELDB_KEY_TORRENT_INSERT_DATE "to-insert-date"
@@ -180,18 +180,10 @@ extern "C" {
 
 #define XML_CHILD_NODE_FILE "http"
 #define XML_CHILD_ITEM_FILE "item"
-#define XML_ITEM_ATTR_FILE_CID "content-id"                // The unique, content integer ID of the download in the XML history file
 #define XML_ITEM_ATTR_FILE_FLOC "file-loc"                 // Location of the file on user's storage disk
 #define XML_ITEM_ATTR_FILE_STAT "status"                   // The download status (i.e., downloading, completed, unknown, etc.)
-#define XML_ITEM_ATTR_FILE_INSERT_DATE "insert-date"       // Date and time upon which the download was added to the XML history file
 #define XML_ITEM_ATTR_FILE_COMPLT_DATE "complt-date"       // Date and time upon which the download was completed
-#define XML_ITEM_ATTR_FILE_STATMSG "status-msg"            // Status message returned by the libcurl library
-#define XML_ITEM_ATTR_FILE_EFFEC_URL "effec-url"           // Given, proper URL returned from the (source) web-server
-#define XML_ITEM_ATTR_FILE_RESP_CODE "resp-code"           // Given return-code returned from the (source) web-server
-#define XML_ITEM_ATTR_FILE_CONT_LNGTH "content-length"     // The size of the download returned from the (source) web-server
-#define XML_ITEM_ATTR_FILE_UNIQUE_ID "unique-id"
 #define XML_ITEM_ATTR_FILE_HASH_TYPE "hash-type"           // The type of hash employed (i.e, SHA1, SHA3-256/512, MD5, etc.)
-#define XML_ITEM_ATTR_FILE_HASH_VAL_GIVEN "hash-val-given" // The hash-value that was given by the user
 #define XML_ITEM_ATTR_FILE_HASH_VAL_RTRND "hash-val-rtrnd" // The hash-value that was calculated after the download (presumably) succeeded
 #define XML_ITEM_ATTR_FILE_HASH_SUCC_TYPE "hash-succ-type" // Whether the calculated hash of the download matched the given hash or not
 
@@ -293,18 +285,6 @@ namespace GekkoFyre {
         Corrupt,
         NotApplicable
     };
-
-    template<typename T>
-    T tuple_read(std::istream& is) {
-        T t;
-        is >> t;
-        return t;
-    }
-
-    template <typename... Args>
-    std::tuple<Args...> tuple_parse(std::istream& is) {
-        return std::make_tuple(tuple_read<Args>(is)...);
-    }
 
     namespace GkFile {
         struct FileHash {
@@ -463,7 +443,6 @@ namespace GekkoFyre {
 
         struct CurlDlInfo {
             std::string file_loc;                // The location of the downloaded file being streamed towards
-            [[deprecated]]unsigned int cId;      // Automatically incremented Content ID for each download/file
             long long insert_timestamp;          // The date/time of the download/file having been inserted into the history file
             long long complt_timestamp;          // The date/time of the download/file having completed transfer
             GekkoFyre::DownloadStatus dlStatus;  // Status of the downloading file(s) in question
@@ -525,6 +504,12 @@ namespace GekkoFyre {
             GkGraph::DownSpeedGraph xfer_graph;              // The 'download speed' graph
             boost::optional<GkTorrent::TorrentInfo> to_info; // Information relating to BitTorrent downloads
             boost::optional<GkCurl::CurlDlInfo> curl_info;   // Information relating to HTTP(S) or FTP(S) downloads
+        };
+
+        struct ProcessDbMap {
+            std::string unique_id;
+            boost::optional<std::vector<GekkoFyre::GkTorrent::GeneralInfo>> tor_gen_info;
+            boost::optional<std::vector<GekkoFyre::GkCurl::CurlDlInfo>> curl_dl_info;
         };
     }
 }

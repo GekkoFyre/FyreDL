@@ -566,6 +566,47 @@ QMap<std::string, std::string> GekkoFyre::CmnRoutines::process_db(std::initializ
     QMap<std::string, std::string> mmap;
     for (const std::tuple<std::string, std::string> &i: args) {
         // Arguments have been split up
+        std::string file_loc, dl_status, insert_timestamp, complt_timestamp, ext_status_msg, ext_effect_url, ext_resp_code,
+                ext_content_length, hash_type, hash_val_given, hash_val_returned, hash_succ_type;
+
+        if (std::get<0>(i) == LEVELDB_KEY_CURL_FLOC) {
+            file_loc = std::get<1>(i);
+            mmap.insert(LEVELDB_KEY_CURL_FLOC, file_loc);
+        } else if (std::get<0>(i) == LEVELDB_KEY_CURL_STAT) {
+            dl_status = std::get<1>(i);
+            mmap.insert(LEVELDB_KEY_CURL_STAT, dl_status);
+        } else if (std::get<0>(i) == LEVELDB_KEY_CURL_INSERT_DATE) {
+            insert_timestamp = std::get<1>(i);
+            mmap.insert(LEVELDB_KEY_CURL_INSERT_DATE, insert_timestamp);
+        } else if (std::get<0>(i) == LEVELDB_KEY_CURL_COMPLT_DATE) {
+            complt_timestamp = std::get<1>(i);
+            mmap.insert(LEVELDB_KEY_CURL_COMPLT_DATE, complt_timestamp);
+        } else if (std::get<0>(i) == LEVELDB_KEY_CURL_STATMSG) {
+            ext_status_msg = std::get<1>(i);
+            mmap.insert(LEVELDB_KEY_CURL_STATMSG, ext_status_msg);
+        } else if (std::get<0>(i) == LEVELDB_KEY_CURL_EFFEC_URL) {
+            ext_effect_url = std::get<1>(i);
+            mmap.insert(LEVELDB_KEY_CURL_EFFEC_URL, ext_effect_url);
+        } else if (std::get<0>(i) == LEVELDB_KEY_CURL_RESP_CODE) {
+            ext_resp_code = std::get<1>(i);
+            mmap.insert(LEVELDB_KEY_CURL_RESP_CODE, ext_resp_code);
+        } else if (std::get<0>(i) == LEVELDB_KEY_CURL_CONT_LNGTH) {
+            ext_content_length = std::get<1>(i);
+            mmap.insert(LEVELDB_KEY_CURL_CONT_LNGTH, ext_content_length);
+        } else if (std::get<0>(i) == LEVELDB_KEY_CURL_HASH_TYPE) {
+            hash_type = std::get<1>(i);
+            mmap.insert(LEVELDB_KEY_CURL_HASH_TYPE, hash_type);
+        } else if (std::get<0>(i) == LEVELDB_KEY_CURL_HASH_VAL_GIVEN) {
+            hash_val_given = std::get<1>(i);
+            mmap.insert(LEVELDB_KEY_CURL_HASH_VAL_GIVEN, hash_val_given);
+        } else if (std::get<0>(i) == LEVELDB_KEY_CURL_HASH_VAL_RTRND) {
+            hash_val_returned = std::get<1>(i);
+            mmap.insert(LEVELDB_KEY_CURL_HASH_VAL_RTRND, hash_val_returned);
+        } else if (std::get<0>(i) == LEVELDB_KEY_CURL_HASH_SUCC_TYPE) {
+            hash_succ_type = std::get<1>(i);
+            mmap.insert(LEVELDB_KEY_CURL_HASH_SUCC_TYPE, hash_succ_type);
+        }
+
         std::string val_to_down_dest, val_to_insert_timestamp, val_to_complt_timestamp, val_to_creatn_timestamp,
                 val_to_status, val_to_comment, val_to_creator, val_to_magnet_uri, val_to_name, val_to_num_files,
                 val_to_num_pieces, val_to_piece_length;
@@ -622,13 +663,15 @@ QMap<std::string, std::string> GekkoFyre::CmnRoutines::process_db(std::initializ
  * @return A pre-defined struct that is far more readable and easily accessed, specifically, 'GekkoFyre::GkTorrent::TorrentInfo'.
  * @see GekkoFyre::CmnRoutines::process_db(), GekkoFyre::CmnRoutines::process_db_xml()
  */
-std::vector<GekkoFyre::GkTorrent::GeneralInfo> GekkoFyre::CmnRoutines::process_db_map(const QMap<std::string, std::string> &map,
+GekkoFyre::Global::ProcessDbMap GekkoFyre::CmnRoutines::process_db_map(const QMap<std::string, std::string> &map,
                                                                                       std::initializer_list<std::string> args)
 {
     QMultiMap<std::pair<std::string, std::string>, std::string> mmap_store;
     QList<std::string> found_unique_id;
+    bool bitTorrent = false;
     for (const auto &arg_key: args) {
         // Expand the arguments
+        if (arg_key == LEVELDB_KEY_TORRENT_FLOC) { bitTorrent = true; }
         std::string val = map.value(arg_key);
         if (!val.empty()) {
             std::vector<GekkoFyre::GkFile::FileDbVal> xml_data = process_db_xml(val);
@@ -679,56 +722,89 @@ std::vector<GekkoFyre::GkTorrent::GeneralInfo> GekkoFyre::CmnRoutines::process_d
 
     // We need to match each item of struct 'GekkoFyre::GkTorrent::TorrentInfo' to its respective place, but to do that,
     // we must first match a Unique Identifier to each 'GekkoFyre::GkTorrent::TorrentInfo' object.
-    std::vector<GekkoFyre::GkTorrent::GeneralInfo> vec_output;
-    for (const auto &i: mmap_store.keys()) {
-        // Expand out the list of keys stored within the QMultiMap
-        for (const auto &j: found_unique_id) {
-            if (i.second == j) {
-
-            }
-        }
-    }
-
+    std::vector<GekkoFyre::GkTorrent::GeneralInfo> tor_vec_output;
+    std::vector<GekkoFyre::GkCurl::CurlDlInfo> curl_vec_output;
     for (auto i = 0; i < found_unique_id.size(); ++i) {
-        GekkoFyre::GkTorrent::GeneralInfo tor_info;
-        for (const auto &j: args) {
-            std::pair<std::string, std::string> key_pair = std::make_pair(j, found_unique_id.at(i));
-            if (j == LEVELDB_KEY_TORRENT_FLOC) {
-                tor_info.down_dest = mmap_store.value(key_pair);
-            } else if (j == LEVELDB_KEY_TORRENT_INSERT_DATE) {
-                tor_info.insert_timestamp = atoll(mmap_store.value(key_pair).c_str());
-            } else if (j == LEVELDB_KEY_TORRENT_COMPLT_DATE) {
-                tor_info.complt_timestamp = atoll(mmap_store.value(key_pair).c_str());
-            } else if (j == LEVELDB_KEY_TORRENT_CREATN_DATE) {
-                tor_info.creatn_timestamp = atol(mmap_store.value(key_pair).c_str());
-            } else if (j == LEVELDB_KEY_TORRENT_DLSTATUS) {
-                tor_info.dlStatus = convDlStat_StringToEnum(QString::fromStdString(mmap_store.value(key_pair)));
-            } else if (j == LEVELDB_KEY_TORRENT_TORRNT_COMMENT) {
-                tor_info.comment = mmap_store.value(key_pair);
-            } else if (j == LEVELDB_KEY_TORRENT_TORRNT_CREATOR) {
-                tor_info.creator = mmap_store.value(key_pair);
-            } else if (j == LEVELDB_KEY_TORRENT_MAGNET_URI) {
-                tor_info.magnet_uri = mmap_store.value(key_pair);
-            } else if (j == LEVELDB_KEY_TORRENT_TORRNT_NAME) {
-                tor_info.torrent_name = mmap_store.value(key_pair);
-            } else if (j == LEVELDB_KEY_TORRENT_NUM_FILES) {
-                tor_info.num_files = atoi(mmap_store.value(key_pair).c_str());
-            } else if (j == LEVELDB_KEY_TORRENT_TORRNT_PIECES) {
-                tor_info.num_pieces = atoi(mmap_store.value(key_pair).c_str());
-            } else if (j == LEVELDB_KEY_TORRENT_TORRNT_PIECE_LENGTH) {
-                tor_info.piece_length = atoi(mmap_store.value(key_pair).c_str());
+        if (bitTorrent) {
+            GekkoFyre::GkTorrent::GeneralInfo tor_info;
+            for (const auto &j: args) {
+                std::pair<std::string, std::string> key_pair = std::make_pair(j, found_unique_id.at(i));
+                if (j == LEVELDB_KEY_TORRENT_FLOC) {
+                    tor_info.down_dest = mmap_store.value(key_pair);
+                } else if (j == LEVELDB_KEY_TORRENT_INSERT_DATE) {
+                    tor_info.insert_timestamp = atoll(mmap_store.value(key_pair).c_str());
+                } else if (j == LEVELDB_KEY_TORRENT_COMPLT_DATE) {
+                    tor_info.complt_timestamp = atoll(mmap_store.value(key_pair).c_str());
+                } else if (j == LEVELDB_KEY_TORRENT_CREATN_DATE) {
+                    tor_info.creatn_timestamp = atol(mmap_store.value(key_pair).c_str());
+                } else if (j == LEVELDB_KEY_TORRENT_DLSTATUS) {
+                    tor_info.dlStatus = convDlStat_StringToEnum(QString::fromStdString(mmap_store.value(key_pair)));
+                } else if (j == LEVELDB_KEY_TORRENT_TORRNT_COMMENT) {
+                    tor_info.comment = mmap_store.value(key_pair);
+                } else if (j == LEVELDB_KEY_TORRENT_TORRNT_CREATOR) {
+                    tor_info.creator = mmap_store.value(key_pair);
+                } else if (j == LEVELDB_KEY_TORRENT_MAGNET_URI) {
+                    tor_info.magnet_uri = mmap_store.value(key_pair);
+                } else if (j == LEVELDB_KEY_TORRENT_TORRNT_NAME) {
+                    tor_info.torrent_name = mmap_store.value(key_pair);
+                } else if (j == LEVELDB_KEY_TORRENT_NUM_FILES) {
+                    tor_info.num_files = atoi(mmap_store.value(key_pair).c_str());
+                } else if (j == LEVELDB_KEY_TORRENT_TORRNT_PIECES) {
+                    tor_info.num_pieces = atoi(mmap_store.value(key_pair).c_str());
+                } else if (j == LEVELDB_KEY_TORRENT_TORRNT_PIECE_LENGTH) {
+                    tor_info.piece_length = atoi(mmap_store.value(key_pair).c_str());
+                }
             }
+
+            tor_info.unique_id = found_unique_id.at(i);
+            tor_vec_output.push_back(tor_info);
+        } else {
+            GekkoFyre::GkCurl::CurlDlInfo curl_info;
+            for (const auto &j: args) {
+                std::pair<std::string, std::string> key_pair = std::make_pair(j, found_unique_id.at(i));
+                if (j == LEVELDB_KEY_CURL_FLOC) {
+                    curl_info.file_loc = mmap_store.value(key_pair);
+                } else if (j == LEVELDB_KEY_CURL_STAT) {
+                    curl_info.dlStatus = convDlStat_IntToEnum(atoi(mmap_store.value(key_pair).c_str()));
+                } else if (j == LEVELDB_KEY_CURL_INSERT_DATE) {
+                    curl_info.insert_timestamp = atoll(mmap_store.value(key_pair).c_str());
+                } else if (j == LEVELDB_KEY_CURL_COMPLT_DATE) {
+                    curl_info.complt_timestamp = atoll(mmap_store.value(key_pair).c_str());
+                } else if (j == LEVELDB_KEY_CURL_STATMSG) {
+                    curl_info.ext_info.status_msg = mmap_store.value(key_pair);
+                } else if (j == LEVELDB_KEY_CURL_EFFEC_URL) {
+                    curl_info.ext_info.effective_url = mmap_store.value(key_pair);
+                } else if (j == LEVELDB_KEY_CURL_RESP_CODE) {
+                    curl_info.ext_info.response_code = atoll(mmap_store.value(key_pair).c_str());
+                } else if (j == LEVELDB_KEY_CURL_CONT_LNGTH) {
+                    curl_info.ext_info.content_length = std::atof(mmap_store.value(key_pair).c_str());
+                } else if (j == LEVELDB_KEY_CURL_HASH_TYPE) {
+                    curl_info.hash_type = convHashType_IntToEnum(atoi(mmap_store.value(key_pair).c_str()));
+                } else if (j == LEVELDB_KEY_CURL_HASH_VAL_GIVEN) {
+                    curl_info.hash_val_given = mmap_store.value(key_pair);
+                } else if (j == LEVELDB_KEY_CURL_HASH_VAL_RTRND) {
+                    curl_info.hash_val_rtrnd = mmap_store.value(key_pair);
+                } else if (j == LEVELDB_KEY_CURL_HASH_SUCC_TYPE) {
+                    curl_info.hash_succ_type = convHashVerif_IntToEnum(atoi(mmap_store.value(key_pair).c_str()));
+                }
+            }
+
+            curl_vec_output.push_back(curl_info);
         }
-
-        tor_info.unique_id = found_unique_id.at(i);
-        vec_output.push_back(tor_info);
     }
 
-    if (vec_output.size() > 0) {
-        return vec_output;
+    GekkoFyre::Global::ProcessDbMap proc_db_map_struct;
+    if (tor_vec_output.size() > 0) {
+        proc_db_map_struct.tor_gen_info = tor_vec_output;
+        return proc_db_map_struct;
     }
 
-    return std::vector<GekkoFyre::GkTorrent::GeneralInfo>();
+    if (curl_vec_output.size() > 0) {
+        proc_db_map_struct.curl_dl_info = curl_vec_output;
+        return proc_db_map_struct;
+    }
+
+    return proc_db_map_struct;
 }
 
 /**
@@ -1276,12 +1352,18 @@ std::vector<GekkoFyre::GkCurl::CurlDlInfo> GekkoFyre::CmnRoutines::readDownloadI
         QMap<std::string, std::string> map_output;
         map_output = process_db({file_loc, dl_status, insert_timestamp, complt_timestamp, ext_status_msg, ext_effect_url, ext_resp_code,
                                  ext_content_length, hash_type, hash_val_given, hash_val_returned, hash_succ_type});
-        std::vector<GekkoFyre::GkTorrent::GeneralInfo> fin_output;
+        GekkoFyre::Global::ProcessDbMap fin_output;
+        std::vector<GekkoFyre::GkCurl::CurlDlInfo> curl_gen_info;
         fin_output = process_db_map(map_output, {LEVELDB_KEY_CURL_FLOC, LEVELDB_KEY_CURL_STAT, LEVELDB_KEY_CURL_INSERT_DATE,
                                                  LEVELDB_KEY_CURL_COMPLT_DATE, LEVELDB_KEY_CURL_STATMSG, LEVELDB_KEY_CURL_EFFEC_URL,
                                                  LEVELDB_KEY_CURL_RESP_CODE, LEVELDB_KEY_CURL_CONT_LNGTH, LEVELDB_KEY_CURL_HASH_TYPE,
                                                  LEVELDB_KEY_CURL_HASH_VAL_GIVEN, LEVELDB_KEY_CURL_HASH_VAL_RTRND,
                                                  LEVELDB_KEY_CURL_HASH_SUCC_TYPE});
+
+        if (fin_output.curl_dl_info.is_initialized()) {
+            curl_gen_info = fin_output.curl_dl_info.value();
+            return curl_gen_info;
+        }
     } catch (const std::exception &e) {
         QMessageBox::warning(nullptr, tr("Error!"), e.what(), QMessageBox::Ok);
     }
@@ -1661,109 +1743,114 @@ std::vector<GekkoFyre::GkTorrent::TorrentInfo> GekkoFyre::CmnRoutines::readTorre
                                      val_to_status, val_to_comment, val_to_creator, val_to_magnet_uri, val_to_name, val_to_num_files,
                                      val_to_num_pieces, val_to_piece_length});
 
-            std::vector<GekkoFyre::GkTorrent::GeneralInfo> fin_output;
+            GekkoFyre::Global::ProcessDbMap fin_output;
+            std::vector<GekkoFyre::GkTorrent::GeneralInfo> proc_tor_data;
             fin_output = process_db_map(map_output, {LEVELDB_KEY_TORRENT_FLOC, LEVELDB_KEY_TORRENT_INSERT_DATE, LEVELDB_KEY_TORRENT_COMPLT_DATE,
                                         LEVELDB_KEY_TORRENT_CREATN_DATE, LEVELDB_KEY_TORRENT_DLSTATUS, LEVELDB_KEY_TORRENT_TORRNT_COMMENT,
                                         LEVELDB_KEY_TORRENT_TORRNT_CREATOR, LEVELDB_KEY_TORRENT_MAGNET_URI, LEVELDB_KEY_TORRENT_TORRNT_NAME,
                                         LEVELDB_KEY_TORRENT_NUM_FILES, LEVELDB_KEY_TORRENT_TORRNT_PIECES, LEVELDB_KEY_TORRENT_TORRNT_PIECE_LENGTH});
 
-            std::unique_ptr<pugi::xml_document> doc = std::make_unique<pugi::xml_document>();
-            leveldb::ReadOptions read_opt;
-            read_opt.verify_checksums = true;
-            for (const auto &info: fin_output) {
-                std::vector<GekkoFyre::GkTorrent::TorrentFile> tor_file_vec;
-                std::vector<GekkoFyre::GkTorrent::TorrentTrackers> tor_tracker_vec;
-                for (int i = 0; i < info.num_files; ++i) {
-                    int final_count = (i + 1);
-                    std::string file_key, file_value;
-                    file_key = multipart_key({LEVELDB_KEY_TORRENT_TORRENT_FILES, std::to_string(final_count), info.unique_id});
-                    s = db_struct.db->Get(read_opt, file_key, &file_value);
+            if (fin_output.tor_gen_info.is_initialized()) {
+                proc_tor_data = fin_output.tor_gen_info.value();
+
+                std::unique_ptr<pugi::xml_document> doc = std::make_unique<pugi::xml_document>();
+                leveldb::ReadOptions read_opt;
+                read_opt.verify_checksums = true;
+                for (const auto &info: proc_tor_data) {
+                    std::vector<GekkoFyre::GkTorrent::TorrentFile> tor_file_vec;
+                    std::vector<GekkoFyre::GkTorrent::TorrentTrackers> tor_tracker_vec;
+                    for (int i = 0; i < info.num_files; ++i) {
+                        int final_count = (i + 1);
+                        std::string file_key, file_value;
+                        file_key = multipart_key({LEVELDB_KEY_TORRENT_TORRENT_FILES, std::to_string(final_count), info.unique_id});
+                        s = db_struct.db->Get(read_opt, file_key, &file_value);
+                        if (!s.ok()) { throw std::runtime_error(tr("Problem whilst reading database. Details:\n\n%1").arg(QString::fromStdString(s.ToString())).toStdString()); }
+                        if (!file_value.empty() && file_value.size() > CFG_XML_MIN_PARSE_SIZE) {
+                            // There is data present!
+                            pugi::xml_parse_result result = doc->load_string(file_value.c_str());
+                            if (!result) {
+                                throw std::invalid_argument(tr("There has been an error whilst processing the XML from the database for BitTorrent download, \"%1\".\n\nParse error: %2, character pos = %3")
+                                                                    .arg(QString::fromStdString(info.torrent_name)).arg(result.description())
+                                                                    .arg(result.offset).toStdString());
+                            }
+
+                            // Parse the rest of the XML
+                            GekkoFyre::GkTorrent::TorrentFile tor_file;
+                            tor_file.unique_id = info.unique_id;
+
+                            //
+                            // Files
+                            //
+                            pugi::xml_node nodeParent = doc->child(LEVELDB_PARENT_NODE);
+                            pugi::xml_node nodeFilesPath = nodeParent.child(LEVELDB_CHILD_FILES_PATH_TORRENT);
+
+                            // Sub-nodes
+                            tor_file.file_path = nodeFilesPath.child_value();
+                            tor_file.sha1_hash_hex = nodeFilesPath.child_value(LEVELDB_CHILD_FILES_HASH_TORRENT);
+                            tor_file.flags = atoi(nodeFilesPath.child_value(LEVELDB_CHILD_FILES_FLAGS_TORRENT));
+                            tor_file.content_length = atoi(nodeFilesPath.child_value(LEVELDB_CHILD_FILES_CONTLNGTH_TORRENT));
+                            tor_file.file_offset = atoi(nodeFilesPath.child_value(LEVELDB_CHILD_FILES_FILEOFFST_TORRENT));
+                            std::stringstream mtime_ss;
+                            mtime_ss << nodeFilesPath.child_value(LEVELDB_CHILD_FILES_MTIME_TORRENT);
+                            mtime_ss >> tor_file.mtime;
+                            tor_file.downloaded = atoi(nodeFilesPath.child_value());
+                            pugi::xml_node map_file_piece = nodeFilesPath.child(LEVELDB_CHILD_NODE_TORRENT_FILES_MAPFLEPCE);
+                            tor_file.map_file_piece.first = atoi(map_file_piece.child_value(LEVELDB_CHILD_FILES_MAPFLEPCE_1_TORRENT));
+                            tor_file.map_file_piece.second = atoi(map_file_piece.child_value(LEVELDB_CHILD_FILES_MAPFLEPCE_2_TORRENT));
+
+                            tor_file_vec.push_back(tor_file);
+                        }
+                    }
+
+                    std::string tracker_key, tracker_value;
+                    tracker_key = multipart_key({LEVELDB_KEY_TORRENT_TRACKERS, info.unique_id});
+                    s = db_struct.db->Get(read_opt, tracker_key, &tracker_value);
                     if (!s.ok()) { throw std::runtime_error(tr("Problem whilst reading database. Details:\n\n%1").arg(QString::fromStdString(s.ToString())).toStdString()); }
-                    if (!file_value.empty() && file_value.size() > CFG_XML_MIN_PARSE_SIZE) {
+                    if (!tracker_value.empty() && tracker_value.size() > CFG_XML_MIN_PARSE_SIZE) {
                         // There is data present!
-                        pugi::xml_parse_result result = doc->load_string(file_value.c_str());
+                        pugi::xml_parse_result result = doc->load_string(tracker_value.c_str());
                         if (!result) {
                             throw std::invalid_argument(tr("There has been an error whilst processing the XML from the database for BitTorrent download, \"%1\".\n\nParse error: %2, character pos = %3")
                                                                 .arg(QString::fromStdString(info.torrent_name)).arg(result.description())
                                                                 .arg(result.offset).toStdString());
                         }
 
-                        // Parse the rest of the XML
-                        GekkoFyre::GkTorrent::TorrentFile tor_file;
-                        tor_file.unique_id = info.unique_id;
-
                         //
-                        // Files
+                        // Trackers
                         //
                         pugi::xml_node nodeParent = doc->child(LEVELDB_PARENT_NODE);
-                        pugi::xml_node nodeFilesPath = nodeParent.child(LEVELDB_CHILD_FILES_PATH_TORRENT);
-
-                        // Sub-nodes
-                        tor_file.file_path = nodeFilesPath.child_value();
-                        tor_file.sha1_hash_hex = nodeFilesPath.child_value(LEVELDB_CHILD_FILES_HASH_TORRENT);
-                        tor_file.flags = atoi(nodeFilesPath.child_value(LEVELDB_CHILD_FILES_FLAGS_TORRENT));
-                        tor_file.content_length = atoi(nodeFilesPath.child_value(LEVELDB_CHILD_FILES_CONTLNGTH_TORRENT));
-                        tor_file.file_offset = atoi(nodeFilesPath.child_value(LEVELDB_CHILD_FILES_FILEOFFST_TORRENT));
-                        std::stringstream mtime_ss;
-                        mtime_ss << nodeFilesPath.child_value(LEVELDB_CHILD_FILES_MTIME_TORRENT);
-                        mtime_ss >> tor_file.mtime;
-                        tor_file.downloaded = atoi(nodeFilesPath.child_value());
-                        pugi::xml_node map_file_piece = nodeFilesPath.child(LEVELDB_CHILD_NODE_TORRENT_FILES_MAPFLEPCE);
-                        tor_file.map_file_piece.first = atoi(map_file_piece.child_value(LEVELDB_CHILD_FILES_MAPFLEPCE_1_TORRENT));
-                        tor_file.map_file_piece.second = atoi(map_file_piece.child_value(LEVELDB_CHILD_FILES_MAPFLEPCE_2_TORRENT));
-
-                        tor_file_vec.push_back(tor_file);
+                        pugi::xml_node nodeTrackers = nodeParent.child(LEVELDB_CHILD_NODE_TORRENT_TRACKERS);
+                        for (pugi::xml_node tracker = nodeTrackers.child(LEVELDB_CHILD_TRACKERS_TIER_TORRENT); tracker;
+                             tracker = tracker.next_sibling(LEVELDB_CHILD_TRACKERS_TIER_TORRENT)) {
+                            // Sub-nodes
+                            GekkoFyre::GkTorrent::TorrentTrackers tor_trackers;
+                            tor_trackers.unique_id = info.unique_id;
+                            tor_trackers.url = tracker.child_value(LEVELDB_CHILD_TRACKERS_URL_TORRENT);
+                            tor_trackers.tier = atoi(tracker.child_value());
+                            tor_trackers.enabled = atoi(tracker.child_value(LEVELDB_CHILD_TRACKERS_AVAILABLE_TORRENT));
+                            tor_tracker_vec.push_back(tor_trackers);
+                        }
                     }
+
+                    // Process all the data now that we have accumulated it all!
+                    GekkoFyre::GkTorrent::TorrentInfo tor_info;
+                    tor_info.general.unique_id = info.unique_id;
+                    tor_info.general.down_dest = info.down_dest;
+                    tor_info.general.insert_timestamp = info.insert_timestamp;
+                    tor_info.general.complt_timestamp = info.complt_timestamp;
+                    tor_info.general.creatn_timestamp = info.creatn_timestamp;
+                    tor_info.general.dlStatus = info.dlStatus;
+                    tor_info.general.comment = info.comment;
+                    tor_info.general.creator = info.creator;
+                    tor_info.general.magnet_uri = info.magnet_uri;
+                    tor_info.general.torrent_name = info.torrent_name;
+                    tor_info.general.num_files = info.num_files;
+                    tor_info.general.num_pieces = info.num_pieces;
+                    tor_info.general.piece_length = info.piece_length;
+                    tor_info.files_vec = tor_file_vec;
+                    tor_info.trackers = tor_tracker_vec;
+                    to_info_vec.push_back(tor_info);
                 }
-
-                std::string tracker_key, tracker_value;
-                tracker_key = multipart_key({LEVELDB_KEY_TORRENT_TRACKERS, info.unique_id});
-                s = db_struct.db->Get(read_opt, tracker_key, &tracker_value);
-                if (!s.ok()) { throw std::runtime_error(tr("Problem whilst reading database. Details:\n\n%1").arg(QString::fromStdString(s.ToString())).toStdString()); }
-                if (!tracker_value.empty() && tracker_value.size() > CFG_XML_MIN_PARSE_SIZE) {
-                    // There is data present!
-                    pugi::xml_parse_result result = doc->load_string(tracker_value.c_str());
-                    if (!result) {
-                        throw std::invalid_argument(tr("There has been an error whilst processing the XML from the database for BitTorrent download, \"%1\".\n\nParse error: %2, character pos = %3")
-                                                            .arg(QString::fromStdString(info.torrent_name)).arg(result.description())
-                                                            .arg(result.offset).toStdString());
-                    }
-
-                    //
-                    // Trackers
-                    //
-                    pugi::xml_node nodeParent = doc->child(LEVELDB_PARENT_NODE);
-                    pugi::xml_node nodeTrackers = nodeParent.child(LEVELDB_CHILD_NODE_TORRENT_TRACKERS);
-                    for (pugi::xml_node tracker = nodeTrackers.child(LEVELDB_CHILD_TRACKERS_TIER_TORRENT); tracker;
-                         tracker = tracker.next_sibling(LEVELDB_CHILD_TRACKERS_TIER_TORRENT)) {
-                        // Sub-nodes
-                        GekkoFyre::GkTorrent::TorrentTrackers tor_trackers;
-                        tor_trackers.unique_id = info.unique_id;
-                        tor_trackers.url = tracker.child_value(LEVELDB_CHILD_TRACKERS_URL_TORRENT);
-                        tor_trackers.tier = atoi(tracker.child_value());
-                        tor_trackers.enabled = atoi(tracker.child_value(LEVELDB_CHILD_TRACKERS_AVAILABLE_TORRENT));
-                        tor_tracker_vec.push_back(tor_trackers);
-                    }
-                }
-
-                // Process all the data now that we have accumulated it all!
-                GekkoFyre::GkTorrent::TorrentInfo tor_info;
-                tor_info.general.unique_id = info.unique_id;
-                tor_info.general.down_dest = info.down_dest;
-                tor_info.general.insert_timestamp = info.insert_timestamp;
-                tor_info.general.complt_timestamp = info.complt_timestamp;
-                tor_info.general.creatn_timestamp = info.creatn_timestamp;
-                tor_info.general.dlStatus = info.dlStatus;
-                tor_info.general.comment = info.comment;
-                tor_info.general.creator = info.creator;
-                tor_info.general.magnet_uri = info.magnet_uri;
-                tor_info.general.torrent_name = info.torrent_name;
-                tor_info.general.num_files = info.num_files;
-                tor_info.general.num_pieces = info.num_pieces;
-                tor_info.general.piece_length = info.piece_length;
-                tor_info.files_vec = tor_file_vec;
-                tor_info.trackers = tor_tracker_vec;
-                to_info_vec.push_back(tor_info);
             }
         } else {
             // There is a problem with the database!

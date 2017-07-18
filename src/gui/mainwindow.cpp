@@ -1684,7 +1684,6 @@ void MainWindow::sendDetails(const std::string &fileName, const double &fileSize
         dl_info.ext_info.response_code = resp_code;
         dl_info.ext_info.status_ok = stat_ok;
         dl_info.ext_info.status_msg = stat_msg;
-        dl_info.cId = 0;
         dl_info.insert_timestamp = 0;
         dl_info.hash_type = hash_type;
         dl_info.hash_val_given = hash_val;

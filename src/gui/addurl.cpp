@@ -135,7 +135,6 @@ void AddURL::on_buttonBox_accepted()
                             dl_info.ext_info.effective_url = info_ext.effective_url;
                             dl_info.ext_info.response_code = info_ext.response_code;
                             dl_info.ext_info.status_ok = info_ext.status_ok;
-                            dl_info.cId = 0;
                             dl_info.insert_timestamp = 0;
                             dl_info.unique_id = routines->createId(FYREDL_UNIQUE_ID_DIGIT_COUNT);
 
@@ -295,7 +294,6 @@ void AddURL::on_buttonBox_accepted()
                             dl_info.ext_info.effective_url = info_ext.effective_url;
                             dl_info.ext_info.response_code = info_ext.response_code;
                             dl_info.ext_info.status_ok = info_ext.status_ok;
-                            dl_info.cId = 0;
                             dl_info.insert_timestamp = 0;
                         } else {
                             // #####################################
@@ -325,7 +323,6 @@ void AddURL::on_buttonBox_accepted()
                             dl_info.ext_info.effective_url = csv_vec.at(i).url;
                             dl_info.ext_info.response_code = info.response_code;
                             dl_info.ext_info.status_ok = false;
-                            dl_info.cId = 0;
                             dl_info.insert_timestamp = 0;
                         }
 
