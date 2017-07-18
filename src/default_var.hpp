@@ -98,7 +98,7 @@ extern "C" {
 #define FYREDL_CONN_LOW_SPEED_TIME 10L                   // The number of seconds that the transfer speed should be below 'FYREDL_CONN_LOW_SPEED_CUTOUT' before connection cut-off.
 #define FYREDL_EST_WAIT_TIME_PRECISION 3                 // The significant digit precision of the estimated wait time counter for each active transfer
 #define FYREDL_UNIQUE_ID_DIGIT_COUNT 32                  // The 'unique identifier' serial number that is given to each download item. This determines how many digits are allocated to this identifier and thus, how much RAM is used for storage thereof.
-#define FYREDL_DEFAULT_RESOLUTION_WIDTH 1920
+#define FYREDL_DEFAULT_RESOLUTION_WIDTH 1920.0
 
 //
 // ######################################
@@ -127,6 +127,20 @@ extern "C" {
 #define LEVELDB_XML_ATTR_DL_TYPE "dl-type"
 #define LEVELDB_XML_ATTR_ITEM_VALUE "value"
 #define LEVELDB_ITEM_ATTR_UNIQUE_ID "unique-id"
+
+#define LEVELDB_KEY_CURL_FLOC "curl-floc"
+#define LEVELDB_KEY_CURL_STAT "curl-stat"
+#define LEVELDB_KEY_CURL_INSERT_DATE "curl-insrt-date"
+#define LEVELDB_KEY_CURL_COMPLT_DATE "curl-complt-date"
+#define LEVELDB_KEY_CURL_STATMSG "curl-statmsg"
+#define LEVELDB_KEY_CURL_EFFEC_URL "curl-effec-url"
+#define LEVELDB_KEY_CURL_RESP_CODE "curl-resp-code"
+#define LEVELDB_KEY_CURL_CONT_LNGTH "curl-cont-lngth"
+#define LEVELDB_KEY_CURL_UNIQUE_ID "curl-unique-id"
+#define LEVELDB_KEY_CURL_HASH_TYPE "curl-hash-type"
+#define LEVELDB_KEY_CURL_HASH_VAL_GIVEN "curl-hash-val-given"
+#define LEVELDB_KEY_CURL_HASH_VAL_RTRND "curl-hash-val-rtrnd"
+#define LEVELDB_KEY_CURL_HASH_SUCC_TYPE "curl-hash-succ-type"
 
 #define LEVELDB_KEY_TORRENT_FLOC "to-dest"
 #define LEVELDB_KEY_TORRENT_INSERT_DATE "to-insert-date"
@@ -449,7 +463,7 @@ namespace GekkoFyre {
 
         struct CurlDlInfo {
             std::string file_loc;                // The location of the downloaded file being streamed towards
-            unsigned int cId;                    // Automatically incremented Content ID for each download/file
+            [[deprecated]]unsigned int cId;      // Automatically incremented Content ID for each download/file
             long long insert_timestamp;          // The date/time of the download/file having been inserted into the history file
             long long complt_timestamp;          // The date/time of the download/file having completed transfer
             GekkoFyre::DownloadStatus dlStatus;  // Status of the downloading file(s) in question

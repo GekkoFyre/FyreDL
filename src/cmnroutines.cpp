@@ -542,7 +542,9 @@ std::pair<std::string, std::string> GekkoFyre::CmnRoutines::read_db_min(const st
     read_opt.verify_checksums = true;
 
     std::string read_xml;
+    mutex.lock();
     s = file_db_struct.db->Get(read_opt, key, &read_xml);
+    mutex.unlock();
 
     return std::make_pair(key, read_xml);
 }
@@ -1253,162 +1255,79 @@ void GekkoFyre::CmnRoutines::clearLayout(QLayout *layout)
 std::vector<GekkoFyre::GkCurl::CurlDlInfo> GekkoFyre::CmnRoutines::readDownloadInfo(const std::string &xmlCfgFile,
                                                                                     const bool &hashesOnly)
 {
-    fs::path xmlCfgFile_loc = findCfgFile(xmlCfgFile);
-    sys::error_code ec;
-    if (fs::exists(xmlCfgFile_loc, ec) && fs::is_regular_file(xmlCfgFile_loc)) {
-        std::vector<GekkoFyre::GkCurl::CurlDlInfo> dl_info_list;
+    try {
+        GekkoFyre::GkFile::FileDb db_struct = openDatabase(CFG_HISTORY_DB_FILE);
+        std::tuple<std::string, std::string> file_loc, dl_status, insert_timestamp, complt_timestamp, ext_status_msg, ext_effect_url,
+                ext_resp_code, ext_content_length, hash_type, hash_val_given, hash_val_returned, hash_succ_type;
 
-        pugi::xml_document doc;
-        mutex.lock();
-        pugi::xml_parse_result result = doc.load_file(xmlCfgFile_loc.string().c_str(), pugi::parse_default|pugi::parse_declaration);
-        mutex.unlock();
-            if (!result) {
-                throw std::invalid_argument(tr("XML parse error: %1, character pos= %2")
-                                            .arg(result.description(),
-                                                 QString::number(result.offset)).toStdString());
-            }
+        file_loc = read_db_min(LEVELDB_KEY_CURL_FLOC, db_struct);
+        dl_status = read_db_min(LEVELDB_KEY_CURL_STAT, db_struct);
+        insert_timestamp = read_db_min(LEVELDB_KEY_CURL_INSERT_DATE, db_struct);
+        complt_timestamp = read_db_min(LEVELDB_KEY_CURL_COMPLT_DATE, db_struct);
+        ext_status_msg = read_db_min(LEVELDB_KEY_CURL_STATMSG, db_struct);
+        ext_effect_url = read_db_min(LEVELDB_KEY_CURL_EFFEC_URL, db_struct);
+        ext_resp_code = read_db_min(LEVELDB_KEY_CURL_RESP_CODE, db_struct);
+        ext_content_length = read_db_min(LEVELDB_KEY_CURL_CONT_LNGTH, db_struct);
+        hash_type = read_db_min(LEVELDB_KEY_CURL_HASH_TYPE, db_struct);
+        hash_val_given = read_db_min(LEVELDB_KEY_CURL_HASH_VAL_GIVEN, db_struct);
+        hash_val_returned = read_db_min(LEVELDB_KEY_CURL_HASH_VAL_RTRND, db_struct);
+        hash_succ_type = read_db_min(LEVELDB_KEY_CURL_HASH_SUCC_TYPE, db_struct);
 
-        pugi::xml_node items = doc.child(XML_PARENT_NODE);
-        for (const auto& file: items.children(XML_CHILD_NODE_FILE)) {
-            for (const auto& item: file.children(XML_CHILD_ITEM_FILE)) {
-                GekkoFyre::GkCurl::CurlDlInfo i;
-                if (hashesOnly) {
-                    // Only a minimum of information is required
-                    i.cId = item.attribute(XML_ITEM_ATTR_FILE_CID).as_uint();
-                    i.unique_id = item.attribute(XML_ITEM_ATTR_FILE_UNIQUE_ID).as_string();
-                    i.file_loc = item.attribute(XML_ITEM_ATTR_FILE_FLOC).value();
-                    i.dlStatus = GekkoFyre::DownloadStatus::Unknown;
-                    i.insert_timestamp = 0;
-                    i.ext_info.status_msg = "";
-                    i.ext_info.effective_url = item.attribute(XML_ITEM_ATTR_FILE_EFFEC_URL).value();
-                    i.ext_info.response_code = -1;
-                    i.ext_info.content_length = -1.0;
-                    i.hash_type = convHashType_IntToEnum(item.attribute(XML_ITEM_ATTR_FILE_HASH_TYPE).as_int());
-                    i.hash_val_given = item.attribute(XML_ITEM_ATTR_FILE_HASH_VAL_GIVEN).value();
-                    i.hash_val_rtrnd = item.attribute(XML_ITEM_ATTR_FILE_HASH_VAL_RTRND).value();
-                    i.hash_succ_type = convHashVerif_IntToEnum(item.attribute(XML_ITEM_ATTR_FILE_HASH_SUCC_TYPE).as_int());
-                } else {
-                    // We require /all/ the information that the XML history file can provide
-                    i.cId = item.attribute(XML_ITEM_ATTR_FILE_CID).as_uint();
-                    i.unique_id = item.attribute(XML_ITEM_ATTR_FILE_UNIQUE_ID).as_string();
-                    i.file_loc = item.attribute(XML_ITEM_ATTR_FILE_FLOC).value();
-                    i.dlStatus = convDlStat_IntToEnum(item.attribute(XML_ITEM_ATTR_FILE_STAT).as_int());
-                    i.insert_timestamp = item.attribute(XML_ITEM_ATTR_FILE_INSERT_DATE).as_llong();
-                    i.complt_timestamp = item.attribute(XML_ITEM_ATTR_FILE_COMPLT_DATE).as_llong();
-                    i.ext_info.status_msg = item.attribute(XML_ITEM_ATTR_FILE_STATMSG).value();
-                    i.ext_info.effective_url = item.attribute(XML_ITEM_ATTR_FILE_EFFEC_URL).value();
-                    i.ext_info.response_code = item.attribute(XML_ITEM_ATTR_FILE_RESP_CODE).as_llong();
-                    i.ext_info.content_length = item.attribute(XML_ITEM_ATTR_FILE_CONT_LNGTH).as_double();
-                    i.hash_type = convHashType_IntToEnum(item.attribute(XML_ITEM_ATTR_FILE_HASH_TYPE).as_int());
-                    i.hash_val_given = item.attribute(XML_ITEM_ATTR_FILE_HASH_VAL_GIVEN).value();
-                    i.hash_val_rtrnd = item.attribute(XML_ITEM_ATTR_FILE_HASH_VAL_RTRND).value();
-                    i.hash_succ_type = convHashVerif_IntToEnum(item.attribute(XML_ITEM_ATTR_FILE_HASH_SUCC_TYPE).as_int());
-                }
-
-                dl_info_list.push_back(i);
-            }
-        }
-
-        return dl_info_list;
+        QMap<std::string, std::string> map_output;
+        map_output = process_db({file_loc, dl_status, insert_timestamp, complt_timestamp, ext_status_msg, ext_effect_url, ext_resp_code,
+                                 ext_content_length, hash_type, hash_val_given, hash_val_returned, hash_succ_type});
+        std::vector<GekkoFyre::GkTorrent::GeneralInfo> fin_output;
+        fin_output = process_db_map(map_output, {LEVELDB_KEY_CURL_FLOC, LEVELDB_KEY_CURL_STAT, LEVELDB_KEY_CURL_INSERT_DATE,
+                                                 LEVELDB_KEY_CURL_COMPLT_DATE, LEVELDB_KEY_CURL_STATMSG, LEVELDB_KEY_CURL_EFFEC_URL,
+                                                 LEVELDB_KEY_CURL_RESP_CODE, LEVELDB_KEY_CURL_CONT_LNGTH, LEVELDB_KEY_CURL_HASH_TYPE,
+                                                 LEVELDB_KEY_CURL_HASH_VAL_GIVEN, LEVELDB_KEY_CURL_HASH_VAL_RTRND,
+                                                 LEVELDB_KEY_CURL_HASH_SUCC_TYPE});
+    } catch (const std::exception &e) {
+        QMessageBox::warning(nullptr, tr("Error!"), e.what(), QMessageBox::Ok);
     }
 
     return std::vector<GekkoFyre::GkCurl::CurlDlInfo>();
 }
 
 /**
- * @brief GekkoFyre::CmnRoutines::writeDownloadInfo
+ * @brief GekkoFyre::CmnRoutines::writeDownloadInfo writes libcurl related information to a Google LevelDB database on the local
+ * disk of the user's system, within the home directory. The information is stored in an XML format.
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
- * @date   2016-10
- * @note   <http://stackoverflow.com/questions/9387610/what-xml-parser-should-i-use-in-c>
- *         <http://www.gerald-fahrnholz.eu/sw/DocGenerated/HowToUse/html/group___grp_pugi_xml.html>
- * @param dl_info
- * @param xmlCfgFile is the XML history file in question.
- * @return
+ * @date   2017-07-18
+ * @param dl_info The download information to add to the database.
+ * @return Whether the write operations were successful or not.
  */
-bool GekkoFyre::CmnRoutines::writeDownloadItem(GekkoFyre::GkCurl::CurlDlInfo &dl_info,
-                                               const std::string &xmlCfgFile)
+bool GekkoFyre::CmnRoutines::writeDownloadItem(GekkoFyre::GkCurl::CurlDlInfo &dl_info)
 {
-    fs::path xmlCfgFile_loc = findCfgFile(xmlCfgFile);
-    sys::error_code ec;
     if (dl_info.ext_info.status_ok) {
-        if (!xmlCfgFile_loc.string().empty()) {
-            if (dl_info.dlStatus == GekkoFyre::DownloadStatus::Stopped || dl_info.dlStatus == GekkoFyre::DownloadStatus::Invalid ||
-                    dl_info.dlStatus == GekkoFyre::DownloadStatus::Unknown) {
-                pugi::xml_node root;
-                unsigned int cId = 0;
+        if (dl_info.dlStatus == GekkoFyre::DownloadStatus::Stopped || dl_info.dlStatus == GekkoFyre::DownloadStatus::Invalid ||
+            dl_info.dlStatus == GekkoFyre::DownloadStatus::Unknown) {
+            try {
                 dl_info.dlStatus = GekkoFyre::DownloadStatus::Unknown;
                 QDateTime now = QDateTime::currentDateTime();
                 dl_info.insert_timestamp = now.toTime_t();
                 dl_info.complt_timestamp = 0;
                 dl_info.ext_info.status_msg = "";
 
-                // Generate new XML document within memory
-                pugi::xml_document doc;
-                // Alternatively store as shared pointer if tree shall be used for longer
-                // time or multiple client calls:
-                // std::shared_ptr<pugi::xml_document> spDoc = std::make_shared<pugi::xml_document>();
-
-                if (!fs::exists(xmlCfgFile_loc, ec) && !fs::is_regular_file(xmlCfgFile_loc)) {
-                    root = createNewXmlFile(xmlCfgFile);
-                } else {
-                    std::vector<GekkoFyre::GkCurl::CurlDlInfo> existing_info = readDownloadInfo(xmlCfgFile);
-
-                    // Finds the largest 'existing_info.cId' value and then increments by +1, ready for
-                    // assignment to a new download entry.
-                    for (size_t i = 0; i < existing_info.size(); ++i) {
-                        static unsigned int tmp;
-                        tmp = existing_info.at(i).cId;
-                        if (tmp > cId) {
-                            cId = tmp;
-                        } else {
-                            ++cId;
-                        }
-                    }
-                }
-
-                // Load XML into memory
-                // Remark: to fully read declaration entries you have to specify, "pugi::parse_declaration"
-                pugi::xml_parse_result result = doc.load_file(xmlCfgFile_loc.string().c_str(), pugi::parse_default|pugi::parse_declaration);
-                if (!result) {
-                    throw std::invalid_argument(tr("XML parse error: %1, character pos= %2")
-                                                        .arg(result.description(),
-                                                             QString::number(result.offset)).toStdString());
-                }
-
-                dl_info.cId = cId;
-
-                // A valid XML document must have a single root node
-                root = doc.document_element();
-
-                pugi::xml_node nodeParent = root.append_child(XML_CHILD_NODE_FILE);
-                pugi::xml_node nodeChild = nodeParent.append_child(XML_CHILD_ITEM_FILE);
-                nodeChild.append_attribute(XML_ITEM_ATTR_FILE_CID) = dl_info.cId;
-                nodeChild.append_attribute(XML_ITEM_ATTR_FILE_FLOC) = dl_info.file_loc.c_str();
-                nodeChild.append_attribute(XML_ITEM_ATTR_FILE_STAT) = convDlStat_toInt(dl_info.dlStatus);
-                nodeChild.append_attribute(XML_ITEM_ATTR_FILE_INSERT_DATE) = dl_info.insert_timestamp;
-                nodeChild.append_attribute(XML_ITEM_ATTR_FILE_COMPLT_DATE) = dl_info.complt_timestamp;
-                nodeChild.append_attribute(XML_ITEM_ATTR_FILE_STATMSG) = dl_info.ext_info.status_msg.c_str();
-                nodeChild.append_attribute(XML_ITEM_ATTR_FILE_EFFEC_URL) = dl_info.ext_info.effective_url.c_str();
-                nodeChild.append_attribute(XML_ITEM_ATTR_FILE_RESP_CODE) = dl_info.ext_info.response_code;
-                nodeChild.append_attribute(XML_ITEM_ATTR_FILE_CONT_LNGTH) = dl_info.ext_info.content_length;
-                nodeChild.append_attribute(XML_ITEM_ATTR_FILE_UNIQUE_ID) = dl_info.unique_id.c_str();
-                nodeChild.append_attribute(XML_ITEM_ATTR_FILE_HASH_TYPE) = convHashType_toInt(dl_info.hash_type);
-                nodeChild.append_attribute(XML_ITEM_ATTR_FILE_HASH_VAL_GIVEN) = dl_info.hash_val_given.c_str();
-                nodeChild.append_attribute(XML_ITEM_ATTR_FILE_HASH_VAL_RTRND) = dl_info.hash_val_rtrnd.c_str();
-                nodeChild.append_attribute(XML_ITEM_ATTR_FILE_HASH_SUCC_TYPE) = convHashVerif_toInt(dl_info.hash_succ_type);
-
-                bool saveSucceed = doc.save_file(xmlCfgFile_loc.string().c_str(), PUGIXML_TEXT("    "));
-                if (!saveSucceed) {
-                    throw std::runtime_error(tr("Error with saving XML config file!").toStdString());
-                }
-
+                std::string unique_id = dl_info.unique_id;
+                GekkoFyre::GkFile::FileDb db_struct = openDatabase(CFG_HISTORY_DB_FILE);
+                batch_write_single_db(LEVELDB_KEY_CURL_FLOC, dl_info.file_loc, unique_id, db_struct);
+                batch_write_single_db(LEVELDB_KEY_CURL_STAT, std::to_string(convDlStat_toInt(dl_info.dlStatus)), unique_id, db_struct);
+                batch_write_single_db(LEVELDB_KEY_CURL_INSERT_DATE, std::to_string(dl_info.insert_timestamp), unique_id, db_struct);
+                batch_write_single_db(LEVELDB_KEY_CURL_COMPLT_DATE, std::to_string(dl_info.complt_timestamp), unique_id, db_struct);
+                batch_write_single_db(LEVELDB_KEY_CURL_STATMSG, dl_info.ext_info.status_msg, unique_id, db_struct);
+                batch_write_single_db(LEVELDB_KEY_CURL_EFFEC_URL, dl_info.ext_info.effective_url, unique_id, db_struct);
+                batch_write_single_db(LEVELDB_KEY_CURL_RESP_CODE, std::to_string(dl_info.ext_info.response_code), unique_id, db_struct);
+                batch_write_single_db(LEVELDB_KEY_CURL_CONT_LNGTH, std::to_string(dl_info.ext_info.content_length), unique_id, db_struct);
+                batch_write_single_db(LEVELDB_KEY_CURL_HASH_TYPE, std::to_string(dl_info.hash_type), unique_id, db_struct);
+                batch_write_single_db(LEVELDB_KEY_CURL_HASH_VAL_GIVEN, dl_info.hash_val_given, unique_id, db_struct);
+                batch_write_single_db(LEVELDB_KEY_CURL_HASH_VAL_RTRND, dl_info.hash_val_rtrnd, unique_id, db_struct);
+                batch_write_single_db(LEVELDB_KEY_CURL_HASH_SUCC_TYPE, std::to_string(convHashVerif_toInt(dl_info.hash_succ_type)), unique_id, db_struct);
                 return true;
-            } else {
-                throw std::invalid_argument(tr("You should not be seeing this!").toStdString());
+            } catch (const std::exception &e) {
+                QMessageBox::warning(nullptr, tr("Error!"), e.what(), QMessageBox::Ok);
+                return false;
             }
-        } else {
-            throw std::invalid_argument(tr("Internal error: no path has been given for the XML "
-                                           "configuration file!").toStdString());
         }
     }
 
@@ -1568,11 +1487,12 @@ bool GekkoFyre::CmnRoutines::modifyDlState(const std::string &file_loc,
 }
 
 /**
- * @note <http://www.thomaswhitton.com/blog/2013/07/01/xml-c-plus-plus-examples/>
+ * @brief GekkoFyre::CmnRoutines::writeTorrentItem writes BitTorrent related information to a Google LevelDB database that is kept on
+ * the user's local storage within the home directory. This information is stored in a readibly parsable XML format.
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
- * @date 2016-12-12
- * @param gk_ti
- * @return
+ * @date 2017-07
+ * @param gk_ti The BitTorrent related information to write to the database.
+ * @return Whether the write operation proceeded successfully or not.
  */
 bool GekkoFyre::CmnRoutines::writeTorrentItem(GekkoFyre::GkTorrent::TorrentInfo &gk_ti)
 {
@@ -1587,21 +1507,16 @@ bool GekkoFyre::CmnRoutines::writeTorrentItem(GekkoFyre::GkTorrent::TorrentInfo 
                     QDateTime now = QDateTime::currentDateTime();
                     gk_ti.general.insert_timestamp = now.toTime_t();
 
-                    using namespace GekkoFyre::GkFile;
                     batch_write_single_db(LEVELDB_KEY_TORRENT_FLOC, gk_ti.general.down_dest, gk_ti.general.unique_id, db_struct);
-
                     batch_write_single_db(LEVELDB_KEY_TORRENT_INSERT_DATE,
                                           std::to_string(gk_ti.general.insert_timestamp),
                                           gk_ti.general.unique_id, db_struct);
-
                     batch_write_single_db(LEVELDB_KEY_TORRENT_COMPLT_DATE,
                                           std::to_string(gk_ti.general.complt_timestamp),
                                           gk_ti.general.unique_id, db_struct);
-
                     batch_write_single_db(LEVELDB_KEY_TORRENT_CREATN_DATE,
                                           std::to_string(gk_ti.general.creatn_timestamp),
                                           gk_ti.general.unique_id, db_struct);
-
                     batch_write_single_db(LEVELDB_KEY_TORRENT_DLSTATUS,
                                           convDlStat_toString(gk_ti.general.dlStatus).toStdString(), gk_ti.general.unique_id, db_struct);
                     batch_write_single_db(LEVELDB_KEY_TORRENT_TORRNT_COMMENT, gk_ti.general.comment, gk_ti.general.unique_id, db_struct);
@@ -1707,19 +1622,17 @@ bool GekkoFyre::CmnRoutines::writeTorrent_extra_data(const GekkoFyre::GkTorrent:
 }
 
 /**
- * @brief GekkoFyre::CmnRoutines::readTorrentInfo extracts the history information from 'CFG_HISTORY_FILE' relating to
- * BitTorrent downloads that have been added to FyreDL. This excludes HTTP(S) and FTP(S) downloads, which are handled
- * by different functions.
- * @note <http://en.cppreference.com/w/cpp/header/cstdlib>
+ * @brief GekkoFyre::CmnRoutines::readTorrentInfo extracts all of the users stored history relating to BitTorrent from a
+ * Google LevelDB database and parses the XML therein, caching whatever it can in memory to speed up the process.
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
- * @date 2016-12-12
+ * @date 2017-07
  * @param minimal_readout only extracts the most vital history information, thus (potentially) saving CPU time and
  * memory.
- * @param xmlCfgFile The XML configuration file in question.
  * @return A STL standard container holding a struct pertaining to all the needed BitTorrent information is returned.
  */
 std::vector<GekkoFyre::GkTorrent::TorrentInfo> GekkoFyre::CmnRoutines::readTorrentInfo(const bool &minimal_readout)
 {
+    // TODO: Implement the parameter 'minimal_readout'!
     std::vector<GekkoFyre::GkTorrent::TorrentInfo> to_info_vec;
     try {
         GekkoFyre::GkFile::FileDb db_struct = openDatabase(CFG_HISTORY_DB_FILE);
