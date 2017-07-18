@@ -23,6 +23,10 @@ libtorrent by Arvid Norberg et al.
 	<http://www.rasterbar.com/products/libtorrent/>
 		BSD-license
 
+LevelDB by Jeffrey Dean, Sanjay Ghemawat, et al. and Google Inc.
+	<https://github.com/google/leveldb>
+		BSD 3-clause
+
 PugiXML by Arseny Kapoulkine et al.
 	<http://pugixml.org/>
 		MIT License

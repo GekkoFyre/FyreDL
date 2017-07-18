@@ -236,6 +236,27 @@ else()
 endif(PUGIXML_FOUND)
 
 #
+# Detect if we are using X11 or the Wayland compositing system, if we are running under Linux
+# https://stackoverflow.com/questions/45135228/effective-way-of-detecting-x11-vs-wayland-preferrably-with-cmake
+#
+# TODO: Finish coding this!
+if(${CMAKE_SYSTEM_NAME} MATCHES "Linux") # Check if we are on Linux
+    find_package(Systemd)
+    if(SYSTEMD_FOUND)
+        execute_process(COMMAND "loginctl show-session $(loginctl | grep $(whoami) | awk '{print $1}') -p Type" OUTPUT_VARIABLE result_display_server)
+        if ("${result_display_server}" MATCHES "Type=x11")
+            set(display_server_x11 TRUE)
+            message(STATUS "Using the X11 display compositor!")
+        else()
+            set(display_server_x11 FALSE)
+            message(STATUS "Using something other than X11 as the display compositor.")
+        endif()
+    else()
+        message(STATUS "Systemd was not found! Resuming without the functionality provided by this...")
+    endif(SYSTEMD_FOUND)
+endif()
+
+#
 # Qt5 translation routines
 # http://stackoverflow.com/questions/19193121/automated-translation-management-with-cmake-and-qt5
 # http://stackoverflow.com/questions/24095800/qt-internationalization-and-cmake-how-to-update-ts-and-dont-lose-them
