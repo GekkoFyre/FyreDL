@@ -101,7 +101,6 @@ public:
     QString convHashType_toString(const GekkoFyre::HashType &hash_type);
     GekkoFyre::DownloadType convDownType_StringToEnum(const QString &down_type);
 
-    static std::string findCfgFile(const std::string &cfgFileName);
     static long getFileSize(const std::string &file_name);
     unsigned long int freeDiskSpace(const QString &path = QDir::rootPath());
     GekkoFyre::GkFile::FileHash cryptoFileHash(const QString &file_dest, const GekkoFyre::HashType &hash_type,
@@ -113,38 +112,27 @@ public:
     GekkoFyre::GkFile::FileDb openDatabase(const std::string &dbFile);
     bool batch_write_single_db(const std::string &key, const std::string &value, const std::string &unique_id,
                                const GekkoFyre::GkFile::FileDb &file_db_struct);
-    GekkoFyre::GkFile::FileDbVal read_database(const std::string &key,
-                                               const std::string &unique_id,
-                                               const std::string &dbFileName = CFG_HISTORY_DB_FILE);
     std::vector<GekkoFyre::GkFile::FileDbVal> read_db_vec(const std::string &key, const GekkoFyre::GkFile::FileDb &file_db_struct);
     std::pair<std::string, std::string> read_db_min(const std::string &key, const GekkoFyre::GkFile::FileDb &file_db_struct);
 
     void clearLayout(QLayout *layout);
 
-    std::vector<GekkoFyre::GkCurl::CurlDlInfo> readDownloadInfo(const std::string &xmlCfgFile = CFG_HISTORY_FILE, const bool &hashesOnly = false);
+    std::vector<GekkoFyre::GkCurl::CurlDlInfo> readDownloadInfo(const bool &hashesOnly = false);
     bool writeDownloadItem(GekkoFyre::GkCurl::CurlDlInfo &dl_info_list);
-    pugi::xml_node createNewXmlFile(const std::string &xmlCfgFile = CFG_HISTORY_FILE);
-    bool delDownloadItem(const QString &file_dest, const std::string &xmlCfgFile = CFG_HISTORY_FILE);
-    bool modifyDlState(const std::string &file_loc, const DownloadStatus &status,
-                       const std::string &hash_checksum = "",
-                       const GekkoFyre::HashVerif &ret_succ_type = GekkoFyre::HashVerif::Analyzing,
-                       const GekkoFyre::HashType &hash_type = GekkoFyre::HashType::None,
-                       const long long &complt_timestamp = 0,
-                       const std::string &xmlCfgFile = CFG_HISTORY_FILE);
+    pugi::xml_node createNewXmlFile();
+    bool delDownloadItem(const QString &file_dest, const std::string &unique_id_backup = "");
+    bool modifyDlState(const std::string &file_loc, const GekkoFyre::DownloadStatus &status, const long long &complt_timestamp = 0,
+                       const std::string &hash_given = "", const GekkoFyre::HashType &hash_type = GekkoFyre::HashType::None,
+                       const std::string &hash_rtrnd = "", const GekkoFyre::HashVerif &ret_succ_type = GekkoFyre::HashVerif::NotApplicable);
 
     bool writeTorrentItem(GekkoFyre::GkTorrent::TorrentInfo &gk_ti);
     std::vector<GekkoFyre::GkTorrent::TorrentInfo> readTorrentInfo(const bool &minimal_readout = false);
-    bool delTorrentItem(const std::string &unique_id, const std::string &xmlCfgFile = CFG_HISTORY_FILE);
-
-    short writeXmlSettings(const GekkoFyre::GkSettings::FyreDL &settings,
-                           const std::string &xmlCfgFile = CFG_SETTINGS_FILE);
-    bool modifyXmlSettings(const GekkoFyre::GkSettings::FyreDL &settings,
-                           const std::string &xmlCfgFile = CFG_SETTINGS_FILE);
+    bool delTorrentItem(const std::string &unique_id);
 
 private:
     int load_file(const std::string &filename, std::vector<char> &v,
                   libtorrent::error_code &ec, int limit = 8000000);
-    std::string multipart_key(const std::initializer_list<std::string> args);
+    std::string multipart_key(const std::initializer_list<std::string> &args);
 
     bool writeTorrent_extra_data(const GekkoFyre::GkTorrent::TorrentInfo &gk_ti, const GekkoFyre::GkFile::FileDb &ext_db_struct);
     void batch_write_to_file_db(const std::vector<GekkoFyre::GkTorrent::TorrentFile> &to_files_vec,
@@ -154,6 +142,13 @@ private:
     GekkoFyre::Global::ProcessDbMap process_db_map(const QMap<std::string, std::string> &map,
                                                    std::initializer_list<std::string> args);
     std::vector<GekkoFyre::GkFile::FileDbVal> process_db_xml(const std::string &xml_input);
+    bool modify_db_write(const std::string &unique_id, const std::string &new_val, const std::vector<GekkoFyre::GkFile::FileDbVal> &db_vals,
+                         const GekkoFyre::GkFile::FileDb &file_db);
+    bool delete_db_write(const std::string &unique_id, const GekkoFyre::GkFile::FileDb &file_db,
+                         const std::initializer_list<std::string> &keys);
+    std::string determine_unique_id(const std::vector<GekkoFyre::GkFile::FileDbVal> &db_vals,
+                                    const std::string &file_path,
+                                    const GekkoFyre::GkFile::FileDb &file_db);
 
     QMutex mutex;
 };

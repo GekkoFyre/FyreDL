@@ -276,25 +276,6 @@ std::string GekkoFyre::CmnRoutines::createId(const size_t &id_length)
 }
 
 /**
- * @brief GekkoFyre::CmnRoutines::findCfgFile finds the defined configuration file and checks if it exists.
- * @note <http://theboostcpplibraries.com/boost.filesystem-paths>
- * @param cfgFileName
- * @return
- */
-std::string GekkoFyre::CmnRoutines::findCfgFile(const std::string &cfgFileName)
-{
-    fs::path home_dir(QDir::homePath().toStdString());
-    std::ostringstream oss;
-    if (fs::is_directory(home_dir)) {
-        oss << home_dir.string() << fs::path::preferred_separator << cfgFileName;
-    } else {
-        throw std::invalid_argument(tr("Unable to find home directory!").toStdString());
-    }
-
-    return oss.str();
-}
-
-/**
  * @brief GekkoFyre::CmnRoutines::openDatabase
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
  * @date 2017-07-08
@@ -394,7 +375,7 @@ bool GekkoFyre::CmnRoutines::batch_write_single_db(const std::string &key, const
         pugi::xml_node xml_version_child = xml_version_node.append_child(LEVELDB_CHILD_ITEM_VERS);
         xml_version_child.append_attribute(LEVELDB_ITEM_ATTR_VERS_NO) = FYREDL_PROG_VERS;
 
-        if (ret_val.size() > 0) {
+        if (!ret_val.empty()) {
             GekkoFyre::GkFile::FileDbVal file_db_val;
             file_db_val.dl_type = GekkoFyre::DownloadType::Torrent;
             file_db_val.value = value;
@@ -433,60 +414,6 @@ bool GekkoFyre::CmnRoutines::batch_write_single_db(const std::string &key, const
 }
 
 /**
- * @brief GekkoFyre::CmnRoutines::read_database will read the LevelDB database and process the XML contained within,
- * outputting an STL container that's ready for use.
- * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
- * @date 2017-07-09
- * @note <https://github.com/google/leveldb/blob/master/doc/index.md>
- * @param key
- * @param unique_id
- * @param dbFileName
- * @return An STL container of the processed XML from the database, all ready for use right away.
- */
-GekkoFyre::GkFile::FileDbVal GekkoFyre::CmnRoutines::read_database(const std::string &key, const std::string &unique_id,
-                                                                   const std::string &dbFileName)
-{
-    GekkoFyre::GkFile::FileDb db_struct = openDatabase(dbFileName);
-    leveldb::Status s;
-    if (s.ok()) {
-        std::string value;
-        s = db_struct.db->Get(leveldb::ReadOptions(), key, &value);
-        if (!s.ok()) {
-            throw std::runtime_error(tr("A problem has occured while attmepting to read key, \"%1\", from the database. Details:\n\n%2")
-                                             .arg(QString::fromStdString(key)).arg(QString::fromStdString(s.ToString())).toStdString());
-        }
-
-        pugi::xml_node root;
-        std::unique_ptr<pugi::xml_document> doc = std::make_unique<pugi::xml_document>();
-        pugi::xml_parse_result result = doc->load_string(value.c_str());
-        if (!result) {
-            throw std::invalid_argument(tr("There has been an error reading information from the database.\n\nParse error: %1, character pos = %2")
-                                                .arg(result.description()).arg(result.offset).toStdString());
-        }
-
-        std::vector<GekkoFyre::GkFile::FileDbVal> file_db_vec;
-        pugi::xml_node items = doc->child(LEVELDB_PARENT_NODE);
-        for (const auto &file: items.children(LEVELDB_XML_CHILD_NODE)) {
-            GekkoFyre::GkFile::FileDbVal file_db_val;
-            file_db_val.dl_type = convDownType_StringToEnum(file.attribute(LEVELDB_XML_ATTR_DL_TYPE).as_string()); // TODO: Fix this immediately! Should be 'IntToEnum'.
-            file_db_val.value = file.attribute(LEVELDB_XML_ATTR_ITEM_VALUE).as_string();
-            file_db_val.unique_id = file.attribute(LEVELDB_ITEM_ATTR_UNIQUE_ID).as_string();
-            file_db_vec.push_back(file_db_val);
-        }
-
-        if (file_db_vec.size() > 0) {
-            for (size_t i = 0; i < file_db_vec.size(); ++i) {
-                if (file_db_vec.at(i).unique_id == unique_id) {
-                    return file_db_vec.at(i);
-                }
-            }
-        }
-    }
-
-    return GekkoFyre::GkFile::FileDbVal();
-}
-
-/**
  * @brief GekkoFyre::CmnRoutines::read_db_vec will read the LevelDB database and process the XML contained within,
  * outputting an STL container that's ready for use.
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
@@ -505,7 +432,7 @@ std::vector<GekkoFyre::GkFile::FileDbVal> GekkoFyre::CmnRoutines::read_db_vec(co
     std::string read_xml;
     s = file_db_struct.db->Get(read_opt, key, &read_xml);
     if (!s.ok()) {
-        throw std::runtime_error(tr("A problem has occured while attmepting to read from the database. Details:\n\n%1")
+        throw std::runtime_error(tr("A problem has occured while attempting to read from the database. Details:\n\n%1")
                                          .arg(QString::fromStdString(s.ToString())).toStdString());
     } else {
         // Proceed
@@ -513,8 +440,16 @@ std::vector<GekkoFyre::GkFile::FileDbVal> GekkoFyre::CmnRoutines::read_db_vec(co
         std::unique_ptr<pugi::xml_document> doc = std::make_unique<pugi::xml_document>();
         pugi::xml_parse_result result = doc->load_string(read_xml.c_str());
         if (!result) {
-            throw std::invalid_argument(tr("There has been an error reading information from the database.\n\nParse error: %1, character pos = %2")
-                                                .arg(result.description()).arg(result.offset).toStdString());
+            QMessageBox::warning(nullptr, tr("Error!"), tr("There has been an error reading information from the database.\n\nParse error: %1, character pos = %2\n\nWiping key...")
+                    .arg(result.description()).arg(result.offset), QMessageBox::Ok);
+            leveldb::WriteOptions write_opt;
+            write_opt.sync = true;
+            s = file_db_struct.db->Delete(write_opt, key);
+            if (!s.ok()) {
+                throw std::runtime_error(tr("A problem occured while attempting to remove aforementioned key from the database...").toStdString());
+            }
+
+            return std::vector<GekkoFyre::GkFile::FileDbVal>();
         }
 
         std::vector<GekkoFyre::GkFile::FileDbVal> file_db_vec;
@@ -524,6 +459,7 @@ std::vector<GekkoFyre::GkFile::FileDbVal> GekkoFyre::CmnRoutines::read_db_vec(co
             file_db_val.dl_type = convDownType_StringToEnum(file.attribute(LEVELDB_XML_ATTR_DL_TYPE).as_string()); // TODO: Fix this immediately! Should be 'IntToEnum'.
             file_db_val.value = file.attribute(LEVELDB_XML_ATTR_ITEM_VALUE).as_string();
             file_db_val.unique_id = file.attribute(LEVELDB_ITEM_ATTR_UNIQUE_ID).as_string();
+            file_db_val.key = key;
             file_db_vec.push_back(file_db_val);
         }
 
@@ -789,6 +725,7 @@ GekkoFyre::Global::ProcessDbMap GekkoFyre::CmnRoutines::process_db_map(const QMa
                 }
             }
 
+            curl_info.unique_id = found_unique_id.at(i);
             curl_vec_output.push_back(curl_info);
         }
     }
@@ -842,6 +779,111 @@ std::vector<GekkoFyre::GkFile::FileDbVal> GekkoFyre::CmnRoutines::process_db_xml
     }
 
     return std::vector<GekkoFyre::GkFile::FileDbVal>();
+}
+
+bool GekkoFyre::CmnRoutines::modify_db_write(const std::string &unique_id, const std::string &new_val,
+                                             const std::vector<GekkoFyre::GkFile::FileDbVal> &db_vals,
+                                             const GekkoFyre::GkFile::FileDb &file_db)
+{
+    for (auto item: db_vals) {
+        if (unique_id == item.unique_id) {
+            // We now have our item!
+            // Therefore we must delete the old value from the database firstly, within the XML values
+            bool del_ret = delete_db_write(item.unique_id, file_db, {item.key});
+            if (!del_ret) { return false; }
+            item.value = new_val;
+            bool write_ret = batch_write_single_db(item.key, item.value, item.unique_id, file_db);
+            return write_ret;
+        }
+    }
+
+    return false;
+}
+
+/**
+ * @brief GekkoFyre::CmnRoutines::delete_db_write deletes the specified objects (with the given Unique ID) from the database
+ * under the specified keys.
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @date 2017-07-21
+ * @param unique_id The Unique ID relating to the object in question to delete.
+ * @param file_db The database connection object.
+ * @param keys The key(s) under which the object resides.
+ * @return Whether the operation(s) were successful or not.
+ */
+bool GekkoFyre::CmnRoutines::delete_db_write(const std::string &unique_id, const GekkoFyre::GkFile::FileDb &file_db, const std::initializer_list<std::string> &keys)
+{
+    for (const auto &key: keys) {
+        leveldb::ReadOptions read_opt;
+        leveldb::Status s;
+        read_opt.verify_checksums = true;
+
+        std::string read_xml;
+        s = file_db.db->Get(read_opt, key, &read_xml);
+        if (!s.ok()) {
+            throw std::runtime_error(tr("A problem has occured while attempting to read from the database. Details:\n\n%1")
+                                             .arg(QString::fromStdString(s.ToString())).toStdString());
+        } else {
+            // Load XML into memory
+            pugi::xml_node root;
+            std::unique_ptr<pugi::xml_document> doc = std::make_unique<pugi::xml_document>();
+            pugi::xml_parse_result result = doc->load_string(read_xml.c_str());
+            if (!result) {
+                throw std::invalid_argument(
+                        tr("There has been an error reading information from the database for deletion.\n\nParse error: %1, character pos = %2")
+                                .arg(result.description()).arg(result.offset).toStdString());
+            }
+
+            pugi::xml_node items = doc->child(LEVELDB_PARENT_NODE);
+            for (const auto &file: items.children(LEVELDB_XML_CHILD_NODE)) {
+                if (file.find_child_by_attribute(LEVELDB_ITEM_ATTR_UNIQUE_ID, unique_id.c_str())) {
+                    file.parent().remove_child(file);
+                    break;
+                }
+            }
+
+            leveldb::WriteBatch batch;
+            std::stringstream ss;
+            doc->save(ss, PUGIXML_TEXT("    "));
+            batch.Delete(key);
+            batch.Put(key, ss.str());
+
+            leveldb::WriteOptions write_options;
+            write_options.sync = true;
+            s = file_db.db->Write(write_options, &batch);
+            if (!s.ok()) {
+                throw std::runtime_error(s.ToString());
+            } else {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+/**
+ * @brief GekkoFyre::CmnRoutines::determine_unique_id determines the Unique ID for a database object from a given file location value
+ * of the download item on the user's local storage, for said database object. For example, if the download is stored at path 'X' in
+ * 'Y' folder on the user's local storage, we can determine as such that it has Unique ID 'Z'.
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @date 2017-07-20
+ * @param db_vals The database values containing the desired local storage paths to extrapolate the Unique ID from.
+ * @param file_db The database connection object.
+ * @param file_path This is the file path to compare with and extract from the rest.
+ * @return The Unique ID, as a standard string.
+ */
+std::string GekkoFyre::CmnRoutines::determine_unique_id(const std::vector<GekkoFyre::GkFile::FileDbVal> &db_vals,
+                                                        const std::string &file_path,
+                                                        const GekkoFyre::GkFile::FileDb &file_db)
+{
+    for (const auto &item: db_vals) {
+        if (item.value == file_path) {
+            return item.unique_id;
+        }
+    }
+
+    std::cerr << tr("Unable to determine Unique ID!").toStdString();
+    return "";
 }
 
 void GekkoFyre::CmnRoutines::batch_write_to_file_db(const std::vector<GekkoFyre::GkTorrent::TorrentFile> &to_files_vec,
@@ -1155,7 +1197,7 @@ int GekkoFyre::CmnRoutines::load_file(const std::string &filename, std::vector<c
     return 0;
 }
 
-std::string GekkoFyre::CmnRoutines::multipart_key(const std::initializer_list<std::string> args)
+std::string GekkoFyre::CmnRoutines::multipart_key(const std::initializer_list<std::string> &args)
 {
     std::ostringstream ret_val;
     static int counter;
@@ -1328,8 +1370,7 @@ void GekkoFyre::CmnRoutines::clearLayout(QLayout *layout)
  * information will not be initialized! ***
  * @return A STL standard container holding a struct pertaining to all the needed CURL information is returned.
  */
-std::vector<GekkoFyre::GkCurl::CurlDlInfo> GekkoFyre::CmnRoutines::readDownloadInfo(const std::string &xmlCfgFile,
-                                                                                    const bool &hashesOnly)
+std::vector<GekkoFyre::GkCurl::CurlDlInfo> GekkoFyre::CmnRoutines::readDownloadInfo(const bool &hashesOnly)
 {
     try {
         GekkoFyre::GkFile::FileDb db_struct = openDatabase(CFG_HISTORY_DB_FILE);
@@ -1416,153 +1457,151 @@ bool GekkoFyre::CmnRoutines::writeDownloadItem(GekkoFyre::GkCurl::CurlDlInfo &dl
     return false;
 }
 
-pugi::xml_node GekkoFyre::CmnRoutines::createNewXmlFile(const std::string &xmlCfgFile)
+pugi::xml_node GekkoFyre::CmnRoutines::createNewXmlFile()
 {
-    fs::path xmlCfgFile_loc = findCfgFile(xmlCfgFile);
-    pugi::xml_document doc;
+    std::unique_ptr<pugi::xml_document> doc = std::make_unique<pugi::xml_document>();
 
     // Generate XML declaration
-    auto declarNode = doc.append_child(pugi::node_declaration);
+    auto declarNode = doc->append_child(pugi::node_declaration);
     declarNode.append_attribute("version") = "1.0";
     declarNode.append_attribute("encoding") = "UTF-8";;
     declarNode.append_attribute("standalone") = "yes";
 
     // A valid XML doc must contain a single root node of any name
-    pugi::xml_node root = doc.append_child(XML_PARENT_NODE);
+    pugi::xml_node root = doc->append_child(LEVELDB_PARENT_NODE);
 
-    pugi::xml_node xml_version_node = root.append_child(XML_CHILD_NODE_VERS);
-    pugi::xml_node xml_version_child = xml_version_node.append_child(XML_CHILD_ITEM_VERS);
-    xml_version_child.append_attribute(XML_ITEM_ATTR_VERS_NO) = FYREDL_PROG_VERS;
-
-    // Save XML tree to file.
-    // Remark: second optional param is indent string to be used;
-    // default indentation is tab character.
-   bool saveSucceed = doc.save_file(xmlCfgFile_loc.string().c_str(), PUGIXML_TEXT("    "));
-   if (!saveSucceed) {
-       throw std::runtime_error(tr("Error with saving XML config file!").toStdString());
-   }
+    pugi::xml_node xml_version_node = root.append_child(LEVELDB_CHILD_NODE_VERS);
+    pugi::xml_node xml_version_child = xml_version_node.append_child(LEVELDB_CHILD_ITEM_VERS);
+    xml_version_child.append_attribute(LEVELDB_ITEM_ATTR_VERS_NO) = FYREDL_PROG_VERS;
 
    return root;
 }
 
 /**
- * @brief GekkoFyre::CmnRoutines::delDownloadItem removes a node from the XML session file; 'CFG_HISTORY_FILE'.
+ * @brief GekkoFyre::CmnRoutines::delDownloadItem deletes the given downloadable item from the Google LevelDB database.
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
- * @date   2016-10
- * @note   <http://www.gerald-fahrnholz.eu/sw/DocGenerated/HowToUse/html/group___grp_pugi_xml.html>
- *         <http://stackoverflow.com/questions/19196683/c-pugixml-get-children-of-parent-by-attribute-id>
- * @param dl_info
- * @param xmlCfgFile is the XML history file in question.
- * @return
+ * @date 2017-07-21
+ * @param file_dest The location of the downloadable item on the user's local storage, along with the folder name of the
+ * download. This is used to deduce the Unique ID of the download in question to modify.
+ * @param unique_id If the 'file_dest' param happens to be empty but the unique identifier provided instead (i.e. in the
+ * event of database corruption), then this may be used as a last resort to delete an item from the database.
+ * @return Whether the series of operations to delete the database object proceeded okay or not.
  */
-bool GekkoFyre::CmnRoutines::delDownloadItem(const QString &file_dest, const std::string &xmlCfgFile)
+bool GekkoFyre::CmnRoutines::delDownloadItem(const QString &file_dest, const std::string &unique_id_backup)
 {
-    fs::path xmlCfgFile_loc = findCfgFile(xmlCfgFile);
-    sys::error_code ec;
-    if (fs::exists(xmlCfgFile_loc, ec) && fs::is_regular_file(xmlCfgFile_loc)) {
-        std::vector<GekkoFyre::GkCurl::CurlDlInfo> dl_info_list;
-        dl_info_list = readDownloadInfo(xmlCfgFile);
-
-        pugi::xml_document doc;
-
-        // Load XML into memory
-        // Remark: to fully read declaration entries you have to specify, "pugi::parse_declaration"
-        pugi::xml_parse_result result = doc.load_file(xmlCfgFile_loc.string().c_str(),
-                                                      pugi::parse_default|pugi::parse_declaration);
-        if (!result) {
-            throw std::invalid_argument(tr("XML parse error: %1, character pos= %2")
-                                        .arg(result.description(),
-                                             QString::number(result.offset)).toStdString());
-        }
-
-        pugi::xml_node items = doc.child(XML_PARENT_NODE);
-        for (const auto& file: items.children(XML_CHILD_NODE_FILE)) {
-            for (const auto& item: file.children(XML_CHILD_ITEM_FILE)) {
-                if (file.find_child_by_attribute(XML_ITEM_ATTR_FILE_FLOC, file_dest.toStdString().c_str())) {
-                    item.parent().remove_child(item);
-                }
+    try {
+        GekkoFyre::GkFile::FileDb db_struct = openDatabase(CFG_HISTORY_DB_FILE);
+        std::vector<GekkoFyre::GkFile::FileDbVal> file_loc_vec = read_db_vec(LEVELDB_KEY_CURL_FLOC, db_struct);
+        std::string unique_id = "";
+        if (!file_dest.isEmpty()) {
+            unique_id = determine_unique_id(file_loc_vec, file_dest.toStdString(), db_struct);
+        } else {
+            if (!unique_id_backup.empty()) {
+                unique_id = unique_id_backup;
             }
         }
 
-        bool saveSucceed = doc.save_file(xmlCfgFile_loc.string().c_str(), PUGIXML_TEXT("    "));
-        if (!saveSucceed) {
-            throw std::runtime_error(tr("Error with saving XML config file!").toStdString());
+        if (!unique_id.empty()) {
+            bool ret_bool;
+            ret_bool = delete_db_write(unique_id, db_struct, {LEVELDB_KEY_CURL_FLOC, LEVELDB_KEY_CURL_STAT, LEVELDB_KEY_CURL_INSERT_DATE,
+                                                              LEVELDB_KEY_CURL_COMPLT_DATE, LEVELDB_KEY_CURL_STATMSG, LEVELDB_KEY_CURL_EFFEC_URL,
+                                                              LEVELDB_KEY_CURL_RESP_CODE, LEVELDB_KEY_CURL_CONT_LNGTH, LEVELDB_KEY_CURL_HASH_TYPE,
+                                                              LEVELDB_KEY_CURL_HASH_VAL_GIVEN, LEVELDB_KEY_CURL_HASH_VAL_RTRND,
+                                                              LEVELDB_KEY_CURL_HASH_SUCC_TYPE});
+            if (ret_bool) {
+                return true;
+            }
         }
-
-        return true;
-    } else {
-        throw std::invalid_argument(tr("XML config file does not exist! Location attempt: "
-                                       "%1").arg(xmlCfgFile_loc.string().c_str()).toStdString());
+    } catch (const std::exception &e) {
+        QMessageBox::warning(nullptr, tr("Error!"), e.what(), QMessageBox::Ok);
+        return false;
     }
 
     return false;
 }
 
 /**
- * @brief GekkoFyre::CmnRoutines::modifyDlState allows the modification of the download state, whether it
- * be 'paused', 'actively downloading', 'unknown', or something else, it will update the given XML history file.
+ * @brief GekkoFyre::CmnRoutines::modifyDlState allows the modification of the download state, and will update
+ * the Google LevelDB database relevantly.
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
- * @date 2016-10
- * @param file_loc relates to the location of the download on the user's local storage.
- * @param status is the download state you wish to change towards.
- * @param hash_checksum is the calculated checksum of the file in question.
- * @param ret_succ_type regards whether the checksum comparison with the original, given checksum was a success or not.
- * @param xmlCfgFile is the XML history file in question.
- * @return Whether the operation was a success or not.
+ * @date 2017-07-21
+ * @param file_loc The location of the downloadable item on the user's local storage, along with the folder name of the
+ * download. This is used to deduce the Unique ID of the download in question to modify.
+ * @param status The status of the download, whether it be 'Paused', 'Stopped', 'Downloading', or something else entirely.
+ * @param complt_timestamp The timestamp of when the downloadable item has completed its task of downloading itself.
+ * @param hash_given The checksum hash that was given with the downloadable item when it was added to FyreDL.
+ * @param hash_type The type of checksum hash that was given with the downloadable item when it was added to FyreDL.
+ * @param hash_rtrnd The returned checksum hash that was calculated after the downloadable item had finished downloading.
+ * @param ret_succ_type Whether the two checksum hashes, the given and the returned, match at all, therefore marking it as
+ * a valid and non-corrupted download.
+ * @return Whether the series of operations to modify the database object(s) proceeded okay or not.
  */
-bool GekkoFyre::CmnRoutines::modifyDlState(const std::string &file_loc,
-                                           const GekkoFyre::DownloadStatus &status,
-                                           const std::string &hash_checksum,
-                                           const GekkoFyre::HashVerif &ret_succ_type,
-                                           const GekkoFyre::HashType &hash_type,
-                                           const long long &complt_timestamp,
-                                           const std::string &xmlCfgFile)
+bool GekkoFyre::CmnRoutines::modifyDlState(const std::string &file_loc, const GekkoFyre::DownloadStatus &status,
+                                           const long long &complt_timestamp, const std::string &hash_given,
+                                           const GekkoFyre::HashType &hash_type, const std::string &hash_rtrnd,
+                                           const GekkoFyre::HashVerif &ret_succ_type)
 {
-    fs::path xmlCfgFile_loc = findCfgFile(xmlCfgFile);
-    sys::error_code ec;
-    if (fs::exists(xmlCfgFile_loc, ec) && fs::is_regular_file(xmlCfgFile_loc)) {
-        pugi::xml_document doc;
+    try {
+        GekkoFyre::GkFile::FileDb db_struct = openDatabase(CFG_HISTORY_DB_FILE);
+        std::vector<GekkoFyre::GkFile::FileDbVal> file_loc_vec, file_stat_vec, file_hash_type_vec, file_hash_rtrnd_vec,
+                file_hash_succ_vec, file_complt_date_vec, file_hash_given_vec;
 
-        // Load XML into memory
-        // Remark: to fully read declaration entries you have to specify, "pugi::parse_declaration"
-        pugi::xml_parse_result result = doc.load_file(xmlCfgFile_loc.string().c_str(),
-                                                      pugi::parse_default|pugi::parse_declaration);
-        if (!result) {
-            throw std::invalid_argument(tr("XML parse error: %1, character pos= %2")
-                                        .arg(result.description(),
-                                             QString::number(result.offset)).toStdString());
-        }
+        file_loc_vec = read_db_vec(LEVELDB_KEY_CURL_FLOC, db_struct);
+        file_stat_vec = read_db_vec(LEVELDB_KEY_CURL_STAT, db_struct);
+        file_complt_date_vec = read_db_vec(LEVELDB_KEY_CURL_COMPLT_DATE, db_struct);
 
-        pugi::xml_node items = doc.child(XML_PARENT_NODE);
-        for (const auto& file: items.children(XML_CHILD_NODE_FILE)) {
-            for (const auto& item: file.children(XML_CHILD_ITEM_FILE)) {
-                if (file.find_child_by_attribute(XML_ITEM_ATTR_FILE_FLOC, file_loc.c_str())) {
-                    item.attribute(XML_ITEM_ATTR_FILE_STAT).set_value(convDlStat_toInt(status));
-                    if (!hash_checksum.empty()) {
-                        if (hash_type != GekkoFyre::HashType::None) {
-                            item.attribute(XML_ITEM_ATTR_FILE_HASH_TYPE).set_value(convHashType_toInt(hash_type));
-                        }
+        std::string unique_id = determine_unique_id(file_loc_vec, file_loc, db_struct);
+        if (!unique_id.empty()) {
+            // We have a Unique ID! Or at least, in theory...
 
-                        item.attribute(XML_ITEM_ATTR_FILE_HASH_VAL_RTRND).set_value(hash_checksum.c_str());
-                        item.attribute(XML_ITEM_ATTR_FILE_HASH_SUCC_TYPE).set_value(convHashVerif_toInt(ret_succ_type));
-                    }
+            // General
+            //
+            bool ret_status, ret_complt_timestamp;
+            ret_status = modify_db_write(unique_id, std::to_string(convDlStat_toInt(status)), file_stat_vec, db_struct);
+            if (complt_timestamp > 0) {
+                ret_complt_timestamp = modify_db_write(unique_id, std::to_string(complt_timestamp), file_complt_date_vec, db_struct);
+            } else {
+                // Just the default boolean value, for if we do not modify the timestamp. Otherwise there'll be some undesired behaviour.
+                ret_complt_timestamp = true;
+            }
 
-                    if (complt_timestamp > 0) {
-                        item.attribute(XML_ITEM_ATTR_FILE_COMPLT_DATE).set_value(complt_timestamp);
-                    }
+            // Hash values
+            //
+            bool modify_hashes = false;
+            bool hash_success = false;
+
+            if (ret_succ_type != GekkoFyre::HashVerif::NotApplicable) {
+                modify_hashes = true;
+                file_hash_type_vec = read_db_vec(LEVELDB_KEY_CURL_HASH_TYPE, db_struct);
+                file_hash_given_vec = read_db_vec(LEVELDB_KEY_CURL_HASH_VAL_GIVEN, db_struct);
+                file_hash_rtrnd_vec = read_db_vec(LEVELDB_KEY_CURL_HASH_VAL_RTRND, db_struct);
+                file_hash_succ_vec = read_db_vec(LEVELDB_KEY_CURL_HASH_SUCC_TYPE, db_struct);
+
+                bool ret_hash_type, ret_hash_given, ret_hash_rtrnd, bool_succ_type;
+                ret_hash_type = modify_db_write(unique_id, std::to_string(convHashType_toInt(hash_type)), file_hash_type_vec, db_struct);
+                ret_hash_given = modify_db_write(unique_id, hash_given, file_hash_given_vec, db_struct);
+                ret_hash_rtrnd = modify_db_write(unique_id, hash_rtrnd, file_hash_rtrnd_vec, db_struct);
+                bool_succ_type = modify_db_write(unique_id, std::to_string(convHashVerif_toInt(ret_succ_type)), file_hash_succ_vec, db_struct);
+                if (ret_hash_type && ret_hash_given && ret_hash_rtrnd && bool_succ_type) {
+                    hash_success = true;
+                }
+            }
+
+            if (modify_hashes) { // Check to see if we have modified any hash-related values this time
+                // We have modified hash-related values, therefore check the additional boolean values that are relevant
+                if (hash_success && ret_status && ret_complt_timestamp) {
+                    return true;
+                }
+            } else {
+                // We have not modified any such values, therefore no additional checks are required!
+                if (ret_status && ret_complt_timestamp) {
+                    return true;
                 }
             }
         }
-
-        bool saveSucceed = doc.save_file(xmlCfgFile_loc.string().c_str(), PUGIXML_TEXT("    "));
-        if (!saveSucceed) {
-            throw std::runtime_error(tr("Error with saving XML config file!").toStdString());
-        }
-
-        return true;
-    } else {
-        throw std::invalid_argument(tr("XML config file does not exist! Location attempt: "
-                                       "%1").arg(xmlCfgFile_loc.string().c_str()).toStdString());
+    } catch (const std::exception &e) {
+        QMessageBox::warning(nullptr, tr("Error!"), e.what(), QMessageBox::Ok);
+        return false;
     }
 
     return false;
@@ -1864,45 +1903,9 @@ std::vector<GekkoFyre::GkTorrent::TorrentInfo> GekkoFyre::CmnRoutines::readTorre
     return to_info_vec;
 }
 
-bool GekkoFyre::CmnRoutines::delTorrentItem(const std::string &unique_id, const std::string &xmlCfgFile)
+bool GekkoFyre::CmnRoutines::delTorrentItem(const std::string &unique_id)
 {
-    fs::path xmlCfgFile_loc = findCfgFile(xmlCfgFile);
-    sys::error_code ec;
-    if (fs::exists(xmlCfgFile_loc, ec) && fs::is_regular_file(xmlCfgFile_loc)) {
-        std::vector<GekkoFyre::GkTorrent::TorrentInfo> gk_torrent_info;
-        gk_torrent_info = readTorrentInfo(false);
-
-        pugi::xml_document doc;
-
-        // Load XML into memory
-        // Remark: to fully read declaration entries you have to specify, "pugi::parse_declaration"
-        pugi::xml_parse_result result = doc.load_file(xmlCfgFile_loc.string().c_str(),
-                                                      pugi::parse_default | pugi::parse_declaration);
-        if (!result) {
-            throw std::invalid_argument(tr("XML parse error: %1, character pos= %2")
-                                                .arg(result.description(),
-                                                     QString::number(result.offset)).toStdString());
-        }
-
-        pugi::xml_node items = doc.child(XML_PARENT_NODE);
-        for (const auto &file: items.children(XML_CHILD_NODE_TORRENT)) {
-            for (const auto &item: file.children(XML_CHILD_ITEM_TORRENT)) {
-                if (file.find_child_by_attribute(XML_ITEM_ATTR_TORRENT_UNIQUE_ID, unique_id.c_str())) {
-                    item.parent().remove_child(item);
-                }
-            }
-        }
-
-        bool saveSucceed = doc.save_file(xmlCfgFile_loc.string().c_str(), PUGIXML_TEXT("    "));
-        if (!saveSucceed) {
-            throw std::runtime_error(tr("Error with saving XML config file!").toStdString());
-        }
-
-        return true;
-    } else {
-        throw std::invalid_argument(tr("XML config file does not exist! Location attempt: "
-                                               "%1").arg(xmlCfgFile_loc.string().c_str()).toStdString());
-    }
+    return false;
 }
 
 int GekkoFyre::CmnRoutines::convDlStat_toInt(const GekkoFyre::DownloadStatus &status)
@@ -2191,126 +2194,4 @@ QString GekkoFyre::CmnRoutines::numberConverter(const double &value)
         QString conv = bytesToKilobytes(value);
         return conv;
     }
-}
-
-/**
- * @brief GekkoFyre::CmnRoutines::writeXmlSettings creates a new XML entry where there is none in regards to the saving
- * of settings information.
- * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
- * @date 2016-12-06
- * @param settings The settings information that needs to be saved.
- * @param xmlCfgFile The XML configuration file in question.
- * @return '1' indicates an already existing entry, '0' indicates an entry was successfully added, and '-1' indicates
- * an error at an attempt to add an entry.
- */
-short GekkoFyre::CmnRoutines::writeXmlSettings(const GekkoFyre::GkSettings::FyreDL &settings,
-                                               const std::string &xmlCfgFile)
-{
-    fs::path xmlCfgFile_loc = findCfgFile(xmlCfgFile);
-    sys::error_code ec;
-    if (!xmlCfgFile_loc.string().empty()) {
-        pugi::xml_node root;
-
-        // Generate new XML document within memory
-        pugi::xml_document doc;
-        // Alternatively store as shared pointer if tree shall be used for longer
-        // time or multiple client calls:
-        // std::shared_ptr<pugi::xml_document> spDoc = std::make_shared<pugi::xml_document>();
-
-        if (!fs::exists(xmlCfgFile_loc, ec) && !fs::is_regular_file(xmlCfgFile_loc)) {
-            root = createNewXmlFile(xmlCfgFile);
-        }
-
-        // Load XML into memory
-        // Remark: to fully read declaration entries you have to specify, "pugi::parse_declaration"
-        pugi::xml_parse_result result = doc.load_file(xmlCfgFile_loc.string().c_str(), pugi::parse_default|pugi::parse_declaration);
-        if (!result) {
-            throw std::invalid_argument(tr("XML parse error: %1, character pos= %2")
-                                                .arg(result.description(),
-                                                     QString::number(result.offset)).toStdString());
-        }
-
-        unsigned short counter = 0;
-        pugi::xml_node items = doc.child(XML_PARENT_NODE);
-        for (const auto& file: items.children(XML_CHILD_NODE_SETTINGS)) {
-            for (const auto &item: file.children(XML_CHILD_ITEM_SETTINGS)) {
-                Q_UNUSED(item);
-                ++counter;
-            }
-        }
-
-        if (counter > 0) {
-            return 1;
-        }
-
-        // A valid XML document must have a single root node
-        root = doc.document_element();
-
-        pugi::xml_node nodeParent = root.append_child(XML_CHILD_NODE_SETTINGS);
-        pugi::xml_node nodeChild = nodeParent.append_child(XML_CHILD_ITEM_SETTINGS);
-        if (settings.main_win_y > 0 && settings.main_win_x > 0) {
-            nodeChild.append_attribute(XML_ITEM_ATTR_SETTINGS_WIN_Y) = settings.main_win_y;
-            nodeChild.append_attribute(XML_ITEM_ATTR_SETTINGS_WIN_X) = settings.main_win_x;
-        }
-
-        bool saveSucceed = doc.save_file(xmlCfgFile_loc.string().c_str(), PUGIXML_TEXT("    "));
-        if (!saveSucceed) {
-            throw std::runtime_error(tr("Error with saving XML config file!").toStdString());
-        } else {
-            return 0;
-        }
-    } else {
-        throw std::invalid_argument(tr("Internal error: no path has been given for the XML "
-                                               "configuration file!").toStdString());
-    }
-
-    return -1;
-}
-
-/**
- * @brief GekkoFyre::CmnRoutines::modifyXmlSettings modifies an already pre-existing, XML configuration file for FyreDL.
- * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
- * @date 2016-12-06
- * @param settings The settings information that needs to be saved.
- * @param xmlCfgFile The XML configuration file in question.
- * @return Whether the operation was a success or not.
- */
-bool GekkoFyre::CmnRoutines::modifyXmlSettings(const GekkoFyre::GkSettings::FyreDL &settings,
-                                               const std::string &xmlCfgFile)
-{
-    fs::path xmlCfgFile_loc = findCfgFile(xmlCfgFile);
-    sys::error_code ec;
-    if (fs::exists(xmlCfgFile_loc, ec) && fs::is_regular_file(xmlCfgFile_loc)) {
-        pugi::xml_document doc;
-
-        // Load XML into memory
-        // Remark: to fully read declaration entries you have to specify, "pugi::parse_declaration"
-        pugi::xml_parse_result result = doc.load_file(xmlCfgFile_loc.string().c_str(),
-                                                      pugi::parse_default|pugi::parse_declaration);
-        if (!result) {
-            throw std::invalid_argument(tr("XML parse error: %1, character pos= %2")
-                                                .arg(result.description(),
-                                                     QString::number(result.offset)).toStdString());
-        }
-
-        pugi::xml_node items = doc.child(XML_PARENT_NODE);
-        const auto xml_settings_node = items.child(XML_CHILD_NODE_SETTINGS);
-        const auto xml_user_item = xml_settings_node.child(XML_CHILD_ITEM_SETTINGS);
-        if (settings.main_win_x > 0 && settings.main_win_y > 0) {
-            xml_user_item.attribute(XML_ITEM_ATTR_SETTINGS_WIN_X).set_value(settings.main_win_x);
-            xml_user_item.attribute(XML_ITEM_ATTR_SETTINGS_WIN_Y).set_value(settings.main_win_y);
-        }
-
-        bool saveSucceed = doc.save_file(xmlCfgFile_loc.string().c_str(), PUGIXML_TEXT("    "));
-        if (!saveSucceed) {
-            throw std::runtime_error(tr("Error with saving XML config file!").toStdString());
-        }
-
-        return true;
-    } else {
-        throw std::invalid_argument(tr("XML config file does not exist! Location attempt: "
-                                               "%1").arg(xmlCfgFile_loc.string().c_str()).toStdString());
-    }
-
-    return false;
 }

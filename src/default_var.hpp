@@ -136,7 +136,6 @@ extern "C" {
 #define LEVELDB_KEY_CURL_EFFEC_URL "curl-effec-url"           // Given, proper URL returned from the (source) web-server
 #define LEVELDB_KEY_CURL_RESP_CODE "curl-resp-code"           // Given return-code returned from the (source) web-server
 #define LEVELDB_KEY_CURL_CONT_LNGTH "curl-cont-lngth"         // The size of the download returned from the (source) web-server
-#define LEVELDB_KEY_CURL_UNIQUE_ID "curl-unique-id"
 #define LEVELDB_KEY_CURL_HASH_TYPE "curl-hash-type"           // The type of hash employed (i.e, SHA1, SHA3-256/512, MD5, etc.)
 #define LEVELDB_KEY_CURL_HASH_VAL_GIVEN "curl-hash-val-given" // The hash-value that was given by the user
 #define LEVELDB_KEY_CURL_HASH_VAL_RTRND "curl-hash-val-rtrnd" // The hash-value that was calculated after the download (presumably) succeeded
@@ -172,25 +171,6 @@ extern "C" {
 #define LEVELDB_KEY_TORRENT_TRACKERS "to-extra-trackers"
 
 // XML configuration
-#define XML_PARENT_NODE "fyredl-db"
-
-#define XML_CHILD_NODE_VERS "fyredl-xml"
-#define XML_CHILD_ITEM_VERS "version"
-#define XML_ITEM_ATTR_VERS_NO "supported"                 // The supported XML file version for this particular FyreDL build
-
-#define XML_CHILD_NODE_FILE "http"
-#define XML_CHILD_ITEM_FILE "item"
-#define XML_ITEM_ATTR_FILE_FLOC "file-loc"                 // Location of the file on user's storage disk
-#define XML_ITEM_ATTR_FILE_STAT "status"                   // The download status (i.e., downloading, completed, unknown, etc.)
-#define XML_ITEM_ATTR_FILE_COMPLT_DATE "complt-date"       // Date and time upon which the download was completed
-#define XML_ITEM_ATTR_FILE_HASH_TYPE "hash-type"           // The type of hash employed (i.e, SHA1, SHA3-256/512, MD5, etc.)
-#define XML_ITEM_ATTR_FILE_HASH_VAL_RTRND "hash-val-rtrnd" // The hash-value that was calculated after the download (presumably) succeeded
-#define XML_ITEM_ATTR_FILE_HASH_SUCC_TYPE "hash-succ-type" // Whether the calculated hash of the download matched the given hash or not
-
-#define XML_CHILD_NODE_TORRENT "torrent"
-#define XML_CHILD_ITEM_TORRENT "item"
-#define XML_ITEM_ATTR_TORRENT_UNIQUE_ID "unique-id"
-
 #define XML_CHILD_NODE_SETTINGS "settings"
 #define XML_CHILD_ITEM_SETTINGS "user"
 #define XML_ITEM_ATTR_SETTINGS_WIN_Y "main-win-y"
@@ -484,13 +464,6 @@ namespace GekkoFyre {
             std::time_t timer_begin;             // The time since epoch at which the timer begun (for charting facilities)
             double content_length;               // The file size of the download, as given by the web-server
             std::vector<GkXferStats> xfer_stats; // The all important transfer statistics of the download in question
-        };
-    }
-
-    namespace GkSettings {
-        struct FyreDL {
-            int main_win_x;
-            int main_win_y;
         };
     }
 

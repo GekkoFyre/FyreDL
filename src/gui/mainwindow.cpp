@@ -142,17 +142,6 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
 
 MainWindow::~MainWindow()
 {
-    try {
-        GekkoFyre::GkSettings::FyreDL settings;
-        settings.main_win_x = ui->centralWidget->geometry().width();
-        settings.main_win_y = ui->centralWidget->geometry().height();
-        if (routines->writeXmlSettings(settings) == 1) {
-            routines->modifyXmlSettings(settings);
-        }
-    } catch (const std::exception &e) {
-        QMessageBox::warning(this, tr("Error!"), e.what(), QMessageBox::Ok);
-    }
-
     delete ui;
     emit finish_curl_multi_thread();
     gk_dl_info_cache.clear();
@@ -187,7 +176,7 @@ void MainWindow::readFromHistoryFile()
 {
     std::vector<GekkoFyre::GkCurl::CurlDlInfo> dl_history;
     std::vector<GekkoFyre::GkTorrent::TorrentInfo> gk_torrent_history;
-    dl_history = routines->readDownloadInfo(CFG_HISTORY_FILE);
+    dl_history = routines->readDownloadInfo();
     gk_torrent_history = routines->readTorrentInfo(true);
 
     dlModel->removeRows(0, (int)dl_history.size(), QModelIndex());
@@ -206,8 +195,12 @@ void MainWindow::readFromHistoryFile()
             }
         } else {
             QMessageBox::warning(this, tr("Error!"), tr("The item below has no download destination! FyreDL cannot "
-                                                                "proceed with insertion of said item.\n\n\"%1\"")
+                                                                "proceed with insertion of said item.\n\n\"%1\"\n\nTherefore "
+                                                                "an attempt is being made at deleting this from the database.")
                     .arg(QUrl(QString::fromStdString(dl_history.at(i).ext_info.effective_url)).fileName()), QMessageBox::Ok);
+            if (!dl_history.at(i).unique_id.empty()) {
+                routines->delDownloadItem("", dl_history.at(i).unique_id);
+            }
         }
     }
 
@@ -338,29 +331,39 @@ void MainWindow::removeSelRows()
         if (indexes.at(0).isValid()) {
             try {
                 const QString file_dest = ui->downloadView->model()->data(ui->downloadView->model()->index(indexes.at(0).row(), MN_DESTINATION_COL)).toString();
-                const fs::path boost_file_dest(file_dest.toStdString());
-                if (!fs::is_directory(boost_file_dest) && fs::is_regular_file(boost_file_dest)) {
-                    // Now remove the row from the XML file...
-                    routines->delDownloadItem(file_dest);
+                const QString sel_row_unique_id = ui->downloadView->model()->data(ui->downloadView->model()->index(indexes.at(0).row(), MN_HIDDEN_UNIQUE_ID)).toString();
+                std::vector<GekkoFyre::Global::DownloadInfo>::size_type i = 0;
+                while (i < gk_dl_info_cache.size()) {
+                    if (gk_dl_info_cache.at(i).unique_id == sel_row_unique_id) {
+                        if (gk_dl_info_cache.at(i).dl_type == GekkoFyre::DownloadType::HTTP || gk_dl_info_cache.at(i).dl_type == GekkoFyre::DownloadType::FTP) {
+                            // Remove the downloadable object from the Google LevelDB database
+                            routines->delDownloadItem(file_dest);
 
-                    // Remove the associated graph(s) from memory
-                    delCharts(file_dest.toStdString());
-                } else {
-                    const std::string serial_col = ui->downloadView->model()->data(ui->downloadView->model()->index(indexes.at(0).row(), MN_HIDDEN_UNIQUE_ID)).toString().toStdString();
+                            // Remove the downloadable object from the memory cache and then break the while-loop
+                            gk_dl_info_cache.erase(gk_dl_info_cache.begin() + i);
+                            break;
+                        } else if (gk_dl_info_cache.at(i).dl_type == GekkoFyre::DownloadType::Torrent || gk_dl_info_cache.at(i).dl_type == GekkoFyre::DownloadType::TorrentMagnetLink) {
+                            // Remove the downloadable object from the Google LevelDB database
+                            routines->delTorrentItem(gk_dl_info_cache.at(i).unique_id.toStdString());
 
-                    // Now remove the row from the XML file...
-                    routines->delTorrentItem(serial_col);
-
-                    // Remove the associated graph(s) from memory
-                    delCharts(serial_col);
+                            // Remove the downloadable object from the memory cache and then break the while-loop
+                            gk_dl_info_cache.erase(gk_dl_info_cache.begin() + i);
+                            break;
+                        }
+                    } else {
+                        ++i;
+                    }
                 }
+
+                // Remove the associated graph(s) from memory
+                delCharts(sel_row_unique_id.toStdString());
 
                 // ...and then the GUI
                 dlModel->removeRows(indexes.at(0).row(), countRow, QModelIndex());
 
                 return;
             } catch (const std::exception &e) {
-                QMessageBox::warning(this, tr("Error!"), QString("%1").arg(e.what()), QMessageBox::Ok);
+                QMessageBox::warning(this, tr("Error!"), e.what(), QMessageBox::Ok);
                 return;
             }
         }
@@ -385,10 +388,13 @@ void MainWindow::resetDlStateStartup()
                 const QString file_dest_string = ui->downloadView->model()->data(file_dest_index).toString();
 
                 try {
-                    routines->modifyDlState(file_dest_string.toStdString(), GekkoFyre::DownloadStatus::Paused);
-                    dlModel->updateCol(find_index, routines->convDlStat_toString(GekkoFyre::DownloadStatus::Paused), MN_STATUS_COL);
+                    bool ret_state = routines->modifyDlState(file_dest_string.toStdString(), GekkoFyre::DownloadStatus::Paused);
+                    bool ret_update_col = dlModel->updateCol(find_index, routines->convDlStat_toString(GekkoFyre::DownloadStatus::Paused), MN_STATUS_COL);
+                    if (!ret_state || !ret_update_col) {
+                        throw std::runtime_error(tr("There has been an error at startup. FyreDL was unable to correctly reset the state of some columns, either due to a GUI or database error.").toStdString());
+                    }
                 } catch (const std::exception &e) {
-                    QMessageBox::warning(this, tr("Error!"), QString("%1").arg(e.what()), QMessageBox::Ok);
+                    QMessageBox::warning(this, tr("Error!"), e.what(), QMessageBox::Ok);
                     return;
                 }
             }
@@ -1236,12 +1242,15 @@ void MainWindow::general_extraDetails()
                     if (gk_dl_info_cache.at(i).dl_type == GekkoFyre::DownloadType::HTTP ||
                             gk_dl_info_cache.at(i).dl_type == GekkoFyre::DownloadType::FTP) {
                         // This is a HTTP(S) or FTP(S) download!
-                        insert_time = gk_dl_info_cache.at(i).curl_info.get().insert_timestamp;
-                        complt_time = gk_dl_info_cache.at(i).curl_info.get().complt_timestamp;
-                        content_length = gk_dl_info_cache.at(i).curl_info.get().ext_info.content_length;
-                        hash_val_given = gk_dl_info_cache.at(i).curl_info.get().hash_val_given;
-                        hash_val_calc = gk_dl_info_cache.at(i).curl_info.get().hash_val_rtrnd;
-                        hashType = routines->convHashType_toString(gk_dl_info_cache.at(i).curl_info.get().hash_type);
+                        if (gk_dl_info_cache.at(i).curl_info.is_initialized()) {
+                            insert_time = gk_dl_info_cache.at(i).curl_info.get().insert_timestamp;
+                            complt_time = gk_dl_info_cache.at(i).curl_info.get().complt_timestamp;
+                            content_length = gk_dl_info_cache.at(i).curl_info.get().ext_info.content_length;
+                            hash_val_given = gk_dl_info_cache.at(i).curl_info.get().hash_val_given;
+                            hash_val_calc = gk_dl_info_cache.at(i).curl_info.get().hash_val_rtrnd;
+                            hashType = routines->convHashType_toString(gk_dl_info_cache.at(i).curl_info.get().hash_type);
+                        }
+
                         break;
                     } else if (gk_dl_info_cache.at(i).dl_type == GekkoFyre::DownloadType::Torrent ||
                             gk_dl_info_cache.at(i).dl_type == GekkoFyre::DownloadType::TorrentMagnetLink) {
@@ -1254,9 +1263,6 @@ void MainWindow::general_extraDetails()
                             hash_val_given = tr("N/A").toStdString();
                             hash_val_calc = tr("N/A").toStdString();
                             hashType = tr("Unknown");
-                        } else {
-                            QMessageBox::warning(this, tr("Warning!"), tr("Unable to initialize the BitTorrent values with the right data, it seems to be unavailable."),
-                                                 QMessageBox::Ok);
                         }
                     } else {
                         // Throw an exception!
@@ -1837,8 +1843,7 @@ void MainWindow::recvDlFinished(const GekkoFyre::GkCurl::DlStatusMsg &status)
                     GekkoFyre::DownloadStatus::Downloading) {
 
                     GekkoFyre::GkFile::FileHash file_hash;
-                    std::vector<GekkoFyre::GkCurl::CurlDlInfo> dl_mini_info_vec = routines->readDownloadInfo(
-                            CFG_HISTORY_FILE, true);
+                    std::vector<GekkoFyre::GkCurl::CurlDlInfo> dl_mini_info_vec = routines->readDownloadInfo(true);
                     for (size_t j = 0; j < dl_mini_info_vec.size(); ++j) {
                         if (dl_mini_info_vec.at(j).file_loc == status.file_loc) {
                             switch (dl_mini_info_vec.at(j).hash_type) {
@@ -1858,10 +1863,8 @@ void MainWindow::recvDlFinished(const GekkoFyre::GkCurl::DlStatusMsg &status)
                         }
                     }
 
-                    routines->modifyDlState(status.file_loc, GekkoFyre::DownloadStatus::Completed,
-                                            file_hash.checksum.toStdString(),
-                                            file_hash.hash_verif, file_hash.hash_type,
-                                            QDateTime::currentDateTime().toTime_t());
+                    routines->modifyDlState(status.file_loc, GekkoFyre::DownloadStatus::Completed, QDateTime::currentDateTime().toTime_t(),
+                                            file_hash.checksum.toStdString(), file_hash.hash_type);
                     dlModel->updateCol(stat_index, routines->convDlStat_toString(GekkoFyre::DownloadStatus::Completed),
                                        MN_STATUS_COL);
 
