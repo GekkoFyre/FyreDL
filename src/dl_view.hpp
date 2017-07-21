@@ -51,6 +51,7 @@
 #include <QString>
 #include <QAbstractTableModel>
 #include <QAbstractItemView>
+#include <QAbstractItemDelegate>
 #include <QVariant>
 #include <vector>
 
@@ -77,6 +78,17 @@ public:
 private:
     // http://stackoverflow.com/questions/23870396/qt-list-clear-does-it-destroy-the-objects
     QList<std::vector<QString>> vectorList;
+};
+
+class downloadDelegate : public QAbstractItemDelegate
+{
+    Q_OBJECT
+public:
+    downloadDelegate(QObject *parent = 0);
+    ~downloadDelegate();
+
+    void paint(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index) const;
+    QSize sizeHint(const QStyleOptionViewItem &option, const QModelIndex &index) const;
 };
 
 #endif // DL_VIEW_HPP

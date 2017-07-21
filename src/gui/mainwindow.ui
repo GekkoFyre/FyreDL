@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1200</width>
+    <width>1300</width>
     <height>800</height>
    </rect>
   </property>
@@ -37,7 +37,7 @@
            <string>Open a file</string>
           </property>
           <property name="icon">
-           <iconset resource="assets.qrc">
+           <iconset resource="../assets.qrc">
             <normaloff>:/icons/assets-img/edit-add-4.png</normaloff>:/icons/assets-img/edit-add-4.png</iconset>
           </property>
           <property name="iconSize">
@@ -54,8 +54,8 @@
            <string>Enter URL</string>
           </property>
           <property name="icon">
-           <iconset resource="assets.qrc">
-            <normaloff>:/icons/assets-img/applications-internet-3.png</normaloff>:/icons/assets-img/applications-internet-3.png</iconset>
+           <iconset resource="../assets.qrc">
+            <normaloff>:/icons/assets-img/network_small.png</normaloff>:/icons/assets-img/network_small.png</iconset>
           </property>
           <property name="iconSize">
            <size>
@@ -71,7 +71,7 @@
            <string>Print</string>
           </property>
           <property name="icon">
-           <iconset resource="assets.qrc">
+           <iconset resource="../assets.qrc">
             <normaloff>:/icons/assets-img/printer-printing.png</normaloff>:/icons/assets-img/printer-printing.png</iconset>
           </property>
           <property name="iconSize">
@@ -88,7 +88,7 @@
            <string>Start</string>
           </property>
           <property name="icon">
-           <iconset resource="assets.qrc">
+           <iconset resource="../assets.qrc">
             <normaloff>:/icons/assets-img/media-playback-start-3.png</normaloff>:/icons/assets-img/media-playback-start-3.png</iconset>
           </property>
           <property name="iconSize">
@@ -105,7 +105,7 @@
            <string>Pause</string>
           </property>
           <property name="icon">
-           <iconset resource="assets.qrc">
+           <iconset resource="../assets.qrc">
             <normaloff>:/icons/assets-img/media-playback-pause-3.png</normaloff>:/icons/assets-img/media-playback-pause-3.png</iconset>
           </property>
           <property name="iconSize">
@@ -122,7 +122,7 @@
            <string/>
           </property>
           <property name="icon">
-           <iconset resource="assets.qrc">
+           <iconset resource="../assets.qrc">
             <normaloff>:/icons/assets-img/gnome-session-reboot.png</normaloff>:/icons/assets-img/gnome-session-reboot.png</iconset>
           </property>
           <property name="iconSize">
@@ -139,7 +139,7 @@
            <string>Stop</string>
           </property>
           <property name="icon">
-           <iconset resource="assets.qrc">
+           <iconset resource="../assets.qrc">
             <normaloff>:/icons/assets-img/media-playback-stop-3.png</normaloff>:/icons/assets-img/media-playback-stop-3.png</iconset>
           </property>
           <property name="iconSize">
@@ -156,7 +156,7 @@
            <string>Delete download</string>
           </property>
           <property name="icon">
-           <iconset resource="assets.qrc">
+           <iconset resource="../assets.qrc">
             <normaloff>:/icons/assets-img/user-trash.png</normaloff>:/icons/assets-img/user-trash.png</iconset>
           </property>
           <property name="iconSize">
@@ -173,7 +173,7 @@
            <string>Cleanup completed downloads</string>
           </property>
           <property name="icon">
-           <iconset resource="assets.qrc">
+           <iconset resource="../assets.qrc">
             <normaloff>:/icons/assets-img/edit-clear-3.png</normaloff>:/icons/assets-img/edit-clear-3.png</iconset>
           </property>
           <property name="iconSize">
@@ -190,7 +190,7 @@
            <string>Preferences</string>
           </property>
           <property name="icon">
-           <iconset resource="assets.qrc">
+           <iconset resource="../assets.qrc">
             <normaloff>:/icons/assets-img/applications-development-web.png</normaloff>:/icons/assets-img/applications-development-web.png</iconset>
           </property>
           <property name="iconSize">
@@ -247,7 +247,7 @@
                   <rect>
                    <x>0</x>
                    <y>0</y>
-                   <width>1138</width>
+                   <width>1238</width>
                    <height>274</height>
                   </rect>
                  </property>
@@ -417,7 +417,7 @@
                   <rect>
                    <x>0</x>
                    <y>0</y>
-                   <width>1138</width>
+                   <width>1238</width>
                    <height>300</height>
                   </rect>
                  </property>
@@ -630,7 +630,7 @@
                   <rect>
                    <x>0</x>
                    <y>0</y>
-                   <width>1152</width>
+                   <width>1252</width>
                    <height>132</height>
                   </rect>
                  </property>
@@ -682,7 +682,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>1200</width>
+     <width>1300</width>
      <height>25</height>
     </rect>
    </property>
@@ -930,7 +930,7 @@
  </widget>
  <layoutdefault spacing="6" margin="11"/>
  <resources>
-  <include location="assets.qrc"/>
+  <include location="../assets.qrc"/>
  </resources>
  <connections/>
 </ui>

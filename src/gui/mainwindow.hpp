@@ -9,7 +9,7 @@
  **       |___/
  **
  **   Thank you for using "FyreDL" for your download management needs!
- **   Copyright (C) 2016. GekkoFyre.
+ **   Copyright (C) 2016-2017. GekkoFyre.
  **
  **
  **   FyreDL is free software: you can redistribute it and/or modify
@@ -57,6 +57,7 @@
 #include <QThread>
 #include <QStringList>
 #include <QStandardItem>
+#include <QPointer>
 
 namespace Ui {
 class MainWindow;
@@ -82,7 +83,7 @@ private:
     void removeSelRows();
     void resetDlStateStartup();
 
-    void initCharts(const QString &unique_id, const GekkoFyre::DownloadType &download_type);
+    void initCharts(const QString &unique_id, const QString &down_dest, const GekkoFyre::DownloadType &download_type);
     void displayCharts(const QString &unique_id);
     void delCharts(const std::string &file_dest);
     void updateChart();
@@ -91,8 +92,9 @@ private:
     void contentsView_update();
     void cV_addItems(QStandardItem *parent, const QStringList &elements);
 
-    bool askDeleteFile(const QString &file_dest, const bool &noRestart = false);
-    void startDownload(const QString &file_dest, const bool &resumeDl = true);
+    bool askDeleteHttpItem(const QString &file_dest, const QString &unique_id, const bool &noRestart = false);
+    void startHttpDownload(const QString &file_dest, const QString &unique_id, const bool &resumeDl = true);
+    void startTorrentDl(const QString &unique_id, const bool &resumeDl = true);
 
     // Immediately below are actions that the user may take on a single downloadable item, such as by pausing,
     // restarting, or halting it, for example. That is not a complete list.
@@ -106,17 +108,18 @@ private:
     void general_extraDetails();
     void transfer_extraDetails();
 
-    downloadModel *dlModel;
-    GekkoFyre::CmnRoutines *routines;
-    GekkoFyre::CurlMulti *curl_multi;
-    std::vector<GekkoFyre::GkCurl::CurlProgressPtr> dl_stat;
-    std::vector<GekkoFyre::GkGraph::GraphInit> graph_init;
+    QPointer<downloadModel> dlModel;
+    std::unique_ptr<GekkoFyre::CmnRoutines> routines;
+    QPointer<GekkoFyre::CurlMulti> curl_multi;
+    QPointer<GekkoFyre::GkTorrentClient> gk_torrent_client;
+    std::vector<GekkoFyre::Global::DownloadInfo> gk_dl_info_cache;
     QString curr_shown_graphs;
 
     // http://stackoverflow.com/questions/10121560/stdthread-naming-your-thread
-    QThread *curl_multi_thread;
+    QPointer<QThread> curl_multi_thread;
 
 signals:
+    // Libcurl specific signals
     void updateDlStats();
     void sendStopDownload(const QString &fileLoc);
     void sendStartDownload(const QString &url, const QString &file_loc, const bool &resumeDl);
@@ -163,12 +166,20 @@ private slots:
                      const std::string &hash_val, const long long &resp_code, const bool &stat_ok,
                      const std::string &stat_msg, const std::string &unique_id,
                      const GekkoFyre::DownloadType &down_type);
+
+    // Libcurl specific slots
     void recvXferStats(const GekkoFyre::GkCurl::CurlProgressPtr &info);
     void manageDlStats();
     void recvDlFinished(const GekkoFyre::GkCurl::DlStatusMsg &status);
 
+    // Libtorrent specific slots
+    void recvBitTorrent_XferStats(const GekkoFyre::GkTorrent::TorrentResumeInfo &gk_xfer_info);
+
 private:
     Ui::MainWindow *ui;
 };
+
+// This is required for signaling, otherwise QVariant does not know the type.
+Q_DECLARE_METATYPE(GekkoFyre::GkTorrent::TorrentResumeInfo);
 
 #endif // MAINWINDOW_HPP

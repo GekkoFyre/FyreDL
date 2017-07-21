@@ -34,42 +34,31 @@
  ********************************************************************************/
 
 /**
- * @file settings.cpp
+ * @file misc.hpp
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
- * @date 2016-10
- * @brief The code and functions behind the, 'settings.ui', designer file.
+ * @date 2017-06-24
+ * @brief Contains any miscellaneous BitTorrent routines.
  */
 
-#include "settings.hpp"
-#include "ui_settings.h"
-#include <QFont>
+#ifndef FYREDL_TORRENT_MISC_HPP
+#define FYREDL_TORRENT_MISC_HPP
 
-Settings::Settings(QWidget *parent) :
-    QDialog(parent),
-    ui(new Ui::Settings)
-{
-    ui->setupUi(this);
+#include "./../default_var.hpp"
+#include <libtorrent/torrent_status.hpp>
+#include <QObject>
+#include <QString>
 
-    // http://stackoverflow.com/questions/9701983/qt-how-to-create-a-setting-window-like-in-gtk
-    // http://www.qtcentre.org/threads/25823-Font-size-increase-in-QtableWidget
-    // http://stackoverflow.com/questions/19434391/in-qt-how-to-resize-icons-in-a-table
-    QSize size;
-    size.setHeight(32);
-    size.setWidth(32);
-    ui->category_treeWidget->setIconSize(size);
+namespace lt = libtorrent;
+namespace GekkoFyre {
+class GkTorrentMisc: public QObject {
+Q_OBJECT
+
+public:
+    GkTorrentMisc();
+    ~GkTorrentMisc();
+
+    QString state(lt::torrent_status::state_t s);
+};
 }
 
-Settings::~Settings()
-{
-    delete ui;
-}
-
-void Settings::on_buttonBox_accepted()
-{
-    // 'Save' has been selected
-}
-
-void Settings::on_buttonBox_rejected()
-{
-    // 'Cancel' has been selected
-}
+#endif // FYREDL_TORRENT_MISC_HPP

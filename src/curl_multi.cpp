@@ -9,7 +9,7 @@
  **       |___/
  **
  **   Thank you for using "FyreDL" for your download management needs!
- **   Copyright (C) 2016. GekkoFyre.
+ **   Copyright (C) 2016-2017. GekkoFyre.
  **
  **
  **   FyreDL is free software: you can redistribute it and/or modify
@@ -48,6 +48,7 @@
 #include <cstdlib>
 #include <random>
 #include <ctime>
+#include <memory>
 #include <QMessageBox>
 
 namespace sys = boost::system;
@@ -326,14 +327,14 @@ void GekkoFyre::CurlMulti::check_multi_info(GekkoFyre::GkCurl::GlobalInfo *g)
     int msgs_left;
     GekkoFyre::GkCurl::ConnInfo *conn;
     CURL *easy;
-    CURLcode res;
+    // CURLcode res;
 
     std::cout << QString("REMAINING: %1\n").arg(QString::number(g->still_running)).toStdString();
 
     while((msg = curl_multi_info_read(g->multi, &msgs_left))) {
         if(msg->msg == CURLMSG_DONE) {
             easy = msg->easy_handle;
-            res = msg->data.result;
+            // res = msg->data.result;
             curl_easy_getinfo(easy, CURLINFO_PRIVATE, &conn);
             curl_easy_getinfo(easy, CURLINFO_EFFECTIVE_URL, &eff_url);
             std::cerr << QString("DONE: %1 => %2\n").arg(eff_url).arg(conn->error).toStdString();
@@ -650,7 +651,6 @@ std::string GekkoFyre::CurlMulti::new_conn(const QString &url, const QString &fi
         curl_easy_setopt(ci->conn_info->easy, CURLOPT_CONNECTTIMEOUT, FYREDL_CONN_TIMEOUT);
 
         ci->conn_info->url = url.toStdString();
-        ci->uuid = uuid;
         curl_easy_setopt(ci->conn_info->easy, CURLOPT_URL, ci->conn_info->url.c_str());
 
         if (!fileLoc.isEmpty()) {
@@ -665,7 +665,7 @@ std::string GekkoFyre::CurlMulti::new_conn(const QString &url, const QString &fi
 
         // http://stackoverflow.com/questions/18031357/why-the-constructor-of-stdostream-is-protected
         // TODO: Fix the memory leak hereinafter!
-        ci->file_buf.astream = new std::ofstream;
+        ci->file_buf.astream = std::make_shared<std::ofstream>();
         if (file_offset == 0 && ci->file_buf.astream != nullptr) {
             ci->file_buf.astream->open(ci->file_buf.file_loc, std::ofstream::out | std::ios::app | std::ios::binary);
         } else if (file_offset > 0 && ci->file_buf.astream != nullptr) {

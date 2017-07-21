@@ -47,7 +47,16 @@
 #define FYREDL_TORRENT_CLIENT_HPP
 
 #include "./../default_var.hpp"
+#include "./../cmnroutines.hpp"
+#include "session.hpp"
+#include "misc.hpp"
+#include <libtorrent/session_handle.hpp>
+#include <libtorrent/torrent_handle.hpp>
+#include <string>
+#include <memory>
 #include <QObject>
+#include <QThread>
+#include <QPointer>
 
 namespace GekkoFyre {
 class GkTorrentClient: public QObject {
@@ -56,7 +65,25 @@ class GkTorrentClient: public QObject {
 public:
     GkTorrentClient();
     ~GkTorrentClient();
+
+    void startTorrentDl(const GekkoFyre::GkTorrent::TorrentInfo &item);
+
+private:
+    int rand_port() const;
+
+    std::unique_ptr<GekkoFyre::CmnRoutines> routines;
+    QPointer<GekkoFyre::GkTorrentSession> gk_to_ses;
+    std::shared_ptr<lt::session_handle> lt_ses;
+    QPointer<QThread> gk_ses_thread;
+
+private slots:
+    void recv_proc_to_stats(const std::string &save_path, const lt::torrent_status &stats);
+
+signals:
+    void update_ses_hash(const std::string &save_dir, const lt::torrent_handle &lt_th);
+    void xfer_torrent_info(const GekkoFyre::GkTorrent::TorrentResumeInfo &xfer_stats);
 };
 }
+
 
 #endif // FYREDL_TORRENT_CLIENT_HPP

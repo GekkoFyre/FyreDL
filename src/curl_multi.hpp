@@ -9,7 +9,7 @@
  **       |___/
  **
  **   Thank you for using "FyreDL" for your download management needs!
- **   Copyright (C) 2016. GekkoFyre.
+ **   Copyright (C) 2016-2017. GekkoFyre.
  **
  **
  **   FyreDL is free software: you can redistribute it and/or modify

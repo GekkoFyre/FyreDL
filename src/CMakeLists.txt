@@ -97,6 +97,8 @@ set(SOURCE_FILES
         singleton_proc.hpp
         torrent/client.hpp
         torrent/client.cpp
+        torrent/misc.hpp
+        torrent/misc.cpp
         torrent/session.hpp
         torrent/session.cpp)
 
@@ -178,6 +180,16 @@ else()
 endif(Boost_FOUND)
 
 #
+# Find X11 subsystem
+#
+if(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
+    find_package(X11 REQUIRED)
+    if (X11_FOUND)
+        set(LIBS ${LIBS} ${X11_LIBRARIES})
+    endif(X11_FOUND)
+endif()
+
+#
 # Find 'libpthreads'
 #
 find_package(Threads REQUIRED)
@@ -202,6 +214,17 @@ if (CURL_FOUND)
 endif(CURL_FOUND)
 
 #
+# Find LevelDB
+#
+find_package(LevelDB REQUIRED)
+if (LEVELDB_FOUND)
+    include_directories(${LEVELDB_INCLUDE_DIR})
+    set(LIBS ${LIBS} ${LEVELDB_LIBRARIES})
+else()
+    message(SEND_ERROR "The 'LevelDB' library could not be found!")
+endif(LEVELDB_FOUND)
+
+#
 # Find 'pugixml'
 #
 find_package(PugiXML REQUIRED)
@@ -211,6 +234,27 @@ if (PUGIXML_FOUND)
 else()
     message(SEND_ERROR "The 'pugixml' library could not be found!")
 endif(PUGIXML_FOUND)
+
+#
+# Detect if we are using X11 or the Wayland compositing system, if we are running under Linux
+# https://stackoverflow.com/questions/45135228/effective-way-of-detecting-x11-vs-wayland-preferrably-with-cmake
+#
+# TODO: Finish coding this!
+if(${CMAKE_SYSTEM_NAME} MATCHES "Linux") # Check if we are on Linux
+    find_package(Systemd)
+    if(SYSTEMD_FOUND)
+        execute_process(COMMAND "loginctl show-session $(loginctl | grep $(whoami) | awk '{print $1}') -p Type" OUTPUT_VARIABLE result_display_server)
+        if ("${result_display_server}" MATCHES "Type=x11")
+            set(display_server_x11 TRUE)
+            message(STATUS "Using the X11 display compositor!")
+        else()
+            set(display_server_x11 FALSE)
+            message(STATUS "Using something other than X11 as the display compositor.")
+        endif()
+    else()
+        message(STATUS "Systemd was not found! Resuming without the functionality provided by this...")
+    endif(SYSTEMD_FOUND)
+endif()
 
 #
 # Qt5 translation routines
@@ -271,7 +315,7 @@ IF(${CMAKE_SYSTEM_NAME} MATCHES "Windows" OR "cygwin" OR "mingw") # Check if we 
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DWIN32_LEAN_AND_MEAN")
         message(STATUS "Using the Microsoft Visual C++ compiler!")
     elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU" OR "Clang")
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mwindows -WIN32_LEAN_AND_MEAN -Wno-shorten-64-to-32 -Wno-sign-conversion") # This is apparently not tested!
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mwindows -WIN32_LEAN_AND_MEAN -Wno-shorten-64-to-32 -Wno-sign-conversion -Wno-deprecated-declarations") # This is apparently not tested!
         message(STATUS "Using either the GCC or Clang compiler!")
     else()
         message(SEND_ERROR "You are using an unsupported Microsoft Windows compiler! (Not MSVC or GCC)")
@@ -282,7 +326,7 @@ elseif(${CMAKE_SYSTEM_NAME} MATCHES "Linux") # Check if we are on Linux
         if("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
             # https://spin.atomicobject.com/2013/10/20/clang-compiler/
             # http://clang.llvm.org/docs/UsersManual.html#controlling-code-generation
-            set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libstdc++ -Wall -Wextra -Werror -Wconversion -Qunused-arguments -Wno-missing-braces -Wno-unused-parameter -Wno-shorten-64-to-32 -Wno-sign-conversion -g")
+            set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libstdc++ -Wall -Wextra -Werror -Wconversion -Qunused-arguments -Wno-missing-braces -Wno-unused-parameter -Wno-shorten-64-to-32 -Wno-sign-conversion -Wno-deprecated-declarations -g")
             message(STATUS "DEBUG build using the Clang compiler!")
 
             set(GK_ADDR_SANITIZE FALSE CACHE BOOL "See the Clang AddressSanitizer documentation for more details.")
@@ -301,7 +345,7 @@ elseif(${CMAKE_SYSTEM_NAME} MATCHES "Linux") # Check if we are on Linux
             endif(GK_THREAD_SANITIZE)
         elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
             # http://stackoverflow.com/questions/3375697/useful-gcc-flags-for-c
-            set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wpointer-arith -Wcast-align -Wconversion -Wunreachable-code -Wno-shorten-64-to-32 -Wno-sign-conversion -g")
+            set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wpointer-arith -Wcast-align -Wconversion -Wunreachable-code -Wno-shorten-64-to-32 -Wno-sign-conversion -Wno-deprecated-declarations -Wno-unused-parameter -g")
             message(STATUS "DEBUG build using the GCC compiler!")
         elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel")
             message(STATUS "DEBUG build using the Intel compiler!")
@@ -311,11 +355,11 @@ elseif(${CMAKE_SYSTEM_NAME} MATCHES "Linux") # Check if we are on Linux
         endif()
     elseif(CMAKE_BUILD_TYPE MATCHES "Release")
         if("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
-            set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-conversion -Qno-unused-arguments -Wno-missing-braces -Wno-unused-parameter -Wno-shorten-64-to-32 -Wno-sign-conversion")
+            set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-conversion -Qno-unused-arguments -Wno-missing-braces -Wno-unused-parameter -Wno-shorten-64-to-32 -Wno-sign-conversion -Wno-deprecated-declarations")
             message(STATUS "DEBUG build using the Clang compiler!")
         elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
             # http://stackoverflow.com/questions/3375697/useful-gcc-flags-for-c
-            set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-pointer-arith -Wno-cast-align -Wno-conversion -Wno-unreachable-code -Wno-shorten-64-to-32 -Wno-sign-conversion")
+            set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-pointer-arith -Wno-cast-align -Wno-conversion -Wno-unreachable-code -Wno-shorten-64-to-32 -Wno-sign-conversion -Wno-deprecated-declarations")
             message(STATUS "DEBUG build using the GCC compiler!")
         elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel")
             message(STATUS "DEBUG build using the Intel compiler!")

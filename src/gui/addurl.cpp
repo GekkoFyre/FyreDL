@@ -60,7 +60,7 @@ AddURL::AddURL(QWidget *parent) :
     ui(new Ui::AddURL)
 {
     ui->setupUi(this);
-    routines = new GekkoFyre::CmnRoutines();
+    routines = std::make_unique<GekkoFyre::CmnRoutines>(this);
 
     ui->url_dest_lineEdit->setText(QDir::homePath());
     ui->file_dest_lineEdit->setText(QDir::homePath());
@@ -69,7 +69,6 @@ AddURL::AddURL(QWidget *parent) :
 AddURL::~AddURL()
 {
     delete ui;
-    delete routines;
 }
 
 /**
@@ -136,7 +135,6 @@ void AddURL::on_buttonBox_accepted()
                             dl_info.ext_info.effective_url = info_ext.effective_url;
                             dl_info.ext_info.response_code = info_ext.response_code;
                             dl_info.ext_info.status_ok = info_ext.status_ok;
-                            dl_info.cId = 0;
                             dl_info.insert_timestamp = 0;
                             dl_info.unique_id = routines->createId(FYREDL_UNIQUE_ID_DIGIT_COUNT);
 
@@ -202,12 +200,12 @@ void AddURL::on_buttonBox_accepted()
                     // # Process the Torrent file #
                     // ############################
                     GekkoFyre::GkTorrent::TorrentInfo gk_torrent_data = routines->torrentFileInfo(csv_file.toStdString());
-                    gk_torrent_data.dlStatus = GekkoFyre::DownloadStatus::Stopped;
-                    gk_torrent_data.down_dest = ui->file_dest_lineEdit->text().toStdString();
+                    gk_torrent_data.general.dlStatus = GekkoFyre::DownloadStatus::Stopped;
+                    gk_torrent_data.general.down_dest = ui->file_dest_lineEdit->text().toStdString();
                     routines->writeTorrentItem(gk_torrent_data);
-                    emit sendDetails(gk_torrent_data.torrent_name, ((double)gk_torrent_data.num_pieces * (double)gk_torrent_data.piece_length),
-                                     0, 0, 0, 0, GekkoFyre::DownloadStatus::Stopped, gk_torrent_data.magnet_uri, gk_torrent_data.down_dest,
-                                     GekkoFyre::HashType::None, "", 0, true, "", gk_torrent_data.unique_id, GekkoFyre::DownloadType::Torrent);
+                    emit sendDetails(gk_torrent_data.general.torrent_name, ((double)gk_torrent_data.general.num_pieces * (double)gk_torrent_data.general.piece_length),
+                                     0, 0, 0, 0, GekkoFyre::DownloadStatus::Stopped, gk_torrent_data.general.magnet_uri, gk_torrent_data.general.down_dest,
+                                     GekkoFyre::HashType::None, "", 0, true, "", gk_torrent_data.general.unique_id, GekkoFyre::DownloadType::Torrent);
                     return AddURL::done(QDialog::Accepted);
                 } else {
                     // ########################
@@ -296,7 +294,6 @@ void AddURL::on_buttonBox_accepted()
                             dl_info.ext_info.effective_url = info_ext.effective_url;
                             dl_info.ext_info.response_code = info_ext.response_code;
                             dl_info.ext_info.status_ok = info_ext.status_ok;
-                            dl_info.cId = 0;
                             dl_info.insert_timestamp = 0;
                         } else {
                             // #####################################
@@ -326,7 +323,6 @@ void AddURL::on_buttonBox_accepted()
                             dl_info.ext_info.effective_url = csv_vec.at(i).url;
                             dl_info.ext_info.response_code = info.response_code;
                             dl_info.ext_info.status_ok = false;
-                            dl_info.cId = 0;
                             dl_info.insert_timestamp = 0;
                         }
 

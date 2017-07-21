@@ -34,42 +34,46 @@
  ********************************************************************************/
 
 /**
- * @file settings.cpp
+ * @file misc.cpp
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
- * @date 2016-10
- * @brief The code and functions behind the, 'settings.ui', designer file.
+ * @date 2017-06-24
+ * @brief Contains any miscellaneous BitTorrent routines.
  */
 
-#include "settings.hpp"
-#include "ui_settings.h"
-#include <QFont>
+#include "misc.hpp"
+#include <libtorrent/torrent_status.hpp>
 
-Settings::Settings(QWidget *parent) :
-    QDialog(parent),
-    ui(new Ui::Settings)
+GekkoFyre::GkTorrentMisc::GkTorrentMisc()
+{}
+
+GekkoFyre::GkTorrentMisc::~GkTorrentMisc()
+{}
+
+/**
+ * @brief GekkoFyre::GkTorrentMisc::state returns the name of a libtorrent status enum.
+ * @date 2016-12-22
+ * @note <http://libtorrent.org/tutorial.html>
+ * @param s is the given libtorrent status enum.
+ * @return The name of a libtorrent status enum.
+ */
+QString GekkoFyre::GkTorrentMisc::state(lt::torrent_status::state_t s)
 {
-    ui->setupUi(this);
-
-    // http://stackoverflow.com/questions/9701983/qt-how-to-create-a-setting-window-like-in-gtk
-    // http://www.qtcentre.org/threads/25823-Font-size-increase-in-QtableWidget
-    // http://stackoverflow.com/questions/19434391/in-qt-how-to-resize-icons-in-a-table
-    QSize size;
-    size.setHeight(32);
-    size.setWidth(32);
-    ui->category_treeWidget->setIconSize(size);
-}
-
-Settings::~Settings()
-{
-    delete ui;
-}
-
-void Settings::on_buttonBox_accepted()
-{
-    // 'Save' has been selected
-}
-
-void Settings::on_buttonBox_rejected()
-{
-    // 'Cancel' has been selected
+    switch (s) {
+        case lt::torrent_status::checking_files:
+            return tr("Checking");
+        case lt::torrent_status::downloading_metadata:
+            return tr("Downloading Metadata");
+        case lt::torrent_status::downloading:
+            return tr("Downloading");
+        case lt::torrent_status::finished:
+            return tr("Finished");
+        case lt::torrent_status::seeding:
+            return tr("Seeding");
+        case lt::torrent_status::allocating:
+            return tr("Allocating");
+        case lt::torrent_status::checking_resume_data:
+            return tr("Checking Resume Data");
+        default:
+            return QString("<N/A>");
+    }
 }

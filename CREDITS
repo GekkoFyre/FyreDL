@@ -1,6 +1,6 @@
 Project (name, author, <URL>, license)
 -----------------------------------------
-It is with the help and hard work of these libraries that Gecho was made possible. We owe our sincere thanks to the following authors, contributors, helpers, and communities below:
+It is with the help and hard work of these libraries that FyreDL was made possible. We owe our sincere thanks to the following authors, contributors, helpers, and communities below:
 
 
 Qt5 by Qt Project et al.
@@ -22,6 +22,10 @@ libcurl by Daniel Stenberg et al.
 libtorrent by Arvid Norberg et al.
 	<http://www.rasterbar.com/products/libtorrent/>
 		BSD-license
+
+LevelDB by Jeffrey Dean, Sanjay Ghemawat, et al. and Google Inc.
+	<https://github.com/google/leveldb>
+		BSD 3-clause
 
 PugiXML by Arseny Kapoulkine et al.
 	<http://pugixml.org/>
