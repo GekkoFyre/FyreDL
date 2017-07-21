@@ -9,7 +9,7 @@
  **       |___/
  **
  **   Thank you for using "FyreDL" for your download management needs!
- **   Copyright (C) 2016. GekkoFyre.
+ **   Copyright (C) 2016-2017. GekkoFyre.
  **
  **
  **   FyreDL is free software: you can redistribute it and/or modify
@@ -70,7 +70,7 @@ class CmnRoutines : public QObject
     Q_OBJECT
 
 public:
-    CmnRoutines();
+    CmnRoutines(QObject *parent = 0);
     ~CmnRoutines();
 
     QString extractFilename(const QString &url);
@@ -109,7 +109,9 @@ public:
                                                       const int &item_limit = 500000,
                                                       const int &depth_limit = 1000);
 
-    GekkoFyre::GkFile::FileDb openDatabase(const std::string &dbFile);
+    GekkoFyre::GkFile::FileDb openDatabase(const std::string &dbFile = CFG_HISTORY_DB_FILE);
+    std::string leveldb_location(const std::string &dbFile = CFG_HISTORY_DB_FILE);
+    void leveldb_lock_remove(const std::string &dbFile = CFG_HISTORY_DB_FILE);
     bool batch_write_single_db(const std::string &key, const std::string &value, const std::string &unique_id,
                                const GekkoFyre::GkFile::FileDb &file_db_struct);
     std::vector<GekkoFyre::GkFile::FileDbVal> read_db_vec(const std::string &key, const GekkoFyre::GkFile::FileDb &file_db_struct);

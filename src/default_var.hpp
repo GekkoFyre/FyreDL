@@ -118,6 +118,7 @@ extern "C" {
 
 // LevelDB configuration
 #define LEVELDB_CFG_CACHE_SIZE 8UL * 1024UL * 1024UL
+#define LEVELDB_CFG_LOCK_FILE_NAME "LOCK"
 
 #define LEVELDB_PARENT_NODE "fyredl-db"
 #define LEVELDB_CHILD_NODE_VERS "fyredl-xml"

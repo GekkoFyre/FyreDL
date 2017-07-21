@@ -9,7 +9,7 @@
  **       |___/
  **
  **   Thank you for using "FyreDL" for your download management needs!
- **   Copyright (C) 2016. GekkoFyre.
+ **   Copyright (C) 2016-2017. GekkoFyre.
  **
  **
  **   FyreDL is free software: you can redistribute it and/or modify
@@ -74,7 +74,7 @@ namespace fs = boost::filesystem;
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
-    routines = std::make_unique<GekkoFyre::CmnRoutines>();
+    routines = std::make_unique<GekkoFyre::CmnRoutines>(this);
 
     try {
         #ifdef _WIN32

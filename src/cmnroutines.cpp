@@ -9,7 +9,7 @@
  **       |___/
  **
  **   Thank you for using "FyreDL" for your download management needs!
- **   Copyright (C) 2016. GekkoFyre.
+ **   Copyright (C) 2016-2017. GekkoFyre.
  **
  **
  **   FyreDL is free software: you can redistribute it and/or modify
@@ -94,7 +94,7 @@ using namespace libtorrent;
 namespace sys = boost::system;
 namespace fs = boost::filesystem;
 
-GekkoFyre::CmnRoutines::CmnRoutines()
+GekkoFyre::CmnRoutines::CmnRoutines(QObject *parent) : QObject(parent)
 {
     setlocale (LC_ALL, "");
 }
@@ -291,9 +291,33 @@ GekkoFyre::GkFile::FileDb GekkoFyre::CmnRoutines::openDatabase(const std::string
     db_struct.options.create_if_missing = true;
     std::unique_ptr<leveldb::Cache>(db_struct.options.block_cache).reset(leveldb::NewLRUCache(LEVELDB_CFG_CACHE_SIZE));
     db_struct.options.compression = leveldb::CompressionType::kSnappyCompression;
+    if (!dbFileName.empty()) {
+        std::string db_location = leveldb_location(dbFileName);
 
-    // Determine the home directory and where to put the database files, depending on whether this is a Linux or
-    // Microsoft Windows operating system that FyreDL is running on.
+        leveldb::DB *raw_db_ptr;
+        s = leveldb::DB::Open(db_struct.options, db_location, &raw_db_ptr);
+        db_struct.db.reset(raw_db_ptr);
+        if (!s.ok()) {
+            throw std::runtime_error(tr("Unable to open/create database! %1").arg(QString::fromStdString(s.ToString())).toStdString());
+        }
+
+        sys::error_code ec;
+        if (fs::exists(db_location, ec) && fs::is_directory(db_location)) {
+            std::cout << tr("Database object created. Status: ").toStdString() << s.ToString();
+        }
+    }
+
+    return db_struct;
+}
+
+/**
+ * @brief GekkoFyre::CmnRoutines::leveldb_location determines the home directory and where to put the database files,
+ * depending on whether this is a Linux or Microsoft Windows operating system that FyreDL is running on.
+ * @param dbFile
+ * @return
+ */
+std::string GekkoFyre::CmnRoutines::leveldb_location(const std::string &dbFile)
+{
     fs::path home_dir(QDir::homePath().toStdString());
     std::ostringstream oss_db_dir;
     std::ostringstream oss_db_file;
@@ -308,24 +332,64 @@ GekkoFyre::GkFile::FileDb GekkoFyre::CmnRoutines::openDatabase(const std::string
             fs::create_directory(oss_db_dir.str());
         }
 
-        oss_db_file << oss_db_dir.str() << fs::path::preferred_separator << dbFileName;
+        oss_db_file << oss_db_dir.str() << fs::path::preferred_separator << dbFile;
     } else {
         throw std::invalid_argument(tr("Unable to find home directory!").toStdString());
     }
 
-    leveldb::DB *raw_db_ptr;
-    s = leveldb::DB::Open(db_struct.options, oss_db_file.str(), &raw_db_ptr);
-    db_struct.db.reset(raw_db_ptr);
-    if (!s.ok()) {
-        throw std::runtime_error(tr("Unable to open/create database! %1").arg(QString::fromStdString(s.ToString())).toStdString());
+    return oss_db_file.str();
+}
+
+/**
+ * @brief GekkoFyre::CmnRoutines::leveldb_lock_remove will detect if a database lock is in place and pose a question to
+ * the user, asking if they want to remove it.
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @date 2017-07-22
+ * @param dbFile The location of the database on the user's local storage.
+ */
+void GekkoFyre::CmnRoutines::leveldb_lock_remove(const std::string &dbFile)
+{
+    std::string db_location = leveldb_location(dbFile);
+    std::ostringstream oss_lock;
+    oss_lock << db_location << fs::path::preferred_separator << LEVELDB_CFG_LOCK_FILE_NAME;
+    if (fs::exists(oss_lock.str()) && fs::is_regular_file(oss_lock.str())) {
+        QMessageBox msg_box;
+        msg_box.setText(tr("A lock file is in-place for the LevelDB database! You must delete it before "
+                           "proceeding to use FyreDL. Continue with this action?"));
+        msg_box.setWindowTitle(tr("Warning!"));
+        msg_box.setStandardButtons(QMessageBox::Apply | QMessageBox::Abort | QMessageBox::Cancel);
+        msg_box.setDefaultButton(QMessageBox::Apply);
+        int ret = msg_box.exec();
+        switch (ret) {
+            case QMessageBox::Apply:
+            {
+                bool rem_ret = fs::remove(oss_lock.str());
+                if (!rem_ret) {
+                    QMessageBox::warning(nullptr, tr("Error!"), tr("Removal of the database lock proved unsuccessful. Aborting..."),
+                                         QMessageBox::Ok);
+                    QCoreApplication::exit(-1);
+                }
+            }
+                break;
+            case QMessageBox::Abort:
+            {
+                QCoreApplication::exit(-1);
+            }
+                break;
+            case QMessageBox::Cancel:
+            {
+                QCoreApplication::exit(-1);
+            }
+                break;
+            default:
+            {
+                QCoreApplication::exit(-1);
+            }
+                break;
+        }
     }
 
-    sys::error_code ec;
-    if (fs::exists(oss_db_file.str(), ec) && fs::is_regular_file(oss_db_file.str())) {
-        std::cout << tr("Database object created. Status: ").toStdString() << s.ToString();
-    }
-
-    return db_struct;
+    return;
 }
 
 /**
@@ -812,7 +876,9 @@ bool GekkoFyre::CmnRoutines::modify_db_write(const std::string &unique_id, const
  */
 bool GekkoFyre::CmnRoutines::delete_db_write(const std::string &unique_id, const GekkoFyre::GkFile::FileDb &file_db, const std::initializer_list<std::string> &keys)
 {
+    static std::initializer_list<std::string>::size_type pos = 0;
     for (const auto &key: keys) {
+        ++pos;
         leveldb::ReadOptions read_opt;
         leveldb::Status s;
         read_opt.verify_checksums = true;
@@ -835,7 +901,7 @@ bool GekkoFyre::CmnRoutines::delete_db_write(const std::string &unique_id, const
 
             pugi::xml_node items = doc->child(LEVELDB_PARENT_NODE);
             for (const auto &file: items.children(LEVELDB_XML_CHILD_NODE)) {
-                if (file.find_child_by_attribute(LEVELDB_ITEM_ATTR_UNIQUE_ID, unique_id.c_str())) {
+                if (file.attribute(LEVELDB_ITEM_ATTR_UNIQUE_ID).as_string() == unique_id) {
                     file.parent().remove_child(file);
                     break;
                 }
@@ -853,9 +919,13 @@ bool GekkoFyre::CmnRoutines::delete_db_write(const std::string &unique_id, const
             if (!s.ok()) {
                 throw std::runtime_error(s.ToString());
             } else {
-                return true;
+                continue;
             }
         }
+    }
+
+    if (pos == keys.size()) {
+        return true;
     }
 
     return false;
