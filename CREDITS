@@ -27,6 +27,14 @@ LevelDB by Jeffrey Dean, Sanjay Ghemawat, et al. and Google Inc.
 	<https://github.com/google/leveldb>
 		BSD 3-clause
 
+LevelDB with full Windows support by Bureau 14
+	<https://github.com/bureau14/leveldb>
+		BSD 3-clause
+		
+LevelDB (Windows support) patches by Netzeband
+	<https://github.com/google/leveldb/issues/475>
+		Public Domain
+
 PugiXML by Arseny Kapoulkine et al.
 	<http://pugixml.org/>
 		MIT License
