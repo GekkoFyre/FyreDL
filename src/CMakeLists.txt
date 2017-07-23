@@ -27,7 +27,7 @@
  ##
  #################################################################################
 
-cmake_minimum_required(VERSION 3.3.0 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.6.0 FATAL_ERROR)
 project(FyreDL C CXX) # http://stackoverflow.com/questions/15193785/how-to-get-cmake-to-recognize-pthread-on-ubuntu
 
 set(CMAKE_VERBOSE_MAKEFILE ON)
@@ -115,6 +115,7 @@ qt5_wrap_ui(UI_HEADERS
 qt5_add_resources(UI_RESOURCES assets.qrc)
 
 # Create the main executable and name it depending on the operating system
+INCLUDE(CMakeDetermineSystem)
 set(EXE_NAME "fyredl" CACHE STRING "The name of the executable.")
 if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
     set_property(CACHE EXE_NAME PROPERTY STRINGS "fyredl")
@@ -158,10 +159,9 @@ target_compile_features("${EXE_NAME}" PRIVATE ${GK_NEEDED_FEATURES})
 #
 # Find the correct Boost C++ packages
 #
-INCLUDE(CMakeDetermineSystem)
 set(Boost_USE_MULTITHREADED TRUE)
-# set(Boost_USE_STATIC_LIBS FALSE CACHE BOOL "Whether to use static libraries with regard to Boost C++ or not")
-# set(Boost_USE_STATIC_RUNTIME FALSE)
+set(Boost_USE_STATIC_LIBS FALSE CACHE BOOL "Whether to use static libraries with regard to Boost C++ or not.")
+set(Boost_USE_STATIC_RUNTIME FALSE CACHE BOOL "Whether to use Boost C++ libraries that are compiled with a static run-time or not.")
 find_package(Boost 1.54.0 REQUIRED COMPONENTS "iostreams"
                                               "filesystem"
                                               "system")
@@ -234,27 +234,6 @@ if (PUGIXML_FOUND)
 else()
     message(SEND_ERROR "The 'pugixml' library could not be found!")
 endif(PUGIXML_FOUND)
-
-#
-# Detect if we are using X11 or the Wayland compositing system, if we are running under Linux
-# https://stackoverflow.com/questions/45135228/effective-way-of-detecting-x11-vs-wayland-preferrably-with-cmake
-#
-# TODO: Finish coding this!
-if(${CMAKE_SYSTEM_NAME} MATCHES "Linux") # Check if we are on Linux
-    find_package(Systemd)
-    if(SYSTEMD_FOUND)
-        execute_process(COMMAND "loginctl show-session $(loginctl | grep $(whoami) | awk '{print $1}') -p Type" OUTPUT_VARIABLE result_display_server)
-        if ("${result_display_server}" MATCHES "Type=x11")
-            set(display_server_x11 TRUE)
-            message(STATUS "Using the X11 display compositor!")
-        else()
-            set(display_server_x11 FALSE)
-            message(STATUS "Using something other than X11 as the display compositor.")
-        endif()
-    else()
-        message(STATUS "Systemd was not found! Resuming without the functionality provided by this...")
-    endif(SYSTEMD_FOUND)
-endif()
 
 #
 # Qt5 translation routines

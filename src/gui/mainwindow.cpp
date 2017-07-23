@@ -131,8 +131,8 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
         QMessageBox::warning(this, tr("Error!"), QString("%1").arg(e.what()), QMessageBox::Ok);
     }
 
-    QShortcut *upKeyOverride = new QShortcut(QKeySequence(Qt::Key_Up), ui->downloadView);
-    QShortcut *downKeyOverride = new QShortcut(QKeySequence(Qt::Key_Down), ui->downloadView);
+    QPointer<QShortcut> upKeyOverride = new QShortcut(QKeySequence(Qt::Key_Up), ui->downloadView);
+    QPointer<QShortcut> downKeyOverride = new QShortcut(QKeySequence(Qt::Key_Down), ui->downloadView);
     QObject::connect(upKeyOverride, SIGNAL(activated()), this, SLOT(keyUpDlModelSlot()));
     QObject::connect(downKeyOverride, SIGNAL(activated()), this, SLOT(keyDownDlModelSlot()));
 
