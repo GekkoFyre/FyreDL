@@ -1,4 +1,4 @@
-##[ FyreDL ] Download Manager##
+[ FyreDL ] Download Manager
 ----------
 The projects that have been forked and are located in this repository are `utils\build-libcurl-windows` and `utils\leveldb-patched-windows`. Please see the `README.md` located in each repository for the full information as to the original authors, the license information, and what new improvements have been made by [GekkoFyre](https://github.com/gekkofyre). The license that applies to ***FyreDL*** does not necessarily apply to these projects.
 
