@@ -69,6 +69,7 @@
 #include <QTextCodec>
 
 #ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
 #define _WIN32_WINNT 0x06000100
 #include <SDKDDKVer.h>
 #include <Windows.h>
@@ -219,40 +220,6 @@ void GekkoFyre::CmnRoutines::print_exception(const std::exception &e, int level)
     } catch (const std::exception &e) {
         print_exception(e, (level + 1));
     } catch (...) {}
-}
-
-/**
- * @brief GekkoFyre::CmnRoutines::singleAppInstance_Win32 detects, under Microsoft Windows, if an existing instance of this
- * application is already open, even across different logins.
- * @author krishna_kp <http://stackoverflow.com/questions/4191465/how-to-run-only-one-instance-of-application>
- * @date 2013-06-07
- * @return Returns false upon finding an existing instance of this application, otherwise returns true on finding none.
- */
-bool GekkoFyre::CmnRoutines::singleAppInstance_Win32()
-{
-    #ifdef _WIN32
-    HANDLE m_hStartEvent = CreateEventW(NULL, FALSE, FALSE, L"Global\\FyreDL");
-    if(m_hStartEvent == NULL) {
-        CloseHandle(m_hStartEvent);
-        return false;
-    }
-
-    if (GetLastError() == ERROR_ALREADY_EXISTS) {
-        CloseHandle(m_hStartEvent);
-        m_hStartEvent = NULL;
-            QMessageBox::information(nullptr, tr("Greetings!"), tr("It seems that an existing instance of this application "
-                                                                   "is already open! Please close that first before "
-                                                                   "re-opening again."),
-                             QMessageBox::Ok);
-        return false;
-    }
-
-    return true;
-    #elif __linux__
-    return true;
-    #else
-    #error "Platform not supported!"
-    #endif
 }
 
 /**

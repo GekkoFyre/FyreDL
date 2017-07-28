@@ -84,7 +84,6 @@ public:
     QString timeBeautify(const double &secondsToConvert);
 
     void print_exception(const std::exception &e, int level = 0);
-    bool singleAppInstance_Win32();
     static std::string createId(const size_t &id_length);
 
     int convDlStat_toInt(const GekkoFyre::DownloadStatus &status);

@@ -43,7 +43,6 @@
 #include "mainwindow.hpp"
 #include "ui_mainwindow.h"
 #include "settings.hpp"
-#include "./../singleton_proc.hpp"
 #include "./../curl_easy.hpp"
 #include "about.hpp"
 #include <boost/filesystem.hpp>
@@ -75,23 +74,6 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
 {
     ui->setupUi(this);
     routines = std::make_unique<GekkoFyre::CmnRoutines>(this);
-
-    try {
-        #ifdef _WIN32
-        if (!routines->singleAppInstance_Win32()) {
-            QCoreApplication::quit(); // Exit with status code '0'
-        }
-        #elif __linux__
-        SingletonProcess singleton(37563);
-        if (!singleton()) {
-            throw std::runtime_error("Application is already open!");
-        }
-        #endif
-    } catch (const std::exception &e) {
-        QMessageBox::information(this, tr("Problem!"), QString("%1").arg(e.what()), QMessageBox::Ok);
-        QCoreApplication::quit(); // Exit with status code '0'
-        return;
-    }
 
     QMessageBox::warning(this, tr("FyreDL"), tr("FyreDL is currently under intense development at this "
                                                 "time! Please only use at your own risk."),
