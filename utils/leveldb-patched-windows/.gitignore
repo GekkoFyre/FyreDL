@@ -3,6 +3,8 @@ build_config.mk
 db_bench
 leveldbutil
 *_test
+cmake-build-debug
+.idea
 
 *.slo
 *.lo
