@@ -42,6 +42,7 @@
 
 #include "gui/mainwindow.hpp"
 #include "default_var.hpp"
+#include "singleton_proc.hpp"
 #include <QApplication>
 
 #ifdef Q_OS_LINUX
@@ -55,6 +56,12 @@ extern "C" {
 
 int main(int argc, char *argv[])
 {
+    SingletonProcess singleton(37563);
+    if (!singleton()) {
+        std::cerr << "Another FyreDL instance is already open!" << std::endl;
+        return 1; // Exit with status code '1'
+    }
+
     // https://github.com/notepadqq/notepadqq/issues/323
     #ifdef __linux__
     Display *d = XOpenDisplay(nullptr);

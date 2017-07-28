@@ -84,7 +84,6 @@ public:
     QString timeBeautify(const double &secondsToConvert);
 
     void print_exception(const std::exception &e, int level = 0);
-    bool singleAppInstance_Win32();
     static std::string createId(const size_t &id_length);
 
     int convDlStat_toInt(const GekkoFyre::DownloadStatus &status);
@@ -100,6 +99,7 @@ public:
     GekkoFyre::HashType convHashType_StringToEnum(const QString &hashType);
     QString convHashType_toString(const GekkoFyre::HashType &hash_type);
     GekkoFyre::DownloadType convDownType_StringToEnum(const QString &down_type);
+    GekkoFyre::DownloadType convDownType_IntToEnum(const int &down_int);
 
     static long getFileSize(const std::string &file_name);
     unsigned long int freeDiskSpace(const QString &path = QDir::rootPath());
@@ -113,7 +113,7 @@ public:
     std::string leveldb_location(const std::string &dbFile = CFG_HISTORY_DB_FILE);
     void leveldb_lock_remove(const std::string &dbFile = CFG_HISTORY_DB_FILE);
     bool batch_write_single_db(const std::string &key, const std::string &value, const std::string &unique_id,
-                               const GekkoFyre::GkFile::FileDb &file_db_struct);
+                               const GekkoFyre::DownloadType &dl_type, const GekkoFyre::GkFile::FileDb &file_db_struct);
     std::vector<GekkoFyre::GkFile::FileDbVal> read_db_vec(const std::string &key, const GekkoFyre::GkFile::FileDb &file_db_struct);
     std::pair<std::string, std::string> read_db_min(const std::string &key, const GekkoFyre::GkFile::FileDb &file_db_struct);
 

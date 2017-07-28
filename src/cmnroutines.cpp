@@ -69,6 +69,7 @@
 #include <QTextCodec>
 
 #ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
 #define _WIN32_WINNT 0x06000100
 #include <SDKDDKVer.h>
 #include <Windows.h>
@@ -222,40 +223,6 @@ void GekkoFyre::CmnRoutines::print_exception(const std::exception &e, int level)
 }
 
 /**
- * @brief GekkoFyre::CmnRoutines::singleAppInstance_Win32 detects, under Microsoft Windows, if an existing instance of this
- * application is already open, even across different logins.
- * @author krishna_kp <http://stackoverflow.com/questions/4191465/how-to-run-only-one-instance-of-application>
- * @date 2013-06-07
- * @return Returns false upon finding an existing instance of this application, otherwise returns true on finding none.
- */
-bool GekkoFyre::CmnRoutines::singleAppInstance_Win32()
-{
-    #ifdef _WIN32
-    HANDLE m_hStartEvent = CreateEventW(NULL, FALSE, FALSE, L"Global\\FyreDL");
-    if(m_hStartEvent == NULL) {
-        CloseHandle(m_hStartEvent);
-        return false;
-    }
-
-    if (GetLastError() == ERROR_ALREADY_EXISTS) {
-        CloseHandle(m_hStartEvent);
-        m_hStartEvent = NULL;
-            QMessageBox::information(nullptr, tr("Greetings!"), tr("It seems that an existing instance of this application "
-                                                                   "is already open! Please close that first before "
-                                                                   "re-opening again."),
-                             QMessageBox::Ok);
-        return false;
-    }
-
-    return true;
-    #elif __linux__
-    return true;
-    #else
-    #error "Platform not supported!"
-    #endif
-}
-
-/**
  * @brief GekkoFyre::CmnRoutines::createId generates a unique ID and returns the value.
  * @date 2016-12-12
  * @note <http://stackoverflow.com/questions/13445688/how-to-generate-a-random-number-in-c>
@@ -405,7 +372,8 @@ void GekkoFyre::CmnRoutines::leveldb_lock_remove(const std::string &dbFile)
  * @return
  */
 bool GekkoFyre::CmnRoutines::batch_write_single_db(const std::string &key, const std::string &value,
-                                                   const std::string &unique_id, const GekkoFyre::GkFile::FileDb &file_db_struct)
+                                                   const std::string &unique_id, const GekkoFyre::DownloadType &dl_type,
+                                                   const GekkoFyre::GkFile::FileDb &file_db_struct)
 {
     leveldb::Status s;
     if (s.ok()) {
@@ -441,20 +409,20 @@ bool GekkoFyre::CmnRoutines::batch_write_single_db(const std::string &key, const
 
         if (!ret_val.empty()) {
             GekkoFyre::GkFile::FileDbVal file_db_val;
-            file_db_val.dl_type = GekkoFyre::DownloadType::Torrent;
+            file_db_val.dl_type = dl_type;
             file_db_val.value = value;
             file_db_val.unique_id = unique_id;
             ret_val.push_back(file_db_val);
 
             for (const auto &val: ret_val) {
                 pugi::xml_node nodeExtraItems = root.append_child(LEVELDB_XML_CHILD_NODE);
-                nodeExtraItems.append_attribute(LEVELDB_XML_ATTR_DL_TYPE) = convDownType_toInt(val.dl_type); // TODO: Fix this immediately!
+                nodeExtraItems.append_attribute(LEVELDB_XML_ATTR_DL_TYPE) = std::to_string(convDownType_toInt(val.dl_type)).c_str();
                 nodeExtraItems.append_attribute(LEVELDB_XML_ATTR_ITEM_VALUE) = val.value.c_str();
                 nodeExtraItems.append_attribute(LEVELDB_ITEM_ATTR_UNIQUE_ID) = val.unique_id.c_str();
             }
         } else {
             pugi::xml_node nodeFirstItem = root.append_child(LEVELDB_XML_CHILD_NODE);
-            nodeFirstItem.append_attribute(LEVELDB_XML_ATTR_DL_TYPE) = convDownType_toInt(GekkoFyre::DownloadType::Torrent); // TODO: Fix this immediately!
+            nodeFirstItem.append_attribute(LEVELDB_XML_ATTR_DL_TYPE) = std::to_string(convDownType_toInt(dl_type)).c_str();
             nodeFirstItem.append_attribute(LEVELDB_XML_ATTR_ITEM_VALUE) = value.c_str();
             nodeFirstItem.append_attribute(LEVELDB_ITEM_ATTR_UNIQUE_ID) = unique_id.c_str();
         }
@@ -520,7 +488,7 @@ std::vector<GekkoFyre::GkFile::FileDbVal> GekkoFyre::CmnRoutines::read_db_vec(co
         pugi::xml_node items = doc->child(LEVELDB_PARENT_NODE);
         for (const auto &file: items.children(LEVELDB_XML_CHILD_NODE)) {
             GekkoFyre::GkFile::FileDbVal file_db_val;
-            file_db_val.dl_type = convDownType_StringToEnum(file.attribute(LEVELDB_XML_ATTR_DL_TYPE).as_string()); // TODO: Fix this immediately! Should be 'IntToEnum'.
+            file_db_val.dl_type = convDownType_IntToEnum(file.attribute(LEVELDB_XML_ATTR_DL_TYPE).as_int());
             file_db_val.value = file.attribute(LEVELDB_XML_ATTR_ITEM_VALUE).as_string();
             file_db_val.unique_id = file.attribute(LEVELDB_ITEM_ATTR_UNIQUE_ID).as_string();
             file_db_val.key = key;
@@ -831,7 +799,7 @@ std::vector<GekkoFyre::GkFile::FileDbVal> GekkoFyre::CmnRoutines::process_db_xml
         pugi::xml_node items = doc->child(LEVELDB_PARENT_NODE);
         for (const auto &file: items.children(LEVELDB_XML_CHILD_NODE)) {
             GekkoFyre::GkFile::FileDbVal file_db_val;
-            file_db_val.dl_type = convDownType_StringToEnum(file.attribute(LEVELDB_XML_ATTR_DL_TYPE).as_string()); // TODO: Fix this immediately! Should be 'IntToEnum'.
+            file_db_val.dl_type = convDownType_IntToEnum(file.attribute(LEVELDB_XML_ATTR_DL_TYPE).as_int());
             file_db_val.value = file.attribute(LEVELDB_XML_ATTR_ITEM_VALUE).as_string();
             file_db_val.unique_id = file.attribute(LEVELDB_ITEM_ATTR_UNIQUE_ID).as_string();
             ret_data.push_back(file_db_val);
@@ -856,7 +824,7 @@ bool GekkoFyre::CmnRoutines::modify_db_write(const std::string &unique_id, const
             bool del_ret = delete_db_write(item.unique_id, file_db, {item.key});
             if (!del_ret) { return false; }
             item.value = new_val;
-            bool write_ret = batch_write_single_db(item.key, item.value, item.unique_id, file_db);
+            bool write_ret = batch_write_single_db(item.key, item.value, item.unique_id, item.dl_type, file_db);
             return write_ret;
         }
     }
@@ -1039,7 +1007,7 @@ void GekkoFyre::CmnRoutines::batch_write_to_file_db(const std::vector<GekkoFyre:
 
         s = ext_db_struct.db->Write(write_opt, &batch);
         if (s.ok()) {
-            std::cout << tr("Deleted key: %1").arg(QString::fromStdString(key)).toStdString();
+            // std::cout << tr("Deleted key: %1\n").arg(QString::fromStdString(key)).toStdString();
             return;
         } else {
             throw std::runtime_error(s.ToString());
@@ -1504,18 +1472,18 @@ bool GekkoFyre::CmnRoutines::writeDownloadItem(GekkoFyre::GkCurl::CurlDlInfo &dl
 
                 std::string unique_id = dl_info.unique_id;
                 GekkoFyre::GkFile::FileDb db_struct = openDatabase(CFG_HISTORY_DB_FILE);
-                batch_write_single_db(LEVELDB_KEY_CURL_FLOC, dl_info.file_loc, unique_id, db_struct);
-                batch_write_single_db(LEVELDB_KEY_CURL_STAT, std::to_string(convDlStat_toInt(dl_info.dlStatus)), unique_id, db_struct);
-                batch_write_single_db(LEVELDB_KEY_CURL_INSERT_DATE, std::to_string(dl_info.insert_timestamp), unique_id, db_struct);
-                batch_write_single_db(LEVELDB_KEY_CURL_COMPLT_DATE, std::to_string(dl_info.complt_timestamp), unique_id, db_struct);
-                batch_write_single_db(LEVELDB_KEY_CURL_STATMSG, dl_info.ext_info.status_msg, unique_id, db_struct);
-                batch_write_single_db(LEVELDB_KEY_CURL_EFFEC_URL, dl_info.ext_info.effective_url, unique_id, db_struct);
-                batch_write_single_db(LEVELDB_KEY_CURL_RESP_CODE, std::to_string(dl_info.ext_info.response_code), unique_id, db_struct);
-                batch_write_single_db(LEVELDB_KEY_CURL_CONT_LNGTH, std::to_string(dl_info.ext_info.content_length), unique_id, db_struct);
-                batch_write_single_db(LEVELDB_KEY_CURL_HASH_TYPE, std::to_string(dl_info.hash_type), unique_id, db_struct);
-                batch_write_single_db(LEVELDB_KEY_CURL_HASH_VAL_GIVEN, dl_info.hash_val_given, unique_id, db_struct);
-                batch_write_single_db(LEVELDB_KEY_CURL_HASH_VAL_RTRND, dl_info.hash_val_rtrnd, unique_id, db_struct);
-                batch_write_single_db(LEVELDB_KEY_CURL_HASH_SUCC_TYPE, std::to_string(convHashVerif_toInt(dl_info.hash_succ_type)), unique_id, db_struct);
+                batch_write_single_db(LEVELDB_KEY_CURL_FLOC, dl_info.file_loc, unique_id, GekkoFyre::DownloadType::HTTP, db_struct);
+                batch_write_single_db(LEVELDB_KEY_CURL_STAT, std::to_string(convDlStat_toInt(dl_info.dlStatus)), unique_id, GekkoFyre::DownloadType::HTTP, db_struct);
+                batch_write_single_db(LEVELDB_KEY_CURL_INSERT_DATE, std::to_string(dl_info.insert_timestamp), unique_id, GekkoFyre::DownloadType::HTTP, db_struct);
+                batch_write_single_db(LEVELDB_KEY_CURL_COMPLT_DATE, std::to_string(dl_info.complt_timestamp), unique_id, GekkoFyre::DownloadType::HTTP, db_struct);
+                batch_write_single_db(LEVELDB_KEY_CURL_STATMSG, dl_info.ext_info.status_msg, unique_id, GekkoFyre::DownloadType::HTTP, db_struct);
+                batch_write_single_db(LEVELDB_KEY_CURL_EFFEC_URL, dl_info.ext_info.effective_url, unique_id, GekkoFyre::DownloadType::HTTP, db_struct);
+                batch_write_single_db(LEVELDB_KEY_CURL_RESP_CODE, std::to_string(dl_info.ext_info.response_code), unique_id, GekkoFyre::DownloadType::HTTP, db_struct);
+                batch_write_single_db(LEVELDB_KEY_CURL_CONT_LNGTH, std::to_string(dl_info.ext_info.content_length), unique_id, GekkoFyre::DownloadType::HTTP, db_struct);
+                batch_write_single_db(LEVELDB_KEY_CURL_HASH_TYPE, std::to_string(dl_info.hash_type), unique_id, GekkoFyre::DownloadType::HTTP, db_struct);
+                batch_write_single_db(LEVELDB_KEY_CURL_HASH_VAL_GIVEN, dl_info.hash_val_given, unique_id, GekkoFyre::DownloadType::HTTP, db_struct);
+                batch_write_single_db(LEVELDB_KEY_CURL_HASH_VAL_RTRND, dl_info.hash_val_rtrnd, unique_id, GekkoFyre::DownloadType::HTTP, db_struct);
+                batch_write_single_db(LEVELDB_KEY_CURL_HASH_SUCC_TYPE, std::to_string(convHashVerif_toInt(dl_info.hash_succ_type)), unique_id, GekkoFyre::DownloadType::HTTP, db_struct);
                 return true;
             } catch (const std::exception &e) {
                 QMessageBox::warning(nullptr, tr("Error!"), e.what(), QMessageBox::Ok);
@@ -1698,28 +1666,18 @@ bool GekkoFyre::CmnRoutines::writeTorrentItem(GekkoFyre::GkTorrent::TorrentInfo 
                     QDateTime now = QDateTime::currentDateTime();
                     gk_ti.general.insert_timestamp = now.toTime_t();
 
-                    batch_write_single_db(LEVELDB_KEY_TORRENT_FLOC, gk_ti.general.down_dest, gk_ti.general.unique_id, db_struct);
-                    batch_write_single_db(LEVELDB_KEY_TORRENT_INSERT_DATE,
-                                          std::to_string(gk_ti.general.insert_timestamp),
-                                          gk_ti.general.unique_id, db_struct);
-                    batch_write_single_db(LEVELDB_KEY_TORRENT_COMPLT_DATE,
-                                          std::to_string(gk_ti.general.complt_timestamp),
-                                          gk_ti.general.unique_id, db_struct);
-                    batch_write_single_db(LEVELDB_KEY_TORRENT_CREATN_DATE,
-                                          std::to_string(gk_ti.general.creatn_timestamp),
-                                          gk_ti.general.unique_id, db_struct);
-                    batch_write_single_db(LEVELDB_KEY_TORRENT_DLSTATUS,
-                                          convDlStat_toString(gk_ti.general.dlStatus).toStdString(), gk_ti.general.unique_id, db_struct);
-                    batch_write_single_db(LEVELDB_KEY_TORRENT_TORRNT_COMMENT, gk_ti.general.comment, gk_ti.general.unique_id, db_struct);
-                    batch_write_single_db(LEVELDB_KEY_TORRENT_TORRNT_CREATOR, gk_ti.general.creator, gk_ti.general.unique_id, db_struct);
-                    batch_write_single_db(LEVELDB_KEY_TORRENT_MAGNET_URI, gk_ti.general.magnet_uri, gk_ti.general.unique_id, db_struct);
-                    batch_write_single_db(LEVELDB_KEY_TORRENT_TORRNT_NAME, gk_ti.general.torrent_name, gk_ti.general.unique_id, db_struct);
-                    batch_write_single_db(LEVELDB_KEY_TORRENT_NUM_FILES, std::to_string(gk_ti.general.num_files),
-                                          gk_ti.general.unique_id, db_struct);
-                    batch_write_single_db(LEVELDB_KEY_TORRENT_TORRNT_PIECES, std::to_string(gk_ti.general.num_pieces),
-                                          gk_ti.general.unique_id, db_struct);
-                    batch_write_single_db(LEVELDB_KEY_TORRENT_TORRNT_PIECE_LENGTH,
-                                          std::to_string(gk_ti.general.piece_length), gk_ti.general.unique_id, db_struct);
+                    batch_write_single_db(LEVELDB_KEY_TORRENT_FLOC, gk_ti.general.down_dest, gk_ti.general.unique_id, GekkoFyre::DownloadType::Torrent, db_struct);
+                    batch_write_single_db(LEVELDB_KEY_TORRENT_INSERT_DATE, std::to_string(gk_ti.general.insert_timestamp), gk_ti.general.unique_id, GekkoFyre::DownloadType::Torrent, db_struct);
+                    batch_write_single_db(LEVELDB_KEY_TORRENT_COMPLT_DATE, std::to_string(gk_ti.general.complt_timestamp), gk_ti.general.unique_id, GekkoFyre::DownloadType::Torrent, db_struct);
+                    batch_write_single_db(LEVELDB_KEY_TORRENT_CREATN_DATE, std::to_string(gk_ti.general.creatn_timestamp), gk_ti.general.unique_id, GekkoFyre::DownloadType::Torrent, db_struct);
+                    batch_write_single_db(LEVELDB_KEY_TORRENT_DLSTATUS, convDlStat_toString(gk_ti.general.dlStatus).toStdString(), gk_ti.general.unique_id, GekkoFyre::DownloadType::Torrent, db_struct);
+                    batch_write_single_db(LEVELDB_KEY_TORRENT_TORRNT_COMMENT, gk_ti.general.comment, gk_ti.general.unique_id, GekkoFyre::DownloadType::Torrent, db_struct);
+                    batch_write_single_db(LEVELDB_KEY_TORRENT_TORRNT_CREATOR, gk_ti.general.creator, gk_ti.general.unique_id, GekkoFyre::DownloadType::Torrent, db_struct);
+                    batch_write_single_db(LEVELDB_KEY_TORRENT_MAGNET_URI, gk_ti.general.magnet_uri, gk_ti.general.unique_id, GekkoFyre::DownloadType::Torrent, db_struct);
+                    batch_write_single_db(LEVELDB_KEY_TORRENT_TORRNT_NAME, gk_ti.general.torrent_name, gk_ti.general.unique_id, GekkoFyre::DownloadType::Torrent, db_struct);
+                    batch_write_single_db(LEVELDB_KEY_TORRENT_NUM_FILES, std::to_string(gk_ti.general.num_files), gk_ti.general.unique_id, GekkoFyre::DownloadType::Torrent, db_struct);
+                    batch_write_single_db(LEVELDB_KEY_TORRENT_TORRNT_PIECES, std::to_string(gk_ti.general.num_pieces), gk_ti.general.unique_id, GekkoFyre::DownloadType::Torrent, db_struct);
+                    batch_write_single_db(LEVELDB_KEY_TORRENT_TORRNT_PIECE_LENGTH, std::to_string(gk_ti.general.piece_length), gk_ti.general.unique_id, GekkoFyre::DownloadType::Torrent, db_struct);
 
                     //
                     // Files and Trackers
@@ -1798,7 +1756,7 @@ bool GekkoFyre::CmnRoutines::writeTorrent_extra_data(const GekkoFyre::GkTorrent:
         batch.Put(key, ss.str());
         s = ext_db_struct.db->Write(write_opt, &batch);
         if (s.ok()) {
-            std::cout << tr("Deleted key: %1").arg(QString::fromStdString(key)).toStdString();
+            // std::cout << tr("Deleted key: %1\n").arg(QString::fromStdString(key)).toStdString();
             return true;
         } else {
             throw std::runtime_error(s.ToString());
@@ -2250,14 +2208,29 @@ GekkoFyre::DownloadType GekkoFyre::CmnRoutines::convDownType_StringToEnum(const 
     }
 }
 
+GekkoFyre::DownloadType GekkoFyre::CmnRoutines::convDownType_IntToEnum(const int &down_int)
+{
+    if (ENUM_GEKKOFYRE_DOWN_TYPE_HTTP) {
+        return GekkoFyre::DownloadType::HTTP;
+    } else if (ENUM_GEKKOFYRE_DOWN_TYPE_FTP) {
+        return GekkoFyre::DownloadType::FTP;
+    } else if (ENUM_GEKKOFYRE_DOWN_TYPE_TORRENT) {
+        return GekkoFyre::DownloadType::Torrent;
+    } else if (ENUM_GEKKOFYRE_DOWN_TYPE_MAGNET_LINK) {
+        return GekkoFyre::DownloadType::TorrentMagnetLink;
+    }
+
+    return GekkoFyre::DownloadType::HTTP;
+}
+
 QString GekkoFyre::CmnRoutines::numberConverter(const double &value)
 {
     QMutexLocker locker(&mutex);
     locker.relock(); // Should lock automatically though
-    if (value < 1024) {
+    if (value < (1024 * 1024)) {
         QString conv = bytesToKilobytes(value);
         return conv;
-    } else if (value > 1024) {
+    } else if (value > (2048 * 1024)) {
         QString conv = bytesToMegabytes(value);
         return conv;
     } else {

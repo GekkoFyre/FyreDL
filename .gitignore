@@ -15,7 +15,7 @@ src/cmake-build-debug/
 # Compiled Dynamic libraries
 *.so
 *.dylib
-*.dll
+# *.dll
 
 # Fortran module files
 *.mod
@@ -28,7 +28,7 @@ src/cmake-build-debug/
 *.lib
 
 # Executables
-*.exe
+# *.exe
 *.out
 *.app
 /NOTES.txt

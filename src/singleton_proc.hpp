@@ -43,7 +43,18 @@
 #ifndef SINGLEPROC_HPP
 #define SINGLEPROC_HPP
 
-#ifdef __linux__
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#define _WIN32_WINNT 0x06000100
+#include <SDKDDKVer.h>
+#include <Windows.h>
+#include <Winsock2.h>
+
+extern "C" {
+#include <stdlib.h>
+}
+
+#elif __linux__
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
 #endif
@@ -52,12 +63,13 @@ extern "C" {
 #include <netinet/in.h>
 }
 
+#else
+#error "Platform not supported!"
 #endif
 
 #include <string>
 #include <cstring>
 
-#ifdef __linux__
 // Using a socket implementation, this checks to see if the application, "FyreDL", is already open or not.
 // The socket is deleted automatically upon exit or crash. You must also choose a port that is unique to
 // this application in the usage of this singleton function.
@@ -99,6 +111,5 @@ private:
     int rc;
     uint16_t port;
 };
-#endif
 
 #endif // SINGLEPROC_HPP
