@@ -353,15 +353,25 @@ void downloadDelegate::paint(QPainter *painter, const QStyleOptionViewItem &opti
         QApplication::style()->drawControl(QStyle::CE_ProgressBar, &progressBarOption, painter);
         return;
     } else {
+        int w, h, x, y = { 0 };
+        option.rect.getRect(&x, &y, &w, &h);
         QStyleOptionViewItem viewItemOption;
         viewItemOption.rect = option.rect;
-        viewItemOption.font = QFont(option.font, painter->device());
+        viewItemOption.rect.setRect((x + FYREDL_DEFAULT_UI_TABLE_PIXEL_PADDING), (y + FYREDL_DEFAULT_UI_TABLE_PIXEL_PADDING),
+                                    (w - FYREDL_DEFAULT_UI_TABLE_PIXEL_PADDING), (h - FYREDL_DEFAULT_UI_TABLE_PIXEL_PADDING));
         viewItemOption.palette = option.palette;
 
         QTextOption textOption;
         textOption.setAlignment(Qt::AlignLeft);
         textOption.setWrapMode(QTextOption::WrapMode::NoWrap);
 
+        QFont font;
+        font.setFamily(FYREDL_DEFAULT_UI_TABLE_FONT_FAMILY);
+        font.setItalic(false);
+        font.setBold(false);
+        font.setPixelSize(FYREDL_DEFAULT_UI_TABLE_FONT_PIXEL_SIZE);
+
+        painter->setFont(font);
         painter->drawText(viewItemOption.rect, index.data().toString(), textOption);
         QApplication::style()->drawControl(QStyle::CE_ItemViewItem, &viewItemOption, painter);
         return;
