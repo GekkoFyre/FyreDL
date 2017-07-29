@@ -1645,6 +1645,23 @@ bool GekkoFyre::CmnRoutines::modifyDlState(const std::string &file_loc, const Ge
     return false;
 }
 
+bool GekkoFyre::CmnRoutines::modifyToState(const std::string &unique_id, const GekkoFyre::DownloadStatus &dl_status)
+{
+    try {
+        if (!unique_id.empty()) {
+            GekkoFyre::GkFile::FileDb db_struct = openDatabase(CFG_HISTORY_DB_FILE);
+            std::vector<GekkoFyre::GkFile::FileDbVal> file_stat_vec = read_db_vec(LEVELDB_KEY_TORRENT_DLSTATUS, db_struct);
+            modify_db_write(unique_id, std::to_string(convDlStat_toInt(dl_status)), file_stat_vec, db_struct);
+            return true;
+        }
+    } catch (const std::exception &e) {
+        QMessageBox::warning(nullptr, tr("Error!"), e.what(), QMessageBox::Ok);
+        return false;
+    }
+
+    return false;
+}
+
 /**
  * @brief GekkoFyre::CmnRoutines::writeTorrentItem writes BitTorrent related information to a Google LevelDB database that is kept on
  * the user's local storage within the home directory. This information is stored in a readibly parsable XML format.

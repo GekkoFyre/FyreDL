@@ -48,14 +48,12 @@
 
 #include "./../default_var.hpp"
 #include "./../cmnroutines.hpp"
-#include "session.hpp"
 #include "misc.hpp"
 #include <libtorrent/session_handle.hpp>
 #include <libtorrent/torrent_handle.hpp>
 #include <string>
 #include <memory>
 #include <QObject>
-#include <QThread>
 #include <QPointer>
 
 namespace GekkoFyre {
@@ -70,18 +68,18 @@ public:
 
 private:
     int rand_port() const;
+    void run_session_bckgrnd();
 
     std::unique_ptr<GekkoFyre::CmnRoutines> routines;
-    QPointer<GekkoFyre::GkTorrentSession> gk_to_ses;
-    std::shared_ptr<lt::session_handle> lt_ses;
-    QPointer<QThread> gk_ses_thread;
+    lt::session_handle *lt_ses;
+    QMap<std::string, lt::torrent_handle> lt_to_handle;
 
 private slots:
     void recv_proc_to_stats(const std::string &save_path, const lt::torrent_status &stats);
 
 signals:
-    void update_ses_hash(const std::string &save_dir, const lt::torrent_handle &lt_th);
     void xfer_torrent_info(const GekkoFyre::GkTorrent::TorrentResumeInfo &xfer_stats);
+    void xfer_internal_stats(const std::string &save_path, const lt::torrent_status &stats);
 };
 }
 

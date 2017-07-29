@@ -126,6 +126,7 @@ public:
     bool modifyDlState(const std::string &file_loc, const GekkoFyre::DownloadStatus &status, const long long &complt_timestamp = 0,
                        const std::string &hash_given = "", const GekkoFyre::HashType &hash_type = GekkoFyre::HashType::None,
                        const std::string &hash_rtrnd = "", const GekkoFyre::HashVerif &ret_succ_type = GekkoFyre::HashVerif::NotApplicable);
+    bool modifyToState(const std::string &unique_id, const GekkoFyre::DownloadStatus &dl_status);
 
     bool writeTorrentItem(GekkoFyre::GkTorrent::TorrentInfo &gk_ti);
     std::vector<GekkoFyre::GkTorrent::TorrentInfo> readTorrentInfo(const bool &minimal_readout = false);

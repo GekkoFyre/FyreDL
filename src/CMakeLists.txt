@@ -98,9 +98,7 @@ set(SOURCE_FILES
         torrent/client.hpp
         torrent/client.cpp
         torrent/misc.hpp
-        torrent/misc.cpp
-        torrent/session.hpp
-        torrent/session.cpp)
+        torrent/misc.cpp)
 
 set(EXTERNAL_SOURCE_FILES
     ./../utils/fast-cpp-csv-parser/csv.h)

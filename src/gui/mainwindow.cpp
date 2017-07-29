@@ -800,11 +800,15 @@ void MainWindow::startHttpDownload(const QString &file_dest, const QString &uniq
  */
 void MainWindow::startTorrentDl(const QString &unique_id, const bool &resumeDl)
 {
+    QModelIndexList indexes = ui->downloadView->selectionModel()->selectedRows();
+    QModelIndex index = dlModel->index(indexes.at(0).row(), MN_STATUS_COL, QModelIndex());
     std::vector<GekkoFyre::GkTorrent::TorrentInfo> gk_ti = routines->readTorrentInfo(false);
     for (auto const &indice: gk_ti) {
         if (indice.general.unique_id == unique_id.toStdString()) {
             QObject::connect(gk_torrent_client, SIGNAL(xfer_torrent_info(GekkoFyre::GkTorrent::TorrentResumeInfo)), this, SLOT(recvBitTorrent_XferStats(GekkoFyre::GkTorrent::TorrentResumeInfo)));
             gk_torrent_client->startTorrentDl(indice);
+            routines->modifyToState(unique_id.toStdString(), GekkoFyre::DownloadStatus::Downloading);
+            dlModel->updateCol(index, routines->convDlStat_toString(GekkoFyre::DownloadStatus::Downloading), MN_STATUS_COL);
             break;
         }
     }
@@ -978,8 +982,10 @@ void MainWindow::resumeDownload()
                         } catch (const std::exception &e) {
                             QMessageBox::warning(this, tr("Error!"), QString("%1").arg(e.what()), QMessageBox::Ok);
                         }
-                    } else if (gk_dl_info_cache.at(k).dl_type == GekkoFyre::DownloadType::Torrent) {
+                    } else if (gk_dl_info_cache.at(k).dl_type == GekkoFyre::DownloadType::Torrent ||
+                            gk_dl_info_cache.at(k).dl_type == GekkoFyre::DownloadType::TorrentMagnetLink) {
                         // Torrent
+                        startTorrentDl(gk_dl_info_cache.at(k).unique_id, false);
                         return;
                     }
                 }
