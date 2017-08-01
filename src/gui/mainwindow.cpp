@@ -73,7 +73,7 @@ namespace fs = boost::filesystem;
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
-    routines = std::make_unique<GekkoFyre::CmnRoutines>(this);
+    routines = std::make_shared<GekkoFyre::CmnRoutines>(this);
 
     QMessageBox::warning(this, tr("FyreDL"), tr("FyreDL is currently under intense development at this "
                                                 "time! Please only use at your own risk."),

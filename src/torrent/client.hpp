@@ -71,7 +71,7 @@ private:
     int rand_port() const;
     void run_session_bckgrnd();
 
-    std::unique_ptr<GekkoFyre::CmnRoutines> routines;
+    std::shared_ptr<GekkoFyre::CmnRoutines> routines;
     lt::session_handle *lt_ses;
     QMap<std::string, lt::torrent_handle> lt_to_handle;
     QMap<std::string, std::string> unique_id_cache;

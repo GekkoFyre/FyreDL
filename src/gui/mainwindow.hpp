@@ -109,7 +109,7 @@ private:
     void transfer_extraDetails();
 
     QPointer<downloadModel> dlModel;
-    std::unique_ptr<GekkoFyre::CmnRoutines> routines;
+    std::shared_ptr<GekkoFyre::CmnRoutines> routines;
     QPointer<GekkoFyre::CurlMulti> curl_multi;
     QPointer<GekkoFyre::GkTorrentClient> gk_torrent_client;
     std::vector<GekkoFyre::Global::DownloadInfo> gk_dl_info_cache;

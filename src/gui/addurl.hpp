@@ -78,7 +78,7 @@ signals:
 
 private:
     Ui::AddURL *ui;
-    std::unique_ptr<GekkoFyre::CmnRoutines> routines;
+    std::shared_ptr<GekkoFyre::CmnRoutines> routines;
 
     QString browseForDir();
 };
