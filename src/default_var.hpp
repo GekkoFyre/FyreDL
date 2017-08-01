@@ -308,7 +308,7 @@ namespace GekkoFyre {
             std::time_t last_seen_cmplte;    // The time when we, or one of our peers, last saw a complete copy of this torrent.
             std::time_t last_scrape;         // The number of seconds since this torrent acquired scrape data. If it has never done that, this value is -1.
             std::time_t time_started;
-            boost::optional<GekkoFyre::GkTorrent::TorrentXferStats> xfer_stats;
+            boost::optional<GkTorrent::TorrentXferStats> xfer_stats;
         };
 
         struct TorrentFile {

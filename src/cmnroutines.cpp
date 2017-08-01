@@ -518,6 +518,31 @@ std::pair<std::string, std::string> GekkoFyre::CmnRoutines::read_db_min(const st
 }
 
 /**
+ * @brief GekkoFyre::CmnRoutines::determine_unique_id determines the Unique ID for a database object from a given file location value
+ * of the download item on the user's local storage, for said database object. For example, if the download is stored at path 'X' in
+ * 'Y' folder on the user's local storage, we can determine as such that it has Unique ID 'Z'.
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @date 2017-07-20
+ * @param db_vals The database values containing the desired local storage paths to extrapolate the Unique ID from.
+ * @param file_db The database connection object.
+ * @param file_path This is the file path to compare with and extract from the rest.
+ * @return The Unique ID, as a standard string.
+ */
+std::string GekkoFyre::CmnRoutines::determine_unique_id(const std::vector<GekkoFyre::GkFile::FileDbVal> &db_vals,
+                                                        const std::string &file_path,
+                                                        const GekkoFyre::GkFile::FileDb &file_db)
+{
+    for (const auto &item: db_vals) {
+        if (item.value == file_path) {
+            return item.unique_id;
+        }
+    }
+
+    std::cerr << tr("Unable to determine Unique ID!").toStdString();
+    return "";
+}
+
+/**
  * @brief GekkoFyre::CmnRoutines::process_db processes raw database output into a slightly more readable 'QMap<std::string, std::string>', that's
  * ready for further processing.
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
@@ -897,31 +922,6 @@ bool GekkoFyre::CmnRoutines::delete_db_write(const std::string &unique_id, const
     }
 
     return false;
-}
-
-/**
- * @brief GekkoFyre::CmnRoutines::determine_unique_id determines the Unique ID for a database object from a given file location value
- * of the download item on the user's local storage, for said database object. For example, if the download is stored at path 'X' in
- * 'Y' folder on the user's local storage, we can determine as such that it has Unique ID 'Z'.
- * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
- * @date 2017-07-20
- * @param db_vals The database values containing the desired local storage paths to extrapolate the Unique ID from.
- * @param file_db The database connection object.
- * @param file_path This is the file path to compare with and extract from the rest.
- * @return The Unique ID, as a standard string.
- */
-std::string GekkoFyre::CmnRoutines::determine_unique_id(const std::vector<GekkoFyre::GkFile::FileDbVal> &db_vals,
-                                                        const std::string &file_path,
-                                                        const GekkoFyre::GkFile::FileDb &file_db)
-{
-    for (const auto &item: db_vals) {
-        if (item.value == file_path) {
-            return item.unique_id;
-        }
-    }
-
-    std::cerr << tr("Unable to determine Unique ID!").toStdString();
-    return "";
 }
 
 void GekkoFyre::CmnRoutines::batch_write_to_file_db(const std::vector<GekkoFyre::GkTorrent::TorrentFile> &to_files_vec,
@@ -1370,29 +1370,6 @@ GekkoFyre::GkTorrent::TorrentInfo GekkoFyre::CmnRoutines::torrentFileInfo(const 
     }
 
     return gk_torrent_struct;
-}
-
-/**
- * @brief GekkoFyre::CmnRoutines::clearLayout will clear any QLayout, such as a QVBoxLayout, of any widgets.
- * @note <http://stackoverflow.com/questions/4857188/clearing-a-layout-in-qt>
- *       <http://stackoverflow.com/questions/4272196/qt-remove-all-widgets-from-layout>
- * @param layout
- */
-void GekkoFyre::CmnRoutines::clearLayout(QLayout *layout)
-{
-    QLayoutItem *item;
-    while ((item = layout->takeAt(0))) {
-        if (item->layout()) {
-            clearLayout(item->layout());
-            delete item->layout();
-        }
-
-        if (item->widget()) {
-            delete item->widget();
-        }
-
-        delete item;
-    }
 }
 
 /**

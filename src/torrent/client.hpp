@@ -53,6 +53,7 @@
 #include <libtorrent/torrent_handle.hpp>
 #include <string>
 #include <memory>
+#include <future>
 #include <QObject>
 #include <QPointer>
 
@@ -61,7 +62,7 @@ class GkTorrentClient: public QObject {
     Q_OBJECT
 
 public:
-    GkTorrentClient();
+    GkTorrentClient(QObject *parent = 0);
     ~GkTorrentClient();
 
     void startTorrentDl(const GekkoFyre::GkTorrent::TorrentInfo &item);
@@ -73,6 +74,9 @@ private:
     std::unique_ptr<GekkoFyre::CmnRoutines> routines;
     lt::session_handle *lt_ses;
     QMap<std::string, lt::torrent_handle> lt_to_handle;
+    QMap<std::string, std::string> unique_id_cache;
+    std::future<void> async_ses;
+    bool async_active;
 
 private slots:
     void recv_proc_to_stats(const std::string &save_path, const lt::torrent_status &stats);
@@ -82,6 +86,5 @@ signals:
     void xfer_internal_stats(const std::string &save_path, const lt::torrent_status &stats);
 };
 }
-
 
 #endif // FYREDL_TORRENT_CLIENT_HPP

@@ -168,7 +168,7 @@ private slots:
                      const GekkoFyre::DownloadType &down_type);
 
     // Libcurl specific slots
-    void recvXferStats(const GekkoFyre::GkCurl::CurlProgressPtr &info);
+    void recvCurl_XferStats(const GekkoFyre::GkCurl::CurlProgressPtr &info);
     void manageDlStats();
     void recvDlFinished(const GekkoFyre::GkCurl::DlStatusMsg &status);
 

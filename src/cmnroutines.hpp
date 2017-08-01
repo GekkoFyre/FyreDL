@@ -117,7 +117,9 @@ public:
     std::vector<GekkoFyre::GkFile::FileDbVal> read_db_vec(const std::string &key, const GekkoFyre::GkFile::FileDb &file_db_struct);
     std::pair<std::string, std::string> read_db_min(const std::string &key, const GekkoFyre::GkFile::FileDb &file_db_struct);
 
-    void clearLayout(QLayout *layout);
+    std::string determine_unique_id(const std::vector<GekkoFyre::GkFile::FileDbVal> &db_vals,
+                                    const std::string &file_path,
+                                    const GekkoFyre::GkFile::FileDb &file_db);
 
     std::vector<GekkoFyre::GkCurl::CurlDlInfo> readDownloadInfo(const bool &hashesOnly = false);
     bool writeDownloadItem(GekkoFyre::GkCurl::CurlDlInfo &dl_info_list);
@@ -149,9 +151,6 @@ private:
                          const GekkoFyre::GkFile::FileDb &file_db);
     bool delete_db_write(const std::string &unique_id, const GekkoFyre::GkFile::FileDb &file_db,
                          const std::initializer_list<std::string> &keys);
-    std::string determine_unique_id(const std::vector<GekkoFyre::GkFile::FileDbVal> &db_vals,
-                                    const std::string &file_path,
-                                    const GekkoFyre::GkFile::FileDb &file_db);
 
     QMutex mutex;
 };

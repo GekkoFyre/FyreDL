@@ -201,7 +201,10 @@ void AddURL::on_buttonBox_accepted()
                     // ############################
                     GekkoFyre::GkTorrent::TorrentInfo gk_torrent_data = routines->torrentFileInfo(csv_file.toStdString());
                     gk_torrent_data.general.dlStatus = GekkoFyre::DownloadStatus::Stopped;
-                    gk_torrent_data.general.down_dest = ui->file_dest_lineEdit->text().toStdString();
+                    gk_torrent_data.general.down_dest = std::string(ui->file_dest_lineEdit->text().toStdString() +
+                                                                            fs::path::preferred_separator +
+                                                                            fs::path(gk_torrent_data.general.torrent_name).stem().string() +
+                                                                            fs::path::preferred_separator);
                     routines->writeTorrentItem(gk_torrent_data);
                     emit sendDetails(gk_torrent_data.general.torrent_name, ((double)gk_torrent_data.general.num_pieces * (double)gk_torrent_data.general.piece_length),
                                      0, 0, 0, 0, GekkoFyre::DownloadStatus::Stopped, gk_torrent_data.general.magnet_uri, gk_torrent_data.general.down_dest,

@@ -51,7 +51,6 @@
 #include <boost/exception/all.hpp>
 #include <QString>
 #include <random>
-#include <thread>
 
 namespace sys = boost::system;
 namespace fs = boost::filesystem;
@@ -64,9 +63,10 @@ using clk = std::chrono::steady_clock;
  *       <http://libtorrent.org/reference-Core.html#save_resume_data()>
  *       <http://libtorrent.org/reference-Core.html#session_handle>
  */
-GekkoFyre::GkTorrentClient::GkTorrentClient()
+GekkoFyre::GkTorrentClient::GkTorrentClient(QObject *parent) : QObject(parent)
 {
     routines = std::make_unique<GekkoFyre::CmnRoutines>();
+    async_active = false;
 
     // http://libtorrent.org/reference-Settings.html#settings_pack
     // http://www.libtorrent.org/include/libtorrent/session_settings.hpp
@@ -98,34 +98,48 @@ GekkoFyre::GkTorrentClient::GkTorrentClient()
     pack.set_str(lt::settings_pack::listen_interfaces, interface);          // Binding to port 0 will make the operating system pick the port. The default is "0.0.0.0:6881", which binds to all interfaces on port 6881. Once/if binding the listen socket(s) succeed, listen_succeeded_alert is posted.
 
     lt_ses = new libtorrent::session(pack);
+
+    // http://doc.qt.io/qt-4.8/threads-qobject.html#signals-and-slots-across-threads
+    // http://wiki.qt.io/Threads_Events_QObjects
+    qRegisterMetaType<std::string>("std::string");
+    qRegisterMetaType<lt::torrent_status>("lt::torrent_status");
     QObject::connect(this, SIGNAL(xfer_internal_stats(std::string,lt::torrent_status)), this,
-                     SLOT(recv_proc_to_stats(std::string,lt::torrent_status)));
+                     SLOT(recv_proc_to_stats(std::string,lt::torrent_status)), Qt::AutoConnection);
 }
 
 GekkoFyre::GkTorrentClient::~GkTorrentClient()
 {}
 
 /**
- * @brief GekkoFyre::GkTorrentClient::startTorrentDl reads the download item's Unique ID from the XML history file
- * and initiates the BitTorrent session with the appropriate parameters.
+ * @brief GekkoFyre::GkTorrentClient::startTorrentDl reads the given download destination to the user's local storage from
+ * the Google LevelDB database and initiates a BitTorrent download of the item in question.
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
  * @date 2016-12-22
- * @param unique_id The Unique ID relating to the download item in question.
+ * @param item The downloadable item in question to get from the BitTorrent P2P network.
  */
 void GekkoFyre::GkTorrentClient::startTorrentDl(const GekkoFyre::GkTorrent::TorrentInfo &item)
 {
     QString torrent_error_name = QString::fromStdString(item.general.torrent_name);
 
     try {
+        fs::path tor_dest = item.general.down_dest;
         lt::add_torrent_params atp; // http://libtorrent.org/reference-Core.html#add-torrent-params
 
         // Load resume data from disk and pass it in as we add the magnet link
-        std::ifstream ifs(FYREDL_TORRENT_RESUME_FILE_EXT, std::ios::binary);
+        std::string resume_file = std::string(tor_dest.string() + item.general.torrent_name + FYREDL_TORRENT_RESUME_FILE_EXT);
+        std::ifstream ifs(resume_file, std::ios::binary);
         ifs.unsetf(std::ios::skipws);
 
         atp.resume_data.assign(std::istream_iterator<char>(ifs), std::istream_iterator<char>());
         atp.url = item.general.magnet_uri;
-        atp.save_path = item.general.down_dest;
+        if (!fs::exists(tor_dest)) {
+            if (!fs::create_directory(tor_dest)) {
+                throw std::runtime_error(tr("Unable to create director, \"%1\".")
+                                                 .arg(QString::fromStdString(tor_dest.string())).toStdString());
+            }
+        }
+
+        atp.save_path = tor_dest.string();
         lt_ses->async_add_torrent(atp);
 
         std::vector<lt::alert*> alerts;
@@ -134,11 +148,21 @@ void GekkoFyre::GkTorrentClient::startTorrentDl(const GekkoFyre::GkTorrent::Torr
             for (lt::alert const *a: alerts) {
                 std::cout << a->message() << std::endl;
                 if (auto at = lt::alert_cast<lt::add_torrent_alert>(a)) {
-                    if (!lt_to_handle.contains(at->handle.save_path())) {
-                        lt_to_handle.insert(at->handle.save_path(), at->handle);
+                    std::string handle_file_path = at->handle.save_path();
+                    if (!lt_to_handle.contains(handle_file_path) && !unique_id_cache.contains(handle_file_path)) {
+                        lt_to_handle.insert(handle_file_path, at->handle);
+
+                        GekkoFyre::GkFile::FileDb db_struct = routines->openDatabase(CFG_HISTORY_DB_FILE);
+                        std::vector<GekkoFyre::GkFile::FileDbVal> file_loc_vec = routines->read_db_vec(LEVELDB_KEY_TORRENT_FLOC, db_struct);
+                        std::string handle_unique_id = routines->determine_unique_id(file_loc_vec, handle_file_path, db_struct);
+                        unique_id_cache.insert(handle_file_path, handle_unique_id);
                     }
 
-                    goto terminate;
+                    if (!async_active) {
+                        async_ses = std::async(std::launch::async, &GkTorrentClient::run_session_bckgrnd, this);
+                        async_active = true;
+                        goto terminate;
+                    }
                 }
 
                 if (lt::alert_cast<lt::torrent_error_alert>(a)) {
@@ -155,21 +179,41 @@ void GekkoFyre::GkTorrentClient::startTorrentDl(const GekkoFyre::GkTorrent::Torr
     } catch (const std::exception &e) {
         QMessageBox::warning(nullptr, tr("Error!"), tr("An issue has occured with torrent, \"%1\".\n\n%2")
                 .arg(torrent_error_name).arg(e.what()), QMessageBox::Ok);
+        return;
     }
-
-    return;
 }
 
+/**
+ * @brief GekkoFyre::GkTorrentClient::recv_proc_to_stats is an intermediate layer in processing the upload/download and other
+ * miscellaneous transfer statistics of the BitTorrent item in question.
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @date 2017-07
+ * @param save_path
+ * @param stats
+ * @see MainWindow::recvBitTorrent_XferStats(), MainWindow::manageDlStats()
+ */
 void GekkoFyre::GkTorrentClient::recv_proc_to_stats(const std::string &save_path, const lt::torrent_status &stats)
 {
     GekkoFyre::GkTorrentMisc gk_to_misc;
     GekkoFyre::GkTorrent::TorrentResumeInfo to_xfer_stats;
     to_xfer_stats.save_path = save_path;
     to_xfer_stats.dl_state = gk_to_misc.state(stats.state);
-    to_xfer_stats.xfer_stats.get().progress_ppm = stats.progress_ppm;
-    to_xfer_stats.xfer_stats.get().dl_rate = stats.upload_rate;
-    to_xfer_stats.xfer_stats.get().ul_rate = stats.download_rate;
-    to_xfer_stats.xfer_stats.get().num_pieces_downloaded = stats.num_pieces;
+
+    if (unique_id_cache.contains(save_path)) {
+        to_xfer_stats.unique_id = unique_id_cache.value(save_path);
+    } else {
+        QMessageBox::warning(nullptr, tr("Error!"), tr("Unable to find Unique ID property for BitTorrent item, \"%1\".")
+                .arg(QString::fromStdString(save_path)), QMessageBox::Ok);
+        return;
+    }
+
+    GkTorrent::TorrentXferStats xfer_stats;
+    xfer_stats.progress_ppm = stats.progress_ppm;
+    xfer_stats.ul_rate = stats.upload_rate;
+    xfer_stats.dl_rate = stats.download_rate;
+    xfer_stats.num_pieces_downloaded = stats.num_pieces;
+    to_xfer_stats.xfer_stats = xfer_stats;
+
     to_xfer_stats.last_seen_cmplte = stats.last_seen_complete;
     to_xfer_stats.last_scrape = stats.last_scrape;
     to_xfer_stats.total_downloaded = stats.all_time_download;
@@ -180,11 +224,10 @@ void GekkoFyre::GkTorrentClient::recv_proc_to_stats(const std::string &save_path
 }
 
 /**
- * @brief GekkoFyre::GkTorrentClient::rand_port
+ * @brief GekkoFyre::GkTorrentClient::rand_port does as the name says; it will create a random port number for you!
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
  * @date 2017-06-27
- * @note <https://stackoverflow.com/questions/5008804/generating-random-integer-from-a-range>
- * @return
+ * @return A random port number in the range of TORRENT_MIN_PORT_LISTEN <= TORRENT_MAX_PORT_LISTEN
  */
 int GekkoFyre::GkTorrentClient::rand_port() const
 {
@@ -195,6 +238,13 @@ int GekkoFyre::GkTorrentClient::rand_port() const
     return uni(rng);
 }
 
+/**
+ * @brief GekkoFyre::GkTorrentClient::run_session_bckgrnd runs in the background on its own, dedicated thread, separate to that of
+ * the GUI and any others. It processes all the relevant helper functions needed to maintain BitTorrent downloads which are
+ * operating at a asynchronous level.
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @date 2017-07
+ */
 void GekkoFyre::GkTorrentClient::run_session_bckgrnd()
 {
     try {
@@ -223,14 +273,16 @@ void GekkoFyre::GkTorrentClient::run_session_bckgrnd()
 
                     // When resume data is ready, save it
                     if (auto rd = lt::alert_cast<lt::save_resume_data_alert>(a)) {
-                        std::ofstream of(FYREDL_TORRENT_RESUME_FILE_EXT, std::ios::binary);
+                        std::string resume_file = std::string(rd->handle.save_path() + rd->torrent_name() +
+                                                              FYREDL_TORRENT_RESUME_FILE_EXT);
+                        std::ofstream of(resume_file, std::ios::binary);
                         of.unsetf(std::ios_base::skipws);
                         lt::bencode(std::ostream_iterator<char>(of), *rd->resume_data);
                     }
 
                     if (auto st = lt::alert_cast<lt::state_update_alert>(a)) {
                         if (st->status.empty()) continue;
-                        int p = 0;
+                        int p = -1;
                         QMap<std::string, lt::torrent_handle>::iterator i;
                         for (i = lt_to_handle.begin(); i != lt_to_handle.end(); ++i) {
                             ++p;

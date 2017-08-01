@@ -80,7 +80,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
                          QMessageBox::Ok);
 
     curl_multi = new GekkoFyre::CurlMulti();
-    gk_torrent_client = new GekkoFyre::GkTorrentClient();
+    gk_torrent_client = new GekkoFyre::GkTorrentClient(this);
 
     // http://wiki.qt.io/QThreads_general_usage
     // https://mayaposch.wordpress.com/2011/11/01/how-to-really-truly-use-qthreads-the-full-explanation/
@@ -762,7 +762,7 @@ void MainWindow::startHttpDownload(const QString &file_dest, const QString &uniq
                                         routines->modifyDlState(file_dest.toStdString(), GekkoFyre::DownloadStatus::Downloading);
                                         dlModel->updateCol(index, routines->convDlStat_toString(GekkoFyre::DownloadStatus::Downloading), MN_STATUS_COL);
 
-                                        QObject::connect(GekkoFyre::routine_singleton::instance(), SIGNAL(sendXferStats(GekkoFyre::GkCurl::CurlProgressPtr)), this, SLOT(recvXferStats(GekkoFyre::GkCurl::CurlProgressPtr)));
+                                        QObject::connect(GekkoFyre::routine_singleton::instance(), SIGNAL(sendXferStats(GekkoFyre::GkCurl::CurlProgressPtr)), this, SLOT(recvCurl_XferStats(GekkoFyre::GkCurl::CurlProgressPtr)));
                                         QObject::connect(GekkoFyre::routine_singleton::instance(), SIGNAL(sendDlFinished(GekkoFyre::GkCurl::DlStatusMsg)), this, SLOT(recvDlFinished(GekkoFyre::GkCurl::DlStatusMsg)));
 
                                         // This is required for signaling, otherwise QVariant does not know the type.
@@ -899,33 +899,12 @@ void MainWindow::resumeDownload()
                                         // The file still exists, so resume downloading since it's from a paused state!
                                         startHttpDownload(dest, unique_id, true);
                                     } else {
-                                        // We have NO existing file... notify the user.
-                                        QMessageBox file_ask;
-                                        file_ask.setIcon(QMessageBox::Information);
-                                        file_ask.setWindowTitle(tr("Problem!"));
-                                        file_ask.setText(tr("The file no longer exists! Should I clear the history for this item?").arg(dest));
-                                        file_ask.setStandardButtons(QMessageBox::Yes | QMessageBox::No | QMessageBox::Cancel);
-                                        file_ask.setDefaultButton(QMessageBox::Yes);
-                                        file_ask.setModal(false);
-                                        int ret = file_ask.exec();
-
-                                        switch (ret) {
-                                            case QMessageBox::Yes:
-                                                removeSelRows();
-                                                return;
-                                            case QMessageBox::No:
-                                                routines->modifyDlState(dest.toStdString(), GekkoFyre::DownloadStatus::Failed);
-                                                dlModel->updateCol(index, routines->convDlStat_toString(GekkoFyre::DownloadStatus::Failed), MN_STATUS_COL);
-                                                return;
-                                            case QMessageBox::Cancel:
-                                                return;
-                                            default:
-                                                return;
-                                        }
+                                        startHttpDownload(dest, unique_id, false);
                                     }
 
                                     return;
                                 case GekkoFyre::DownloadStatus::Unknown:
+                                    // TODO: Fill out the code for this!
                                 case GekkoFyre::DownloadStatus::Stopped:
                                     if (fs::exists(dest_boost_path) && fs::is_regular_file(dest_boost_path)) {
                                         // We have an existing file!
@@ -934,7 +913,8 @@ void MainWindow::resumeDownload()
                                         file_ask.setWindowTitle(tr("Pre-existing file!"));
                                         file_ask.setText(
                                                 tr("A pre-existing file, \"%1\", with the same name has been detected. "
-                                                           "Delete to continue? Press 'No' to deal with manually.").arg(dest));
+                                                           "Would you like to continue with the download? Press 'No' to delete or "
+                                                           "'Cancel' to deal with manually on your own.").arg(dest));
                                         file_ask.setStandardButtons(QMessageBox::Yes | QMessageBox::No | QMessageBox::Cancel);
                                         file_ask.setDefaultButton(QMessageBox::Yes);
                                         file_ask.setModal(false);
@@ -942,8 +922,11 @@ void MainWindow::resumeDownload()
 
                                         switch (ret) {
                                             case QMessageBox::Yes:
-                                                if (fs::exists(dest_boost_path) &&
-                                                    fs::is_regular_file(dest_boost_path)) {
+                                                // TODO: Add smarts to see if the pre-existing file is the same size as the download in question!
+                                                startHttpDownload(dest, unique_id, true);
+                                                return;
+                                            case QMessageBox::No:
+                                                if (fs::exists(dest_boost_path) && fs::is_regular_file(dest_boost_path)) {
                                                     sys::error_code ec;
                                                     fs::remove(dest_boost_path, ec);
                                                     if (ec != sys::errc::success) {
@@ -957,12 +940,6 @@ void MainWindow::resumeDownload()
                                                                     .toStdString());
                                                 }
 
-                                                return;
-                                            case QMessageBox::No:
-                                                QMessageBox::information(this, tr("Pre-existing file"), tr("You must deal with the file "
-                                                                                                                   "manually in order to "
-                                                                                                                   "continue the download."),
-                                                                         QMessageBox::Ok);
                                                 return;
                                             case QMessageBox::Cancel:
                                                 return;
@@ -1689,7 +1666,7 @@ void MainWindow::sendDetails(const std::string &fileName, const double &fileSize
 }
 
 /**
- * @brief MainWindow::recvXferStats receives the statistics regarding a HTTP(S)/FTP(S) download.
+ * @brief MainWindow::recvCurl_XferStats receives the statistics regarding a HTTP(S)/FTP(S) download.
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
  * @date   2016-10-23
  * @note   <http://stackoverflow.com/questions/9086372/how-to-compare-pointers>
@@ -1698,7 +1675,7 @@ void MainWindow::sendDetails(const std::string &fileName, const double &fileSize
  * @param info is the struct related to the download info.
  * @see MainWindow::manageDlStats()
  */
-void MainWindow::recvXferStats(const GekkoFyre::GkCurl::CurlProgressPtr &info)
+void MainWindow::recvCurl_XferStats(const GekkoFyre::GkCurl::CurlProgressPtr &info)
 {
     QMutex curl_multi_mutex;
     GekkoFyre::GkGraph::GkXferStats stats_temp;
@@ -1709,7 +1686,7 @@ void MainWindow::recvXferStats(const GekkoFyre::GkCurl::CurlProgressPtr &info)
 
     stats_temp.download_rate = info.stat.back().dlnow;
     stats_temp.upload_rate = info.stat.back().upnow;
-    stats_temp.download_total = info.stat.back().dltotal;
+    stats_temp.download_total = info.stat.back().dltotal; // Modify this value to be the file-size of the download instead.
     stats_temp.upload_total = info.stat.back().uptotal;
 
     for (size_t i = 0; i < gk_dl_info_cache.size(); ++i) {
@@ -1739,12 +1716,11 @@ void MainWindow::recvXferStats(const GekkoFyre::GkCurl::CurlProgressPtr &info)
 }
 
 /**
- * @brief MainWindow::manageDlStats manages the statistics regarding a HTTP(S)/FTP(S)/Torrent download and updates the
- * relevant columns.
+ * @brief MainWindow::manageDlStats is central to managing the statistics of a HTTP(S)/FTP(S)/BitTorrent download, updating
+ * the relevant columns on the GUI, and if needed, updating the database also.
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
  * @date 2016-10-23
- * @note <http://www.qtcentre.org/threads/18082-Hot-to-get-a-QModelIndexList-from-a-model>
- * @see MainWindow::recvXferStats(), MainWindow::recvBitTorrent_XferStats()
+ * @see MainWindow::recvCurl_XferStats(), MainWindow::recvBitTorrent_XferStats()
  */
 void MainWindow::manageDlStats()
 {
