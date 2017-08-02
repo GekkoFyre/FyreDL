@@ -278,7 +278,7 @@ namespace GekkoFyre {
         };
 
         struct FileDb {
-            std::unique_ptr<leveldb::DB> db;
+            std::shared_ptr<leveldb::DB> db;
             leveldb::Options options;
         };
 

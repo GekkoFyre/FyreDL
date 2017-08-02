@@ -59,6 +59,7 @@
 #include <QStandardItem>
 #include <QPointer>
 
+using namespace GekkoFyre;
 namespace Ui {
 class MainWindow;
 }
@@ -88,7 +89,7 @@ private:
     void delCharts(const std::string &file_dest);
     void updateChart();
 
-    std::unique_ptr<QStandardItemModel> cV_model;
+    QPointer<QStandardItemModel> cV_model;
     void contentsView_update();
     void cV_addItems(QStandardItem *parent, const QStringList &elements);
 
@@ -113,7 +114,6 @@ private:
     QPointer<GekkoFyre::CurlMulti> curl_multi;
     QPointer<GekkoFyre::GkTorrentClient> gk_torrent_client;
     std::vector<GekkoFyre::Global::DownloadInfo> gk_dl_info_cache;
-    QString curr_shown_graphs;
 
     // http://stackoverflow.com/questions/10121560/stdthread-naming-your-thread
     QPointer<QThread> curl_multi_thread;

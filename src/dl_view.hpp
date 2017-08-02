@@ -50,18 +50,18 @@
 #include <QList>
 #include <QString>
 #include <QAbstractTableModel>
-#include <QAbstractItemView>
-#include <QAbstractItemDelegate>
+#include <QStyledItemDelegate>
 #include <QVariant>
 #include <vector>
 
-// http://doc.qt.io/qt-5/qtwidgets-itemviews-addressbook-example.html
-class downloadModel : public QAbstractTableModel
-{
+namespace GekkoFyre {
+class downloadModel : public QAbstractTableModel {
     Q_OBJECT
+
 public:
     downloadModel(QObject *parent = 0);
     downloadModel(QList<std::vector<QString>> vector, QObject *parent = 0);
+    ~downloadModel();
 
     int rowCount(const QModelIndex &parent) const Q_DECL_OVERRIDE;
     int columnCount(const QModelIndex &parent) const Q_DECL_OVERRIDE;
@@ -80,15 +80,19 @@ private:
     QList<std::vector<QString>> vectorList;
 };
 
-class downloadDelegate : public QAbstractItemDelegate
-{
+class downloadDelegate : public QStyledItemDelegate {
     Q_OBJECT
+
 public:
     downloadDelegate(QObject *parent = 0);
     ~downloadDelegate();
 
     void paint(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index) const;
     QSize sizeHint(const QStyleOptionViewItem &option, const QModelIndex &index) const;
+
+public slots:
+    bool helpEvent(QHelpEvent *event, QAbstractItemView *view, const QStyleOptionViewItem &option, const QModelIndex &index);
 };
+}
 
 #endif // DL_VIEW_HPP

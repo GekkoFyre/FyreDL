@@ -162,6 +162,7 @@ double GekkoFyre::CmnRoutines::percentDownloaded(const double &content_length, c
     double percent = (double)std::round((amountDl / content_length) * 100);
     if (percent >= 101) {
         std::cerr << tr("Incorrect download percentage reported!").toStdString() << std::endl;
+        return 0;
     }
 
     return percent;
@@ -256,10 +257,13 @@ GekkoFyre::GkFile::FileDb GekkoFyre::CmnRoutines::openDatabase(const std::string
     leveldb::Status s;
     GekkoFyre::GkFile::FileDb db_struct;
     db_struct.options.create_if_missing = true;
-    std::unique_ptr<leveldb::Cache>(db_struct.options.block_cache).reset(leveldb::NewLRUCache(LEVELDB_CFG_CACHE_SIZE));
+    std::shared_ptr<leveldb::Cache>(db_struct.options.block_cache).reset(leveldb::NewLRUCache(LEVELDB_CFG_CACHE_SIZE));
     db_struct.options.compression = leveldb::CompressionType::kSnappyCompression;
     if (!dbFileName.empty()) {
         std::string db_location = leveldb_location(dbFileName);
+        sys::error_code ec;
+        bool doesExist;
+        doesExist = !fs::exists(db_location, ec) ? false : true;
 
         leveldb::DB *raw_db_ptr;
         s = leveldb::DB::Open(db_struct.options, db_location, &raw_db_ptr);
@@ -268,9 +272,8 @@ GekkoFyre::GkFile::FileDb GekkoFyre::CmnRoutines::openDatabase(const std::string
             throw std::runtime_error(tr("Unable to open/create database! %1").arg(QString::fromStdString(s.ToString())).toStdString());
         }
 
-        sys::error_code ec;
-        if (fs::exists(db_location, ec) && fs::is_directory(db_location)) {
-            std::cout << tr("Database object created. Status: ").toStdString() << s.ToString();
+        if (fs::exists(db_location, ec) && fs::is_directory(db_location) && !doesExist) {
+            std::cout << tr("Database object created. Status: ").toStdString() << s.ToString() << std::endl;
         }
     }
 
@@ -396,13 +399,13 @@ bool GekkoFyre::CmnRoutines::batch_write_single_db(const std::string &key, const
 
         std::stringstream new_xml_data;
         // Generate XML declaration
-        auto declarNode = doc->append_child(pugi::node_declaration);
+        auto declarNode = doc.get()->append_child(pugi::node_declaration);
         declarNode.append_attribute("version") = "1.0";
         declarNode.append_attribute("encoding") = "UTF-8";;
         declarNode.append_attribute("standalone") = "yes";
 
         // A valid XML doc must contain a single root node of any name
-        root = doc->append_child(LEVELDB_PARENT_NODE);
+        root = doc.get()->append_child(LEVELDB_PARENT_NODE);
         pugi::xml_node xml_version_node = root.append_child(LEVELDB_CHILD_NODE_VERS);
         pugi::xml_node xml_version_child = xml_version_node.append_child(LEVELDB_CHILD_ITEM_VERS);
         xml_version_child.append_attribute(LEVELDB_ITEM_ATTR_VERS_NO) = FYREDL_PROG_VERS;
@@ -431,7 +434,7 @@ bool GekkoFyre::CmnRoutines::batch_write_single_db(const std::string &key, const
         // Remark: second optional param is indent string to be used;
         // default indentation is tab character.
         std::stringstream ss;
-        doc->save(ss, PUGIXML_TEXT("    "));
+        doc.get()->save(ss, PUGIXML_TEXT("    "));
         batch.Put(key, ss.str());
 
         s = file_db_struct.db->Write(write_options, &batch);
@@ -470,7 +473,7 @@ std::vector<GekkoFyre::GkFile::FileDbVal> GekkoFyre::CmnRoutines::read_db_vec(co
         // Proceed
         pugi::xml_node root;
         std::unique_ptr<pugi::xml_document> doc = std::make_unique<pugi::xml_document>();
-        pugi::xml_parse_result result = doc->load_string(read_xml.c_str());
+        pugi::xml_parse_result result = doc.get()->load_string(read_xml.c_str());
         if (!result) {
             QMessageBox::warning(nullptr, tr("Error!"), tr("There has been an error reading information from the database.\n\nParse error: %1, character pos = %2\n\nWiping key...")
                     .arg(result.description()).arg(result.offset), QMessageBox::Ok);
@@ -485,7 +488,7 @@ std::vector<GekkoFyre::GkFile::FileDbVal> GekkoFyre::CmnRoutines::read_db_vec(co
         }
 
         std::vector<GekkoFyre::GkFile::FileDbVal> file_db_vec;
-        pugi::xml_node items = doc->child(LEVELDB_PARENT_NODE);
+        pugi::xml_node items = doc.get()->child(LEVELDB_PARENT_NODE);
         for (const auto &file: items.children(LEVELDB_XML_CHILD_NODE)) {
             GekkoFyre::GkFile::FileDbVal file_db_val;
             file_db_val.dl_type = convDownType_IntToEnum(file.attribute(LEVELDB_XML_ATTR_DL_TYPE).as_int());
@@ -815,13 +818,13 @@ std::vector<GekkoFyre::GkFile::FileDbVal> GekkoFyre::CmnRoutines::process_db_xml
     if (!xml_input.empty() && xml_input.size() > CFG_XML_MIN_PARSE_SIZE) {
         std::vector<GekkoFyre::GkFile::FileDbVal> ret_data;
         std::unique_ptr<pugi::xml_document> doc = std::make_unique<pugi::xml_document>();
-        pugi::xml_parse_result result = doc->load_string(xml_input.c_str());
+        pugi::xml_parse_result result = doc.get()->load_string(xml_input.c_str());
         if (!result) {
             throw std::invalid_argument(tr("There has been an error whilst processing the XML from the database.\n\nParse error: %1, character pos = %2")
                                                 .arg(result.description()).arg(result.offset).toStdString());
         }
 
-        pugi::xml_node items = doc->child(LEVELDB_PARENT_NODE);
+        pugi::xml_node items = doc.get()->child(LEVELDB_PARENT_NODE);
         for (const auto &file: items.children(LEVELDB_XML_CHILD_NODE)) {
             GekkoFyre::GkFile::FileDbVal file_db_val;
             file_db_val.dl_type = convDownType_IntToEnum(file.attribute(LEVELDB_XML_ATTR_DL_TYPE).as_int());
@@ -885,14 +888,14 @@ bool GekkoFyre::CmnRoutines::delete_db_write(const std::string &unique_id, const
             // Load XML into memory
             pugi::xml_node root;
             std::unique_ptr<pugi::xml_document> doc = std::make_unique<pugi::xml_document>();
-            pugi::xml_parse_result result = doc->load_string(read_xml.c_str());
+            pugi::xml_parse_result result = doc.get()->load_string(read_xml.c_str());
             if (!result) {
                 throw std::invalid_argument(
                         tr("There has been an error reading information from the database for deletion.\n\nParse error: %1, character pos = %2")
                                 .arg(result.description()).arg(result.offset).toStdString());
             }
 
-            pugi::xml_node items = doc->child(LEVELDB_PARENT_NODE);
+            pugi::xml_node items = doc.get()->child(LEVELDB_PARENT_NODE);
             for (const auto &file: items.children(LEVELDB_XML_CHILD_NODE)) {
                 if (file.attribute(LEVELDB_ITEM_ATTR_UNIQUE_ID).as_string() == unique_id) {
                     file.parent().remove_child(file);
@@ -902,7 +905,7 @@ bool GekkoFyre::CmnRoutines::delete_db_write(const std::string &unique_id, const
 
             leveldb::WriteBatch batch;
             std::stringstream ss;
-            doc->save(ss, PUGIXML_TEXT("    "));
+            doc.get()->save(ss, PUGIXML_TEXT("    "));
             batch.Delete(key);
             batch.Put(key, ss.str());
 
@@ -948,13 +951,13 @@ void GekkoFyre::CmnRoutines::batch_write_to_file_db(const std::vector<GekkoFyre:
             }
 
             // Generate XML declaration
-            auto declarNode = doc->append_child(pugi::node_declaration);
+            auto declarNode = doc.get()->append_child(pugi::node_declaration);
             declarNode.append_attribute("version") = "1.0";
             declarNode.append_attribute("encoding") = "UTF-8";;
             declarNode.append_attribute("standalone") = "yes";
 
             // A valid XML doc must contain a single root node of any name
-            root = doc->append_child(LEVELDB_PARENT_NODE);
+            root = doc.get()->append_child(LEVELDB_PARENT_NODE);
             pugi::xml_node xml_version_node = root.append_child(LEVELDB_CHILD_NODE_VERS);
             pugi::xml_node xml_version_child = xml_version_node.append_child(LEVELDB_CHILD_ITEM_VERS);
             xml_version_child.append_attribute(LEVELDB_ITEM_ATTR_VERS_NO) = FYREDL_PROG_VERS;
@@ -1001,7 +1004,7 @@ void GekkoFyre::CmnRoutines::batch_write_to_file_db(const std::vector<GekkoFyre:
             nodeFilesDownBool.append_child(pugi::node_pcdata)
                     .set_value(std::to_string(files.downloaded).data());
             std::stringstream ss;
-            doc->save(ss, PUGIXML_TEXT("    "));
+            doc.get()->save(ss, PUGIXML_TEXT("    "));
             batch.Put(key, ss.str());
         }
 
@@ -1477,13 +1480,13 @@ pugi::xml_node GekkoFyre::CmnRoutines::createNewXmlFile()
     std::unique_ptr<pugi::xml_document> doc = std::make_unique<pugi::xml_document>();
 
     // Generate XML declaration
-    auto declarNode = doc->append_child(pugi::node_declaration);
+    auto declarNode = doc.get()->append_child(pugi::node_declaration);
     declarNode.append_attribute("version") = "1.0";
     declarNode.append_attribute("encoding") = "UTF-8";;
     declarNode.append_attribute("standalone") = "yes";
 
     // A valid XML doc must contain a single root node of any name
-    pugi::xml_node root = doc->append_child(LEVELDB_PARENT_NODE);
+    pugi::xml_node root = doc.get()->append_child(LEVELDB_PARENT_NODE);
 
     pugi::xml_node xml_version_node = root.append_child(LEVELDB_CHILD_NODE_VERS);
     pugi::xml_node xml_version_child = xml_version_node.append_child(LEVELDB_CHILD_ITEM_VERS);
@@ -1628,15 +1631,17 @@ bool GekkoFyre::CmnRoutines::modifyToState(const std::string &unique_id, const G
         if (!unique_id.empty()) {
             GekkoFyre::GkFile::FileDb db_struct = openDatabase(CFG_HISTORY_DB_FILE);
             std::vector<GekkoFyre::GkFile::FileDbVal> file_stat_vec = read_db_vec(LEVELDB_KEY_TORRENT_DLSTATUS, db_struct);
-            modify_db_write(unique_id, std::to_string(convDlStat_toInt(dl_status)), file_stat_vec, db_struct);
-            return true;
+            bool ret_succ = modify_db_write(unique_id, std::to_string(convDlStat_toInt(dl_status)), file_stat_vec, db_struct);
+            if (ret_succ) {
+                return true;
+            }
         }
+
+        return false;
     } catch (const std::exception &e) {
         QMessageBox::warning(nullptr, tr("Error!"), e.what(), QMessageBox::Ok);
         return false;
     }
-
-    return false;
 }
 
 /**
@@ -1717,13 +1722,13 @@ bool GekkoFyre::CmnRoutines::writeTorrent_extra_data(const GekkoFyre::GkTorrent:
         //
         std::stringstream new_xml_data;
         // Generate XML declaration
-        auto declarNode = doc->append_child(pugi::node_declaration);
+        auto declarNode = doc.get()->append_child(pugi::node_declaration);
         declarNode.append_attribute("version") = "1.0";
         declarNode.append_attribute("encoding") = "UTF-8";;
         declarNode.append_attribute("standalone") = "yes";
 
         // A valid XML doc must contain a single root node of any name
-        root = doc->append_child(LEVELDB_PARENT_NODE);
+        root = doc.get()->append_child(LEVELDB_PARENT_NODE);
         pugi::xml_node xml_version_node = root.append_child(LEVELDB_CHILD_NODE_VERS);
         pugi::xml_node xml_version_child = xml_version_node.append_child(LEVELDB_CHILD_ITEM_VERS);
         xml_version_child.append_attribute(LEVELDB_ITEM_ATTR_VERS_NO) = FYREDL_PROG_VERS;
@@ -1746,7 +1751,7 @@ bool GekkoFyre::CmnRoutines::writeTorrent_extra_data(const GekkoFyre::GkTorrent:
         }
 
         std::stringstream ss;
-        doc->save(ss, PUGIXML_TEXT("    "));
+        doc.get()->save(ss, PUGIXML_TEXT("    "));
         batch.Put(key, ss.str());
         s = ext_db_struct.db->Write(write_opt, &batch);
         if (s.ok()) {
@@ -1828,7 +1833,7 @@ std::vector<GekkoFyre::GkTorrent::TorrentInfo> GekkoFyre::CmnRoutines::readTorre
                         if (!s.ok()) { throw std::runtime_error(tr("Problem whilst reading database. Details:\n\n%1").arg(QString::fromStdString(s.ToString())).toStdString()); }
                         if (!file_value.empty() && file_value.size() > CFG_XML_MIN_PARSE_SIZE) {
                             // There is data present!
-                            pugi::xml_parse_result result = doc->load_string(file_value.c_str());
+                            pugi::xml_parse_result result = doc.get()->load_string(file_value.c_str());
                             if (!result) {
                                 throw std::invalid_argument(tr("There has been an error whilst processing the XML from the database for BitTorrent download, \"%1\".\n\nParse error: %2, character pos = %3")
                                                                     .arg(QString::fromStdString(info.torrent_name)).arg(result.description())
@@ -1842,7 +1847,7 @@ std::vector<GekkoFyre::GkTorrent::TorrentInfo> GekkoFyre::CmnRoutines::readTorre
                             //
                             // Files
                             //
-                            pugi::xml_node nodeParent = doc->child(LEVELDB_PARENT_NODE);
+                            pugi::xml_node nodeParent = doc.get()->child(LEVELDB_PARENT_NODE);
                             pugi::xml_node nodeFilesPath = nodeParent.child(LEVELDB_CHILD_FILES_PATH_TORRENT);
 
                             // Sub-nodes
@@ -1869,7 +1874,7 @@ std::vector<GekkoFyre::GkTorrent::TorrentInfo> GekkoFyre::CmnRoutines::readTorre
                     if (!s.ok()) { throw std::runtime_error(tr("Problem whilst reading database. Details:\n\n%1").arg(QString::fromStdString(s.ToString())).toStdString()); }
                     if (!tracker_value.empty() && tracker_value.size() > CFG_XML_MIN_PARSE_SIZE) {
                         // There is data present!
-                        pugi::xml_parse_result result = doc->load_string(tracker_value.c_str());
+                        pugi::xml_parse_result result = doc.get()->load_string(tracker_value.c_str());
                         if (!result) {
                             throw std::invalid_argument(tr("There has been an error whilst processing the XML from the database for BitTorrent download, \"%1\".\n\nParse error: %2, character pos = %3")
                                                                 .arg(QString::fromStdString(info.torrent_name)).arg(result.description())
@@ -1879,7 +1884,7 @@ std::vector<GekkoFyre::GkTorrent::TorrentInfo> GekkoFyre::CmnRoutines::readTorre
                         //
                         // Trackers
                         //
-                        pugi::xml_node nodeParent = doc->child(LEVELDB_PARENT_NODE);
+                        pugi::xml_node nodeParent = doc.get()->child(LEVELDB_PARENT_NODE);
                         pugi::xml_node nodeTrackers = nodeParent.child(LEVELDB_CHILD_NODE_TORRENT_TRACKERS);
                         for (pugi::xml_node tracker = nodeTrackers.child(LEVELDB_CHILD_TRACKERS_TIER_TORRENT); tracker;
                              tracker = tracker.next_sibling(LEVELDB_CHILD_TRACKERS_TIER_TORRENT)) {

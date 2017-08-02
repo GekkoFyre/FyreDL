@@ -56,10 +56,14 @@ extern "C" {
 
 int main(int argc, char *argv[])
 {
-    SingletonProcess singleton(37563);
-    if (!singleton()) {
-        std::cerr << "Another FyreDL instance is already open!" << std::endl;
-        return 1; // Exit with status code '1'
+    try {
+        SingletonProcess singleton(37563);
+        if (!singleton()) {
+            std::cerr << "Another FyreDL instance is already open!" << std::endl;
+            return 1; // Exit with status code '1'
+        }
+    } catch (const std::exception &e) {
+        std::cerr << e.what() << std::endl;
     }
 
     // https://github.com/notepadqq/notepadqq/issues/323
