@@ -84,7 +84,7 @@ public:
     QString timeBeautify(const double &secondsToConvert);
 
     void print_exception(const std::exception &e, int level = 0);
-    static std::string createId(const size_t &id_length);
+    static std::string createId(const size_t &id_length = FYREDL_UNIQUE_ID_DIGIT_COUNT) noexcept;
 
     int convDlStat_toInt(const GekkoFyre::DownloadStatus &status);
     int convHashType_toInt(const GekkoFyre::HashType &hash_type);
@@ -117,12 +117,17 @@ public:
     std::vector<GekkoFyre::GkFile::FileDbVal> read_db_vec(const std::string &key, const GekkoFyre::GkFile::FileDb &file_db_struct);
     std::pair<std::string, std::string> read_db_min(const std::string &key, const GekkoFyre::GkFile::FileDb &file_db_struct);
 
-    std::string determine_unique_id(const std::vector<GekkoFyre::GkFile::FileDbVal> &db_vals,
-                                    const std::string &file_path,
-                                    const GekkoFyre::GkFile::FileDb &file_db);
+    std::string add_download_id(const std::string &file_path, const GekkoFyre::GkFile::FileDb &file_db_struct,
+                                const bool &is_torrent = false, const std::string &override_unique_id = "");
+    bool add_item_db(const std::string download_id, const std::string &key, const std::string &value,
+                     const GekkoFyre::GkFile::FileDb &db_struct) noexcept;
+    std::string read_item_db(const std::string download_id, const std::string &key, const GekkoFyre::GkFile::FileDb &db_struct);
+    std::string determine_download_id(const std::string &file_path, const GekkoFyre::GkFile::FileDb &db_struct);
+    QMap<std::string, std::pair<std::string, bool>> extract_download_ids(const GekkoFyre::GkFile::FileDb &db_struct,
+                                                                         const bool &torrentsOnly = false);
 
-    std::vector<GekkoFyre::GkCurl::CurlDlInfo> readDownloadInfo(const bool &hashesOnly = false);
-    bool writeDownloadItem(GekkoFyre::GkCurl::CurlDlInfo &dl_info_list);
+    std::vector<GekkoFyre::GkCurl::CurlDlInfo> readCurlItems(const bool &hashesOnly = false);
+    bool addCurlItem(GekkoFyre::GkCurl::CurlDlInfo &dl_info_list);
     pugi::xml_node createNewXmlFile();
     bool delDownloadItem(const QString &file_dest, const std::string &unique_id_backup = "");
     bool modifyDlState(const std::string &file_loc, const GekkoFyre::DownloadStatus &status, const long long &complt_timestamp = 0,

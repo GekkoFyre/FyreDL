@@ -154,7 +154,8 @@ void GekkoFyre::GkTorrentClient::startTorrentDl(const GekkoFyre::GkTorrent::Torr
 
                         GekkoFyre::GkFile::FileDb db_struct = routines->openDatabase(CFG_HISTORY_DB_FILE);
                         std::vector<GekkoFyre::GkFile::FileDbVal> file_loc_vec = routines->read_db_vec(LEVELDB_KEY_TORRENT_FLOC, db_struct);
-                        std::string handle_unique_id = routines->determine_unique_id(file_loc_vec, handle_file_path, db_struct);
+                        std::string handle_unique_id = routines->determine_download_id(file_loc_vec, handle_file_path,
+                                                                                       db_struct);
                         unique_id_cache.insert(handle_file_path, handle_unique_id);
                     }
 

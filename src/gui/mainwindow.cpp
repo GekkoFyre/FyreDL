@@ -157,7 +157,7 @@ void MainWindow::readFromHistoryFile()
 {
     std::vector<GekkoFyre::GkCurl::CurlDlInfo> dl_history;
     std::vector<GekkoFyre::GkTorrent::TorrentInfo> gk_torrent_history;
-    dl_history = routines->readDownloadInfo();
+    dl_history = routines->readCurlItems();
     gk_torrent_history = routines->readTorrentInfo(true);
 
     dlModel->removeRows(0, (int)dl_history.size(), QModelIndex());
@@ -443,7 +443,7 @@ void MainWindow::initCharts(const QString &unique_id, const QString &down_dest,
 
         if (download_type == GekkoFyre::DownloadType::HTTP || download_type == GekkoFyre::DownloadType::FTP) {
             // Download type is either HTTP or FTP
-            std::vector<GekkoFyre::GkCurl::CurlDlInfo> curl_dl_info = routines->readDownloadInfo();
+            std::vector<GekkoFyre::GkCurl::CurlDlInfo> curl_dl_info = routines->readCurlItems();
             for (size_t j = 0; j < curl_dl_info.size(); ++j) {
                 if (curl_dl_info.at(j).unique_id == unique_id.toStdString()) {
                     graph_info.curl_info = curl_dl_info.at(j);
@@ -1671,7 +1671,7 @@ void MainWindow::sendDetails(const std::string &fileName, const double &fileSize
         dl_info.hash_type = hash_type;
         dl_info.hash_val_given = hash_val;
         dl_info.unique_id = unique_id;
-        routines->writeDownloadItem(dl_info);
+        routines->addCurlItem(dl_info);
     }
 
     return;
@@ -1819,7 +1819,7 @@ void MainWindow::recvDlFinished(const GekkoFyre::GkCurl::DlStatusMsg &status)
                     GekkoFyre::DownloadStatus::Downloading) {
 
                     GekkoFyre::GkFile::FileHash file_hash;
-                    std::vector<GekkoFyre::GkCurl::CurlDlInfo> dl_mini_info_vec = routines->readDownloadInfo(true);
+                    std::vector<GekkoFyre::GkCurl::CurlDlInfo> dl_mini_info_vec = routines->readCurlItems(true);
                     for (size_t j = 0; j < dl_mini_info_vec.size(); ++j) {
                         if (dl_mini_info_vec.at(j).file_loc == status.file_loc) {
                             switch (dl_mini_info_vec.at(j).hash_type) {

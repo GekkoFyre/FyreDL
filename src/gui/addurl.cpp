@@ -214,15 +214,15 @@ void AddURL::on_buttonBox_accepted()
                     // ########################
                     // # Process the CSV file #
                     // ########################
-                    io::CSVReader<CSV_NUM_COLS> in(csv_file.toStdString());
-                    in.read_header(io::ignore_missing_column, CSV_FIELD_URL, CSV_FIELD_DEST, CSV_FIELD_HASH); // If a column with a name is not in the file but is in the argument list, then read_row will not modify the corresponding variable.
-                    if (!in.has_column(CSV_FIELD_URL)) {
+                    io::CSVReader<URL_ADD_CSV_NUM_COLS> in(csv_file.toStdString());
+                    in.read_header(io::ignore_missing_column, URL_ADD_CSV_FIELD_URL, URL_ADD_CSV_FIELD_DEST, URL_ADD_CSV_FIELD_HASH); // If a column with a name is not in the file but is in the argument list, then read_row will not modify the corresponding variable.
+                    if (!in.has_column(URL_ADD_CSV_FIELD_URL)) {
                         throw std::invalid_argument(tr("Error reading CSV file! Is it formatted correctly?\n\n%1")
                                                             .arg(csv_file).toStdString());
                     }
 
                     QString csv_file_dest = ui->file_dest_lineEdit->text();
-                    if (!in.has_column(CSV_FIELD_DEST) && csv_file_dest.isEmpty()) {
+                    if (!in.has_column(URL_ADD_CSV_FIELD_DEST) && csv_file_dest.isEmpty()) {
                         throw std::invalid_argument(tr("No destination provided either in dialog or CSV file!")
                                                             .toStdString());
                     }
@@ -236,7 +236,7 @@ void AddURL::on_buttonBox_accepted()
                     std::vector<CsvImport> csv_vec;
                     std::string url, dest, hash = { "" };
                     bool has_col_hash = false;
-                    if (in.has_column(CSV_FIELD_HASH)) { has_col_hash = true; }
+                    if (in.has_column(URL_ADD_CSV_FIELD_HASH)) { has_col_hash = true; }
 
                     while (in.read_row(url, dest, hash)) {
                         // Handle the imported CSV data
@@ -271,7 +271,7 @@ void AddURL::on_buttonBox_accepted()
                             dl_info.dlStatus = GekkoFyre::DownloadStatus::Stopped;
 
                             // Make one final check and assign the appropriate values
-                            if (in.has_column(CSV_FIELD_DEST)) {
+                            if (in.has_column(URL_ADD_CSV_FIELD_DEST)) {
                                 dl_info.file_loc = csv_vec.at(i).dest;
                             } else if (!csv_file_dest.isEmpty()) {
                                 std::ostringstream oss_path;
@@ -310,7 +310,7 @@ void AddURL::on_buttonBox_accepted()
                                 oss_path << csv_file_dest.toStdString() << fs::path::preferred_separator
                                          << routines->extractFilename(QString::fromStdString(info_ext.effective_url)).toStdString();
                                 dl_info.file_loc = oss_path.str();
-                            } else if (in.has_column(CSV_FIELD_DEST)) {
+                            } else if (in.has_column(URL_ADD_CSV_FIELD_DEST)) {
                                 dl_info.file_loc = csv_vec.at(i).dest;
                             }
 

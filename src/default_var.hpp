@@ -123,6 +123,8 @@ extern "C" {
 #define LEVELDB_CFG_CACHE_SIZE 8UL * 1024UL * 1024UL
 #define LEVELDB_CFG_LOCK_FILE_NAME "LOCK"
 
+#define LEVELDB_STORE_UNIQUE_ID "store-unique-id"
+
 #define LEVELDB_PARENT_NODE "fyredl-db"
 #define LEVELDB_CHILD_NODE_VERS "fyredl-xml"
 #define LEVELDB_CHILD_ITEM_VERS "version"
@@ -204,10 +206,15 @@ extern "C" {
 #define TAB_INDEX_LOG 4
 
 // Comma Separated Value related information
-#define CSV_NUM_COLS 3
-#define CSV_FIELD_URL "url"
-#define CSV_FIELD_DEST "destination"
-#define CSV_FIELD_HASH "hash"
+#define URL_ADD_CSV_NUM_COLS 3
+#define URL_ADD_CSV_FIELD_URL "url"
+#define URL_ADD_CSV_FIELD_DEST "destination"
+#define URL_ADD_CSV_FIELD_HASH "hash"
+
+#define LEVELDB_CSV_UNIQUE_ID_COLS 3
+#define LEVELDB_CSV_UID_KEY "unique-id"
+#define LEVELDB_CSV_UID_VALUE1 "file-loc"
+    #define LEVELDB_CSV_UID_VALUE2 "is-torrent"
 
 // [ Enum values ]
 // Download Types
