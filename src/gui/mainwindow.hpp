@@ -124,6 +124,7 @@ signals:
     void sendStopDownload(const QString &fileLoc);
     void sendStartDownload(const QString &url, const QString &file_loc, const bool &resumeDl);
     void finish_curl_multi_thread();
+    void terminate_xfers();
 
 private slots:
     void on_action_Open_a_File_triggered();
@@ -171,6 +172,7 @@ private slots:
     void recvCurl_XferStats(const GekkoFyre::GkCurl::CurlProgressPtr &info);
     void manageDlStats();
     void recvDlFinished(const GekkoFyre::GkCurl::DlStatusMsg &status);
+    void terminate_curl_downloads();
 
     // Libtorrent specific slots
     void recvBitTorrent_XferStats(const GekkoFyre::GkTorrent::TorrentResumeInfo &gk_xfer_info);

@@ -153,14 +153,14 @@ void GekkoFyre::GkTorrentClient::startTorrentDl(const GekkoFyre::GkTorrent::Torr
                         lt_to_handle.insert(handle_file_path, at->handle);
 
                         GekkoFyre::GkFile::FileDb db_struct = routines->openDatabase(CFG_HISTORY_DB_FILE);
-                        std::vector<GekkoFyre::GkFile::FileDbVal> file_loc_vec = routines->read_db_vec(LEVELDB_KEY_TORRENT_FLOC, db_struct);
-                        std::string handle_unique_id = routines->determine_download_id(file_loc_vec, handle_file_path,
-                                                                                       db_struct);
-                        unique_id_cache.insert(handle_file_path, handle_unique_id);
+                        // std::string handle_unique_id = routines->determine_download_id(handle_file_path, db_struct);
+                        // TODO: Finish this section!
+                        unique_id_cache.insert(handle_file_path, "handle_unique_id");
                     }
 
                     if (!async_active) {
-                        async_ses = std::async(std::launch::async, &GkTorrentClient::run_session_bckgrnd, this);
+                        // async_ses = std::async(std::launch::async, &GkTorrentClient::run_session_bckgrnd, this);
+                        // TODO: Finish this section!
                         async_active = true;
                         goto terminate;
                     }

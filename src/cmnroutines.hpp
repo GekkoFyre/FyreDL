@@ -117,12 +117,13 @@ public:
     std::vector<GekkoFyre::GkFile::FileDbVal> read_db_vec(const std::string &key, const GekkoFyre::GkFile::FileDb &file_db_struct);
     std::pair<std::string, std::string> read_db_min(const std::string &key, const GekkoFyre::GkFile::FileDb &file_db_struct);
 
+    bool convertBool_fromInt(const int &value);
     std::string add_download_id(const std::string &file_path, const GekkoFyre::GkFile::FileDb &file_db_struct,
                                 const bool &is_torrent = false, const std::string &override_unique_id = "");
     bool add_item_db(const std::string download_id, const std::string &key, const std::string &value,
                      const GekkoFyre::GkFile::FileDb &db_struct) noexcept;
-    std::string read_item_db(const std::string download_id, const std::string &key, const GekkoFyre::GkFile::FileDb &db_struct);
-    std::string determine_download_id(const std::string &file_path, const GekkoFyre::GkFile::FileDb &db_struct);
+    std::string read_item_db(const std::string download_id, const GekkoFyre::GkFile::FileDb &db_struct);
+    std::pair<std::string, bool> determine_download_id(const std::string &file_path, const GekkoFyre::GkFile::FileDb &db_struct);
     QMap<std::string, std::pair<std::string, bool>> extract_download_ids(const GekkoFyre::GkFile::FileDb &db_struct,
                                                                          const bool &torrentsOnly = false);
 

@@ -113,6 +113,8 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
         QMessageBox::warning(this, tr("Error!"), QString("%1").arg(e.what()), QMessageBox::Ok);
     }
 
+    QObject::connect(this, SIGNAL(terminate_xfers()), this, SLOT(terminate_curl_downloads()));
+
     QPointer<QShortcut> upKeyOverride = new QShortcut(QKeySequence(Qt::Key_Up), ui->downloadView);
     QPointer<QShortcut> downKeyOverride = new QShortcut(QKeySequence(Qt::Key_Down), ui->downloadView);
     QObject::connect(upKeyOverride, SIGNAL(activated()), this, SLOT(keyUpDlModelSlot()));
@@ -124,13 +126,12 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
 MainWindow::~MainWindow()
 {
     delete ui;
-    emit finish_curl_multi_thread();
+    emit terminate_xfers();
     gk_dl_info_cache.clear();
 }
 
 /**
- * @brief MainWindow::addDownload adds a URL and its properties/information to the 'downloadView' TableView
- * widget.
+ * @brief MainWindow::addDownload adds a URL and its properties/information to the 'downloadView' TableView widget.
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
  * @note   <http://doc.qt.io/qt-5/qtwidgets-itemviews-addressbook-example.html#addresswidget-class-implementation>
  *         <https://en.wikipedia.org/wiki/List_of_HTTP_status_codes#2xx_Success>
@@ -771,28 +772,25 @@ void MainWindow::startHttpDownload(const QString &file_dest, const QString &uniq
                         if (gk_dl_info_cache.at(k).dl_type == GekkoFyre::DownloadType::HTTP ||
                                 gk_dl_info_cache.at(k).dl_type == GekkoFyre::DownloadType::FTP) {
                             // TODO: QFutureWatcher<GekkoFyre::CurlMulti::CurlInfo> *verifyFileFutWatch;
-                            GekkoFyre::GkCurl::CurlInfo verify = GekkoFyre::CurlEasy::verifyFileExists(url);
-                            if (verify.response_code == 200) {
-                                if (status != GekkoFyre::DownloadStatus::Downloading) {
-                                    double freeDiskSpace = (double)routines->freeDiskSpace(QDir(file_dest).absolutePath());
-                                    GekkoFyre::GkCurl::CurlInfoExt extended_info = GekkoFyre::CurlEasy::curlGrabInfo(url);
-                                    if ((unsigned long int)((extended_info.content_length * FREE_DSK_SPACE_MULTIPLIER) < freeDiskSpace)) {
-                                        routines->modifyDlState(file_dest.toStdString(), GekkoFyre::DownloadStatus::Downloading);
-                                        dlModel->updateCol(index, routines->convDlStat_toString(GekkoFyre::DownloadStatus::Downloading), MN_STATUS_COL);
+                            if (status != GekkoFyre::DownloadStatus::Downloading) {
+                                double freeDiskSpace = (double)routines->freeDiskSpace(QDir(file_dest).absolutePath());
+                                GekkoFyre::GkCurl::CurlInfoExt extended_info = GekkoFyre::CurlEasy::curlGrabInfo(url);
+                                if ((unsigned long int)((extended_info.content_length * FREE_DSK_SPACE_MULTIPLIER) < freeDiskSpace)) {
+                                    routines->modifyDlState(file_dest.toStdString(), GekkoFyre::DownloadStatus::Downloading);
+                                    dlModel->updateCol(index, routines->convDlStat_toString(GekkoFyre::DownloadStatus::Downloading), MN_STATUS_COL);
 
-                                        QObject::connect(GekkoFyre::routine_singleton::instance(), SIGNAL(sendXferStats(GekkoFyre::GkCurl::CurlProgressPtr)), this, SLOT(recvCurl_XferStats(GekkoFyre::GkCurl::CurlProgressPtr)));
-                                        QObject::connect(GekkoFyre::routine_singleton::instance(), SIGNAL(sendDlFinished(GekkoFyre::GkCurl::DlStatusMsg)), this, SLOT(recvDlFinished(GekkoFyre::GkCurl::DlStatusMsg)));
+                                    QObject::connect(GekkoFyre::routine_singleton::instance(), SIGNAL(sendXferStats(GekkoFyre::GkCurl::CurlProgressPtr)), this, SLOT(recvCurl_XferStats(GekkoFyre::GkCurl::CurlProgressPtr)));
+                                    QObject::connect(GekkoFyre::routine_singleton::instance(), SIGNAL(sendDlFinished(GekkoFyre::GkCurl::DlStatusMsg)), this, SLOT(recvDlFinished(GekkoFyre::GkCurl::DlStatusMsg)));
 
-                                        // This is required for signaling, otherwise QVariant does not know the type.
-                                        qRegisterMetaType<GekkoFyre::GkCurl::CurlProgressPtr>("curlProgressPtr");
-                                        qRegisterMetaType<GekkoFyre::GkCurl::DlStatusMsg>("DlStatusMsg");
+                                    // This is required for signaling, otherwise QVariant does not know the type.
+                                    qRegisterMetaType<GekkoFyre::GkCurl::CurlProgressPtr>("curlProgressPtr");
+                                    qRegisterMetaType<GekkoFyre::GkCurl::DlStatusMsg>("DlStatusMsg");
 
-                                        // Emit the signal data necessary to initiate a download
-                                        emit sendStartDownload(url, file_dest, resumeDl);
-                                        return;
-                                    } else {
-                                        throw std::runtime_error(tr("Not enough free disk space!").toStdString());
-                                    }
+                                    // Emit the signal data necessary to initiate a download
+                                    emit sendStartDownload(url, file_dest, resumeDl);
+                                    return;
+                                } else {
+                                    throw std::runtime_error(tr("Not enough free disk space!").toStdString());
                                 }
                             }
                         }
@@ -1861,12 +1859,19 @@ void MainWindow::recvDlFinished(const GekkoFyre::GkCurl::DlStatusMsg &status)
     return;
 }
 
+void MainWindow::terminate_curl_downloads()
+{
+    emit finish_curl_multi_thread();
+    curl_multi_thread->quit();
+    curl_multi_thread->wait();
+}
+
 /**
  * @brief MainWindow::recvBitTorrent_XferStats receives the processed statistics from the built-in BitTorrent client.
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
  * @date 2016-12-22
- * @param gk_xfer_stats is the statistics in question, in the form of a struct.
- * @see MainWindow::manageDlSotats()
+ * @param gk_xfer_info is the statistics in question, in the form of a struct.
+ * @see MainWindow::manageDlStats()
  */
 void MainWindow::recvBitTorrent_XferStats(const GekkoFyre::GkTorrent::TorrentResumeInfo &gk_xfer_info)
 {

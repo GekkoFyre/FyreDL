@@ -315,9 +315,10 @@ elseif(${CMAKE_SYSTEM_NAME} MATCHES "Linux") # Check if we are on Linux
             if(GK_MEM_SANITIZE)
                 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O1 -fno-omit-frame-pointer -fno-optimize-sibling-calls -fsanitize=memory")
             endif(GK_MEM_SANITIZE)
-
             set(GK_THREAD_SANITIZE FALSE CACHE BOOL "See the Clang ThreadSanitizer documentation for more details.")
             if(GK_THREAD_SANITIZE)
+                # https://github.com/google/sanitizers/wiki/ThreadSanitizerFlags
+                set(CMAKE_POSITION_INDEPENDENT_CODE FALSE)
                 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O1 -fsanitize=thread")
             endif(GK_THREAD_SANITIZE)
         elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")

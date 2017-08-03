@@ -230,7 +230,7 @@ void GekkoFyre::CmnRoutines::print_exception(const std::exception &e, int level)
  * @note <http://stackoverflow.com/questions/13445688/how-to-generate-a-random-number-in-c>
  * @return The uniquely generated ID.
  */
-std::string GekkoFyre::CmnRoutines::createId(const size_t &id_length)
+std::string GekkoFyre::CmnRoutines::createId(const size_t &id_length) noexcept
 {
     std::mt19937 rng;
     rng.seed(std::random_device()());
@@ -521,6 +521,20 @@ std::pair<std::string, std::string> GekkoFyre::CmnRoutines::read_db_min(const st
     return std::make_pair(key, read_xml);
 }
 
+bool GekkoFyre::CmnRoutines::convertBool_fromInt(const int &value) {
+    bool bool_convert;
+    switch (value) {
+        case 0:
+            bool_convert = false;
+        case 1:
+            bool_convert = true;
+        default:
+            throw std::invalid_argument(tr("An invalid integer was provided to convert from to a boolean value.").toStdString());
+    }
+
+    return bool_convert;
+}
+
 /**
  * @brief GekkoFyre::CmnRoutines::add_download_id adds a Unique ID (key) to the Google LevelDB database as a key-value store, along
  * with the file-path of the download's location (value) on the user's local storage.
@@ -554,17 +568,17 @@ std::string GekkoFyre::CmnRoutines::add_download_id(const std::string &file_path
     if (!csv_read_data.empty() && csv_read_data.size() > CFG_XML_MIN_PARSE_SIZE) {
         QMap<std::string, std::pair<std::string, bool>> cache;
         io::CSVReader<LEVELDB_CSV_UNIQUE_ID_COLS> csv_in(csv_read_data);
-        csv_in.read_header(io::ignore_missing_column, LEVELDB_CSV_UID_KEY, LEVELDB_CSV_UID_VALUE1, LEVELDB_CSV_UID_VALUE2); // If a column with a name is not in the file but is in the argument list, then read_row will not modify the corresponding variable.
+        csv_in.read_header(io::ignore_no_column, LEVELDB_CSV_UID_KEY, LEVELDB_CSV_UID_VALUE1, LEVELDB_CSV_UID_VALUE2); // If a column with a name is not in the file but is in the argument list, then read_row will not modify the corresponding variable.
         if (!csv_in.has_column(LEVELDB_CSV_UID_KEY) || !csv_in.has_column(LEVELDB_CSV_UID_VALUE1) ||
                 !csv_in.has_column(LEVELDB_CSV_UID_VALUE2)) {
             throw std::invalid_argument(tr("Information provided from database is invalid!").toStdString());
         }
 
         std::string unique_id, path;
-        bool is_torrent_csv;
+        int is_torrent_csv;
         while (csv_in.read_row(unique_id, path, is_torrent_csv)) {
             if (!cache.contains(unique_id)) {
-                cache.insert(unique_id, std::make_pair(path, is_torrent_csv));
+                cache.insert(unique_id, std::make_pair(path, convertBool_fromInt(is_torrent_csv)));
             } else {
                 std::cerr << tr("Unique ID already exists in database! Creating new Unique ID...").toStdString() << std::endl;
                 return add_download_id(file_path, file_db_struct, is_torrent, override_unique_id);
@@ -595,7 +609,7 @@ std::string GekkoFyre::CmnRoutines::add_download_id(const std::string &file_path
 }
 
 bool GekkoFyre::CmnRoutines::add_item_db(const std::string download_id, const std::string &key, const std::string &value,
-                                         const GekkoFyre::GkFile::FileDb &db_struct)
+                                         const GekkoFyre::GkFile::FileDb &db_struct) noexcept
 {
     leveldb::WriteOptions write_options;
     write_options.sync = true;
@@ -613,15 +627,13 @@ bool GekkoFyre::CmnRoutines::add_item_db(const std::string download_id, const st
     return true;
 }
 
-std::string GekkoFyre::CmnRoutines::read_item_db(const std::string download_id, const std::string &key,
-                                                 const GekkoFyre::GkFile::FileDb &db_struct)
+std::string GekkoFyre::CmnRoutines::read_item_db(const std::string download_id, const GekkoFyre::GkFile::FileDb &db_struct)
 {
     leveldb::ReadOptions read_opt;
     leveldb::Status s;
     read_opt.verify_checksums = true;
-    std::string joined_key = std::string(download_id + "_" + key);
     std::string read_data;
-    s = db_struct.db->Get(read_opt, joined_key, &read_data);
+    s = db_struct.db->Get(read_opt, download_id, &read_data);
     if (!s.ok()) {
         throw std::runtime_error(s.ToString());
     }
@@ -636,9 +648,9 @@ std::string GekkoFyre::CmnRoutines::read_item_db(const std::string download_id, 
  * @date 2017-08-03
  * @param file_path The file path to use in extrapolating the Unique ID.
  * @param db_struct The database object to use in connecting to the Google LevelDB database.
- * @return The found Unique ID.
+ * @return The found Unique ID along with the type of download in question (i.e. HTTP/FTP or BitTorrent).
  */
-std::string GekkoFyre::CmnRoutines::determine_download_id(const std::string &file_path,
+std::pair<std::string, bool> GekkoFyre::CmnRoutines::determine_download_id(const std::string &file_path,
                                                           const GekkoFyre::GkFile::FileDb &db_struct)
 {
     leveldb::ReadOptions read_opt;
@@ -653,35 +665,43 @@ std::string GekkoFyre::CmnRoutines::determine_download_id(const std::string &fil
     }
 
     if (!csv_read_xml.empty() && csv_read_xml.size() > CFG_XML_MIN_PARSE_SIZE) {
-        QMap<std::string, std::string> cache;
+        QMap<std::string, std::pair<std::string, bool>> cache;
         io::CSVReader<LEVELDB_CSV_UNIQUE_ID_COLS> csv_in(csv_read_xml);
-        csv_in.read_header(io::ignore_missing_column, LEVELDB_CSV_UID_KEY,
-                           LEVELDB_CSV_UID_VALUE1); // If a column with a name is not in the file but is in the argument list, then read_row will not modify the corresponding variable.
-        if (!csv_in.has_column(LEVELDB_CSV_UID_KEY)) {
-            throw std::invalid_argument(tr("Information provided from database is invalid!").toStdString());
-        }
-
-        if (!csv_in.has_column(LEVELDB_CSV_UID_VALUE1)) {
+        csv_in.read_header(io::ignore_no_column, LEVELDB_CSV_UID_KEY, LEVELDB_CSV_UID_VALUE1, LEVELDB_CSV_UID_VALUE2); // If a column with a name is not in the file but is in the argument list, then read_row will not modify the corresponding variable.
+        if (!csv_in.has_column(LEVELDB_CSV_UID_KEY) || !csv_in.has_column(LEVELDB_CSV_UID_VALUE1) ||
+                !csv_in.has_column(LEVELDB_CSV_UID_VALUE2)) {
             throw std::invalid_argument(tr("Information provided from database is invalid!").toStdString());
         }
 
         std::string unique_id, path;
-        while (csv_in.read_row(unique_id, path)) {
-            cache.insert(unique_id, path);
+        int is_torrent_csv;
+        while (csv_in.read_row(unique_id, path, is_torrent_csv)) {
+            cache.insert(unique_id, std::make_pair(path, convertBool_fromInt(is_torrent_csv)));
         }
 
         for (const auto &item: cache.toStdMap()) {
-            if (item.second == file_path) {
-                return item.first;
+            if (item.second.first == file_path) {
+                return std::make_pair(item.first, item.second.second);
             }
         }
     }
 
     std::cerr << tr("Unable to determine the Unique ID from the given storage path, \"%1\"")
             .arg(QString::fromStdString(file_path)).toStdString() << std::endl;
-    return "";
+    return std::make_pair("", false);
 }
 
+/**
+ * @brief GekkoFyre::CmnRoutines::extract_download_ids extracts all the downloadable Unique IDs from the Google LevelDB database
+ * and presents them as a QMap object, containing as the value the path on the local storage to the item and whether
+ * it's a HTTP/FTP or BitTorrent downloadable.
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @date 2017-08-03
+ * @param db_struct The database object used to connect to the Google LevelDB database on the user's local storage.
+ * @param torrentsOnly Whether you want to only extract BitTorrent Unique IDs or not. If false, will only extract downloadables
+ * of the libcurl variant.
+ * @return Self-explanatory as per the brief.
+ */
 QMap<std::string, std::pair<std::string, bool>> GekkoFyre::CmnRoutines::extract_download_ids(const GekkoFyre::GkFile::FileDb &db_struct,
                                                                                              const bool &torrentsOnly)
 {
@@ -707,19 +727,19 @@ QMap<std::string, std::pair<std::string, bool>> GekkoFyre::CmnRoutines::extract_
         }
 
         std::string unique_id, path;
-        bool is_torrent_csv;
+        int is_torrent_csv;
         while (csv_in.read_row(unique_id, path, is_torrent_csv)) {
             if (torrentsOnly) {
                 // Only accept download items marked as 'BitTorrent'
                 if (is_torrent_csv) {
-                    cache.insert(unique_id, std::make_pair(path, is_torrent_csv));
+                    cache.insert(unique_id, std::make_pair(path, convertBool_fromInt(is_torrent_csv)));
                 }
             }
 
             if (!torrentsOnly) {
                 // Only accept download items marked as 'HTTP/FTP'
                 if (!is_torrent_csv) {
-                    cache.insert(unique_id, std::make_pair(path, is_torrent_csv));
+                    cache.insert(unique_id, std::make_pair(path, convertBool_fromInt(is_torrent_csv)));
                 }
             }
         }
@@ -1574,38 +1594,61 @@ GekkoFyre::GkTorrent::TorrentInfo GekkoFyre::CmnRoutines::torrentFileInfo(const 
 std::vector<GekkoFyre::GkCurl::CurlDlInfo> GekkoFyre::CmnRoutines::readCurlItems(const bool &hashesOnly)
 {
     try {
+        std::vector<GekkoFyre::GkCurl::CurlDlInfo> output;
         GekkoFyre::GkFile::FileDb db_struct = openDatabase(CFG_HISTORY_DB_FILE);
-        std::tuple<std::string, std::string> file_loc, dl_status, insert_timestamp, complt_timestamp, ext_status_msg, ext_effect_url,
-                ext_resp_code, ext_content_length, hash_type, hash_val_given, hash_val_returned, hash_succ_type;
+        auto download_ids = extract_download_ids(db_struct, false);
+        for (auto const &id: download_ids.toStdMap()) {
+            if (!id.second.second) { // Therefore not a BitTorrent item
+                std::string joined_key = id.first;
+                size_t pos = 0;
+                std::string delimeter = "_";
+                std::string token;
+                std::vector<std::string> split_key;
+                while ((pos = joined_key.find(delimeter)) != std::string::npos) {
+                    token = joined_key.substr(0, pos);
+                    split_key.push_back(token);
+                    joined_key.erase(0, (pos + delimeter.length()));
+                }
 
-        file_loc = read_db_min(LEVELDB_KEY_CURL_FLOC, db_struct);
-        dl_status = read_db_min(LEVELDB_KEY_CURL_STAT, db_struct);
-        insert_timestamp = read_db_min(LEVELDB_KEY_CURL_INSERT_DATE, db_struct);
-        complt_timestamp = read_db_min(LEVELDB_KEY_CURL_COMPLT_DATE, db_struct);
-        ext_status_msg = read_db_min(LEVELDB_KEY_CURL_STATMSG, db_struct);
-        ext_effect_url = read_db_min(LEVELDB_KEY_CURL_EFFEC_URL, db_struct);
-        ext_resp_code = read_db_min(LEVELDB_KEY_CURL_RESP_CODE, db_struct);
-        ext_content_length = read_db_min(LEVELDB_KEY_CURL_CONT_LNGTH, db_struct);
-        hash_type = read_db_min(LEVELDB_KEY_CURL_HASH_TYPE, db_struct);
-        hash_val_given = read_db_min(LEVELDB_KEY_CURL_HASH_VAL_GIVEN, db_struct);
-        hash_val_returned = read_db_min(LEVELDB_KEY_CURL_HASH_VAL_RTRND, db_struct);
-        hash_succ_type = read_db_min(LEVELDB_KEY_CURL_HASH_SUCC_TYPE, db_struct);
+                split_key.push_back(joined_key);
+                auto db_read = read_item_db(joined_key, db_struct);
 
-        QMap<std::string, std::string> map_output;
-        map_output = process_db({file_loc, dl_status, insert_timestamp, complt_timestamp, ext_status_msg, ext_effect_url, ext_resp_code,
-                                 ext_content_length, hash_type, hash_val_given, hash_val_returned, hash_succ_type});
-        GekkoFyre::Global::ProcessDbMap fin_output;
-        std::vector<GekkoFyre::GkCurl::CurlDlInfo> curl_gen_info;
-        fin_output = process_db_map(map_output, {LEVELDB_KEY_CURL_FLOC, LEVELDB_KEY_CURL_STAT, LEVELDB_KEY_CURL_INSERT_DATE,
-                                                 LEVELDB_KEY_CURL_COMPLT_DATE, LEVELDB_KEY_CURL_STATMSG, LEVELDB_KEY_CURL_EFFEC_URL,
-                                                 LEVELDB_KEY_CURL_RESP_CODE, LEVELDB_KEY_CURL_CONT_LNGTH, LEVELDB_KEY_CURL_HASH_TYPE,
-                                                 LEVELDB_KEY_CURL_HASH_VAL_GIVEN, LEVELDB_KEY_CURL_HASH_VAL_RTRND,
-                                                 LEVELDB_KEY_CURL_HASH_SUCC_TYPE});
+                for (const auto &key: split_key) {
+                    GekkoFyre::GkCurl::CurlDlInfo dl_info;
+                    if (key == LEVELDB_KEY_CURL_STAT) {
+                        dl_info.dlStatus = convDlStat_StringToEnum(QString::fromStdString(id.second.first));
+                    } else if (key == LEVELDB_KEY_CURL_INSERT_DATE) {
+                        dl_info.insert_timestamp = std::atoll(id.second.first.c_str());
+                    } else if (key == LEVELDB_KEY_CURL_COMPLT_DATE) {
+                        dl_info.complt_timestamp = std::atoll(id.second.first.c_str());
+                    } else if (key == LEVELDB_KEY_CURL_STATMSG) {
+                        dl_info.ext_info.status_msg = id.second.first;
+                    } else if (key == LEVELDB_KEY_CURL_EFFEC_URL) {
+                        dl_info.ext_info.effective_url = id.second.first;
+                    } else if (key == LEVELDB_KEY_CURL_RESP_CODE) {
+                        dl_info.ext_info.response_code = std::atoll(id.second.first.c_str());
+                    } else if (key == LEVELDB_KEY_CURL_CONT_LNGTH) {
+                        dl_info.ext_info.content_length = std::atof(id.second.first.c_str());
+                    } else if (key == LEVELDB_KEY_CURL_HASH_TYPE) {
+                        dl_info.hash_type = convHashType_StringToEnum(QString::fromStdString(id.second.first));
+                    } else if (key == LEVELDB_KEY_CURL_HASH_VAL_GIVEN) {
+                        dl_info.hash_val_given = id.second.first;
+                    } else if (key == LEVELDB_KEY_CURL_HASH_VAL_RTRND) {
+                        dl_info.hash_val_rtrnd = id.second.first;
+                    } else if (key == LEVELDB_KEY_CURL_HASH_SUCC_TYPE) {
+                        // TODO: Fix this so it actually reads from the database!
+                        dl_info.hash_succ_type = GekkoFyre::HashVerif::NotApplicable;
+                    } else {
+                        // TODO: Make sure this actually reads as the file-location!
+                        dl_info.file_loc = id.second.first;
+                    }
 
-        if (fin_output.curl_dl_info.is_initialized()) {
-            curl_gen_info = fin_output.curl_dl_info.value();
-            return curl_gen_info;
+                    output.push_back(dl_info);
+                }
+            }
         }
+
+        return output;
     } catch (const std::exception &e) {
         QMessageBox::warning(nullptr, tr("Error!"), e.what(), QMessageBox::Ok);
     }
@@ -1684,7 +1727,7 @@ pugi::xml_node GekkoFyre::CmnRoutines::createNewXmlFile()
  * @date 2017-07-21
  * @param file_dest The location of the downloadable item on the user's local storage, along with the folder name of the
  * download. This is used to deduce the Unique ID of the download in question to modify.
- * @param unique_id If the 'file_dest' param happens to be empty but the unique identifier provided instead (i.e. in the
+ * @param unique_id_backup If the 'file_dest' param happens to be empty but the unique identifier provided instead (i.e. in the
  * event of database corruption), then this may be used as a last resort to delete an item from the database.
  * @return Whether the series of operations to delete the database object proceeded okay or not.
  */
@@ -1694,22 +1737,10 @@ bool GekkoFyre::CmnRoutines::delDownloadItem(const QString &file_dest, const std
         GekkoFyre::GkFile::FileDb db_struct = openDatabase(CFG_HISTORY_DB_FILE);
         std::string unique_id = "";
         if (!file_dest.isEmpty()) {
-            unique_id = determine_download_id(file_dest.toStdString(), db_struct);
+            std::tuple<std::string, bool> download_id = determine_download_id(file_dest.toStdString(), db_struct);
         } else {
             if (!unique_id_backup.empty()) {
                 unique_id = unique_id_backup;
-            }
-        }
-
-        if (!unique_id.empty()) {
-            bool ret_bool;
-            ret_bool = delete_db_write(unique_id, db_struct, {LEVELDB_KEY_CURL_FLOC, LEVELDB_KEY_CURL_STAT, LEVELDB_KEY_CURL_INSERT_DATE,
-                                                              LEVELDB_KEY_CURL_COMPLT_DATE, LEVELDB_KEY_CURL_STATMSG, LEVELDB_KEY_CURL_EFFEC_URL,
-                                                              LEVELDB_KEY_CURL_RESP_CODE, LEVELDB_KEY_CURL_CONT_LNGTH, LEVELDB_KEY_CURL_HASH_TYPE,
-                                                              LEVELDB_KEY_CURL_HASH_VAL_GIVEN, LEVELDB_KEY_CURL_HASH_VAL_RTRND,
-                                                              LEVELDB_KEY_CURL_HASH_SUCC_TYPE});
-            if (ret_bool) {
-                return true;
             }
         }
     } catch (const std::exception &e) {
@@ -1749,55 +1780,7 @@ bool GekkoFyre::CmnRoutines::modifyDlState(const std::string &file_loc, const Ge
         file_stat_vec = read_db_vec(LEVELDB_KEY_CURL_STAT, db_struct);
         file_complt_date_vec = read_db_vec(LEVELDB_KEY_CURL_COMPLT_DATE, db_struct);
 
-        std::string unique_id = determine_download_id(file_loc, db_struct);
-        if (!unique_id.empty()) {
-            // We have a Unique ID! Or at least, in theory...
-
-            // General
-            //
-            bool ret_status, ret_complt_timestamp;
-            ret_status = modify_db_write(unique_id, std::to_string(convDlStat_toInt(status)), file_stat_vec, db_struct);
-            if (complt_timestamp > 0) {
-                ret_complt_timestamp = modify_db_write(unique_id, std::to_string(complt_timestamp), file_complt_date_vec, db_struct);
-            } else {
-                // Just the default boolean value, for if we do not modify the timestamp. Otherwise there'll be some undesired behaviour.
-                ret_complt_timestamp = true;
-            }
-
-            // Hash values
-            //
-            bool modify_hashes = false;
-            bool hash_success = false;
-
-            if (ret_succ_type != GekkoFyre::HashVerif::NotApplicable) {
-                modify_hashes = true;
-                file_hash_type_vec = read_db_vec(LEVELDB_KEY_CURL_HASH_TYPE, db_struct);
-                file_hash_given_vec = read_db_vec(LEVELDB_KEY_CURL_HASH_VAL_GIVEN, db_struct);
-                file_hash_rtrnd_vec = read_db_vec(LEVELDB_KEY_CURL_HASH_VAL_RTRND, db_struct);
-                file_hash_succ_vec = read_db_vec(LEVELDB_KEY_CURL_HASH_SUCC_TYPE, db_struct);
-
-                bool ret_hash_type, ret_hash_given, ret_hash_rtrnd, bool_succ_type;
-                ret_hash_type = modify_db_write(unique_id, std::to_string(convHashType_toInt(hash_type)), file_hash_type_vec, db_struct);
-                ret_hash_given = modify_db_write(unique_id, hash_given, file_hash_given_vec, db_struct);
-                ret_hash_rtrnd = modify_db_write(unique_id, hash_rtrnd, file_hash_rtrnd_vec, db_struct);
-                bool_succ_type = modify_db_write(unique_id, std::to_string(convHashVerif_toInt(ret_succ_type)), file_hash_succ_vec, db_struct);
-                if (ret_hash_type && ret_hash_given && ret_hash_rtrnd && bool_succ_type) {
-                    hash_success = true;
-                }
-            }
-
-            if (modify_hashes) { // Check to see if we have modified any hash-related values this time
-                // We have modified hash-related values, therefore check the additional boolean values that are relevant
-                if (hash_success && ret_status && ret_complt_timestamp) {
-                    return true;
-                }
-            } else {
-                // We have not modified any such values, therefore no additional checks are required!
-                if (ret_status && ret_complt_timestamp) {
-                    return true;
-                }
-            }
-        }
+        std::tuple<std::string, bool> download_id = determine_download_id(file_loc, db_struct);
     } catch (const std::exception &e) {
         QMessageBox::warning(nullptr, tr("Error!"), e.what(), QMessageBox::Ok);
         return false;
