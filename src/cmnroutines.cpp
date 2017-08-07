@@ -608,7 +608,7 @@ std::string GekkoFyre::CmnRoutines::add_download_id(const std::string &file_path
     return key;
 }
 
-bool GekkoFyre::CmnRoutines::add_item_db(const std::string download_id, const std::string &key, const std::string &value,
+void GekkoFyre::CmnRoutines::add_item_db(const std::string download_id, const std::string &key, const std::string &value,
                                          const GekkoFyre::GkFile::FileDb &db_struct) noexcept
 {
     leveldb::WriteOptions write_options;
@@ -620,11 +620,10 @@ bool GekkoFyre::CmnRoutines::add_item_db(const std::string download_id, const st
     leveldb::Status s;
     s = db_struct.db->Write(write_options, &batch);
     if (!s.ok()) {
-        std::cerr << s.ToString() << std::endl;
-        return false;
+        throw std::runtime_error(s.ToString());
     }
 
-    return true;
+    return;
 }
 
 std::string GekkoFyre::CmnRoutines::read_item_db(const std::string download_id, const GekkoFyre::GkFile::FileDb &db_struct)
@@ -700,7 +699,8 @@ std::pair<std::string, bool> GekkoFyre::CmnRoutines::determine_download_id(const
  * @param db_struct The database object used to connect to the Google LevelDB database on the user's local storage.
  * @param torrentsOnly Whether you want to only extract BitTorrent Unique IDs or not. If false, will only extract downloadables
  * of the libcurl variant.
- * @return Self-explanatory as per the brief.
+ * @return The key is the Unique ID itself, while the value is a pair consisting of the storage path and whether it's a
+ * BitTorrent item or not.
  */
 QMap<std::string, std::pair<std::string, bool>> GekkoFyre::CmnRoutines::extract_download_ids(const GekkoFyre::GkFile::FileDb &db_struct,
                                                                                              const bool &torrentsOnly)
@@ -1587,8 +1587,7 @@ GekkoFyre::GkTorrent::TorrentInfo GekkoFyre::CmnRoutines::torrentFileInfo(const 
  * @note   <http://www.gerald-fahrnholz.eu/sw/DocGenerated/HowToUse/html/group___grp_pugi_xml.html>
  *         <http://stackoverflow.com/questions/16155888/proper-way-to-parse-xml-using-pugixml>
  * @param xmlCfgFile is the XML history file in question.
- * @param hashesOnly excludes all the 'extended' information by not loading it into memory. *** Warning! The extended
- * information will not be initialized! ***
+ * @param hashesOnly excludes all the 'extended' information by not loading it into memory.
  * @return A STL standard container holding a struct pertaining to all the needed CURL information is returned.
  */
 std::vector<GekkoFyre::GkCurl::CurlDlInfo> GekkoFyre::CmnRoutines::readCurlItems(const bool &hashesOnly)
@@ -1731,7 +1730,7 @@ pugi::xml_node GekkoFyre::CmnRoutines::createNewXmlFile()
  * event of database corruption), then this may be used as a last resort to delete an item from the database.
  * @return Whether the series of operations to delete the database object proceeded okay or not.
  */
-bool GekkoFyre::CmnRoutines::delDownloadItem(const QString &file_dest, const std::string &unique_id_backup)
+bool GekkoFyre::CmnRoutines::delCurlItem(const QString &file_dest, const std::string &unique_id_backup)
 {
     try {
         GekkoFyre::GkFile::FileDb db_struct = openDatabase(CFG_HISTORY_DB_FILE);
@@ -1767,20 +1766,38 @@ bool GekkoFyre::CmnRoutines::delDownloadItem(const QString &file_dest, const std
  * a valid and non-corrupted download.
  * @return Whether the series of operations to modify the database object(s) proceeded okay or not.
  */
-bool GekkoFyre::CmnRoutines::modifyDlState(const std::string &file_loc, const GekkoFyre::DownloadStatus &status,
-                                           const long long &complt_timestamp, const std::string &hash_given,
-                                           const GekkoFyre::HashType &hash_type, const std::string &hash_rtrnd,
-                                           const GekkoFyre::HashVerif &ret_succ_type)
+bool GekkoFyre::CmnRoutines::modifyCurlItem(const std::string &file_loc, const GekkoFyre::DownloadStatus &status,
+                                            const long long &complt_timestamp, const std::string &hash_given,
+                                            const GekkoFyre::HashType &hash_type, const std::string &hash_rtrnd,
+                                            const GekkoFyre::HashVerif &ret_succ_type)
 {
     try {
         GekkoFyre::GkFile::FileDb db_struct = openDatabase(CFG_HISTORY_DB_FILE);
-        std::vector<GekkoFyre::GkFile::FileDbVal> file_loc_vec, file_stat_vec, file_hash_type_vec, file_hash_rtrnd_vec,
-                file_hash_succ_vec, file_complt_date_vec, file_hash_given_vec;
+        auto identifier = determine_download_id(file_loc, db_struct);
+        if (!identifier.first.empty()) {
+            std::string dl_id = identifier.first;
 
-        file_stat_vec = read_db_vec(LEVELDB_KEY_CURL_STAT, db_struct);
-        file_complt_date_vec = read_db_vec(LEVELDB_KEY_CURL_COMPLT_DATE, db_struct);
+            //
+            // General
+            add_item_db(dl_id, LEVELDB_KEY_CURL_STAT, std::to_string(convDlStat_toInt(status)), db_struct);
+            if (complt_timestamp > 0) {
+                add_item_db(dl_id, LEVELDB_KEY_CURL_COMPLT_DATE, std::to_string(complt_timestamp), db_struct);
+            }
 
-        std::tuple<std::string, bool> download_id = determine_download_id(file_loc, db_struct);
+            //
+            // Hash Values
+            if (ret_succ_type != GekkoFyre::HashVerif::NotApplicable) {
+                add_item_db(dl_id, LEVELDB_KEY_CURL_HASH_TYPE, std::to_string(convHashType_toInt(hash_type)), db_struct);
+                add_item_db(dl_id, LEVELDB_KEY_CURL_HASH_VAL_GIVEN, hash_given, db_struct);
+                add_item_db(dl_id, LEVELDB_KEY_CURL_HASH_VAL_RTRND, hash_rtrnd, db_struct);
+                add_item_db(dl_id, LEVELDB_KEY_CURL_HASH_SUCC_TYPE, std::to_string(convHashVerif_toInt(ret_succ_type)), db_struct);
+            }
+
+            return true;
+        } else {
+            throw std::invalid_argument(tr("An invalid Unique ID has been provided. Unable to modify download item with "
+                                                   "storage path, \"%1\".").arg(QString::fromStdString(file_loc)).toStdString());
+        }
     } catch (const std::exception &e) {
         QMessageBox::warning(nullptr, tr("Error!"), e.what(), QMessageBox::Ok);
         return false;
@@ -1789,7 +1806,7 @@ bool GekkoFyre::CmnRoutines::modifyDlState(const std::string &file_loc, const Ge
     return false;
 }
 
-bool GekkoFyre::CmnRoutines::modifyToState(const std::string &unique_id, const GekkoFyre::DownloadStatus &dl_status)
+bool GekkoFyre::CmnRoutines::modifyTorrentItem(const std::string &unique_id, const GekkoFyre::DownloadStatus &dl_status)
 {
     try {
         if (!unique_id.empty()) {

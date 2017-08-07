@@ -125,35 +125,6 @@ add_executable("${EXE_NAME}" ${SOURCE_FILES} ${EXTERNAL_SOURCE_FILES} ${UI_HEADE
 set_property(TARGET ${EXE_NAME} PROPERTY CXX_STANDARD 14)
 set_property(TARGET ${EXE_NAME} PROPERTY CXX_STANDARD_REQUIRED ON)
 
-# http://stackoverflow.com/questions/10851247/how-to-activate-c-11-in-cmake
-# https://cmake.org/cmake/help/v3.1/command/target_compile_features.html
-# https://cmake.org/cmake/help/v3.1/prop_gbl/CMAKE_CXX_KNOWN_FEATURES.html#prop_gbl:CMAKE_CXX_KNOWN_FEATURES
-# http://stackoverflow.com/questions/10984442/how-to-detect-c11-support-of-a-compiler-with-cmake/20165220#20165220
-message(STATUS "Your C++ compiler supports the following features: ")
-get_property(known_features GLOBAL PROPERTY CMAKE_CXX_KNOWN_FEATURES)
-foreach(i ${known_features})
-    message(STATUS "${i}")
-endforeach()
-
-# https://cmake.org/cmake/help/v3.1/prop_gbl/CMAKE_CXX_KNOWN_FEATURES.html
-set(GK_NEEDED_FEATURES cxx_auto_type
-                       cxx_decltype
-                       cxx_decltype_auto
-                       cxx_digit_separators
-                       cxx_explicit_conversions
-                       cxx_inline_namespaces
-                       cxx_lambdas
-                       cxx_long_long_type
-                       cxx_nullptr
-                       cxx_range_for
-                       cxx_raw_string_literals
-                       cxx_return_type_deduction
-                       cxx_sizeof_member
-                       cxx_strong_enums
-                       cxx_static_assert
-                       cxx_unicode_literals)
-target_compile_features("${EXE_NAME}" PRIVATE ${GK_NEEDED_FEATURES})
-
 #
 # Find the correct Boost C++ packages
 #
@@ -162,6 +133,8 @@ set(Boost_USE_STATIC_LIBS FALSE CACHE BOOL "Whether to use static libraries with
 set(Boost_USE_STATIC_RUNTIME FALSE CACHE BOOL "Whether to use Boost C++ libraries that are compiled with a static run-time or not.")
 find_package(Boost 1.54.0 REQUIRED COMPONENTS "iostreams"
                                               "filesystem"
+                                              "chrono"
+                                              "random"
                                               "system")
 if (Boost_FOUND)
     include_directories(${Boost_INCLUDE_DIRS})
@@ -260,21 +233,30 @@ if (BUILD_API_DOC)
     endif(DOXYGEN_FOUND)
 endif(BUILD_API_DOC)
 
+set(FYREDL_INSTALL_DIR "${CMAKE_INSTALL_PREFIX}/bin" CACHE STRING "The installation directory for the binary.")
+set(FYREDL_LIB_DIR "${CMAKE_INSTALL_PREFIX}/lib" CACHE STRING "The installation directory for the library.")
+set(FYREDL_ARCHIVE_DIR "${CMAKE_BINARY_DIR}/archive" CACHE STRING "The compilation directory for the archives (i.e. *.deb, etc.).")
 IF(CMAKE_BUILD_TYPE MATCHES "Debug")
-    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "./debug/bin")
-    set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "./debug/lib")
-    set(LIB_INSTALL_DIR "${CMAKE_INSTALL_PREFIX}/lib/debug")
-    set(BIN_INSTALL_DIR "${CMAKE_INSTALL_PREFIX}/bin/debug")
+    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${FYREDL_INSTALL_DIR}")
+    set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${FYREDL_LIB_DIR}")
+    message(STATUS "FyreDL will be installed towards the directory: \"${FYREDL_INSTALL_DIR}\"")
+
+    set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${FYREDL_ARCHIVE_DIR}")
+    message(STATUS "Archive directory has been set to: \"${FYREDL_ARCHIVE_DIR}\"")
 elseif(CMAKE_BUILD_TYPE MATCHES "Release")
-    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "./release/bin")
-    set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "./release/lib")
-    set(LIB_INSTALL_DIR "${CMAKE_INSTALL_PREFIX}/lib")
-    set(BIN_INSTALL_DIR "${CMAKE_INSTALL_PREFIX}/bin")
+    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${FYREDL_INSTALL_DIR}")
+    set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${FYREDL_LIB_DIR}")
+    message(STATUS "FyreDL will be installed towards the directory: \"${FYREDL_INSTALL_DIR}\"")
+
+    set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${FYREDL_ARCHIVE_DIR}")
+    message(STATUS "Archive directory has been set to: \"${FYREDL_ARCHIVE_DIR}\"")
 else()
-    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "./other-build/bin")
-    set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "./other-build/lib")
-    set(LIB_INSTALL_DIR "${CMAKE_INSTALL_PREFIX}/lib")
-    set(BIN_INSTALL_DIR "${CMAKE_INSTALL_PREFIX}/bin")
+    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${FYREDL_INSTALL_DIR}")
+    set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${FYREDL_LIB_DIR}")
+    message(STATUS "FyreDL will be installed towards the directory: \"${FYREDL_INSTALL_DIR}\"")
+
+    set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${FYREDL_ARCHIVE_DIR}")
+    message(STATUS "Archive directory has been set to: \"${FYREDL_ARCHIVE_DIR}\"")
 ENDIF()
 
 target_link_libraries(fyredl Qt5::Core Qt5::Widgets Qt5::Gui Qt5::Charts ${LIBS})
