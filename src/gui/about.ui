@@ -126,7 +126,9 @@
           <bool>true</bool>
          </property>
          <property name="plainText">
-          <string>Additional copyrights via the libraries used by FyreDL...
+          <string>Additional copyrights/disclaimers via the libraries used by FyreDL and any binaries 
+distributed with such, are provided below...
+
 
 [ Boost C++ Libraries by various ]
 ----------------------------------------------------------------------------
@@ -222,11 +224,6 @@ INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
 CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
 ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 POSSIBILITY OF SUCH DAMAGE.
-
-
-[ pugixml ]
-----------------------------------------------------------------------------
-This software is based on pugixml library (http://pugixml.org). pugixml is Copyright (C) 2006-2015 Arseny Kapoulkine.
 
 
 [ Fast C++ CSV Parser ]

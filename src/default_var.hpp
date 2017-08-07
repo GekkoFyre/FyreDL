@@ -288,13 +288,6 @@ namespace GekkoFyre {
             std::shared_ptr<leveldb::DB> db;
             leveldb::Options options;
         };
-
-        struct FileDbVal {
-            std::string key;
-            std::string value;
-            std::string unique_id;
-            DownloadType dl_type;
-        };
     }
 
     namespace GkTorrent {
@@ -488,12 +481,6 @@ namespace GekkoFyre {
             GkGraph::DownSpeedGraph xfer_graph;              // The 'download speed' graph
             boost::optional<GkTorrent::TorrentInfo> to_info; // Information relating to BitTorrent downloads
             boost::optional<GkCurl::CurlDlInfo> curl_info;   // Information relating to HTTP(S) or FTP(S) downloads
-        };
-
-        struct ProcessDbMap {
-            std::string unique_id;
-            boost::optional<std::vector<GekkoFyre::GkTorrent::GeneralInfo>> tor_gen_info;
-            boost::optional<std::vector<GekkoFyre::GkCurl::CurlDlInfo>> curl_dl_info;
         };
     }
 }

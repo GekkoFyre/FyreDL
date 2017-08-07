@@ -35,10 +35,6 @@ LevelDB (Windows support) patches by Netzeband
 	<https://github.com/google/leveldb/issues/475>
 		Public Domain
 
-PugiXML by Arseny Kapoulkine et al.
-	<http://pugixml.org/>
-		MIT License
-
 Doxygen by Dimitri van Heesch et al.
 	<http://www.stack.nl/~dimitri/doxygen/>
 		GNU General Public License (GPL, version 2)

@@ -27,7 +27,7 @@
  ##
  #################################################################################
 
-cmake_minimum_required(VERSION 3.6.0 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.4.0 FATAL_ERROR)
 project(FyreDL C CXX) # http://stackoverflow.com/questions/15193785/how-to-get-cmake-to-recognize-pthread-on-ubuntu
 
 set(CMAKE_VERBOSE_MAKEFILE ON)
@@ -194,17 +194,6 @@ if (LEVELDB_FOUND)
 else()
     message(SEND_ERROR "The 'LevelDB' library could not be found!")
 endif(LEVELDB_FOUND)
-
-#
-# Find 'pugixml'
-#
-find_package(PugiXML REQUIRED)
-if (PUGIXML_FOUND)
-    include_directories(${PUGIXML_INCLUDE_DIR})
-    set(LIBS ${LIBS} ${PUGIXML_LIBRARIES})
-else()
-    message(SEND_ERROR "The 'pugixml' library could not be found!")
-endif(PUGIXML_FOUND)
 
 #
 # Qt5 translation routines
