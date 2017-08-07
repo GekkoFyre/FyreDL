@@ -281,6 +281,22 @@ GekkoFyre::GkFile::FileDb GekkoFyre::CmnRoutines::openDatabase(const std::string
     return db_struct;
 }
 
+std::string GekkoFyre::CmnRoutines::multipart_key(const std::initializer_list<std::string> &args) {
+    std::ostringstream ret_val;
+    static int counter;
+    counter = 0;
+    for (const auto &arg: args) {
+        ++counter;
+        if (counter == 1) {
+            ret_val << arg;
+        } else {
+            ret_val << "_" << arg;
+        }
+    }
+
+    return ret_val.str();
+}
+
 /**
  * @brief GekkoFyre::CmnRoutines::leveldb_location determines the home directory and where to put the database files,
  * depending on whether this is a Linux or Microsoft Windows operating system that FyreDL is running on.
@@ -433,7 +449,7 @@ std::string GekkoFyre::CmnRoutines::add_download_id(const std::string &file_path
             }
         }
 
-        csv_out << LEVELDB_CSV_UID_KEY << "," << LEVELDB_CSV_UID_VALUE1 << std::endl;
+        csv_out << LEVELDB_CSV_UID_KEY << "," << LEVELDB_CSV_UID_VALUE1 << "," << LEVELDB_CSV_UID_VALUE2 << std::endl;
         for (const auto &item: cache.toStdMap()) {
             csv_out << item.first << ",";
             csv_out << item.second.first << ",";
@@ -1223,48 +1239,58 @@ bool GekkoFyre::CmnRoutines::modifyTorrentItem(const std::string &unique_id, con
 }
 
 /**
- * @brief GekkoFyre::CmnRoutines::writeTorrentItem writes BitTorrent related information to a Google LevelDB database that is kept on
+ * @brief GekkoFyre::CmnRoutines::addTorrentItem writes BitTorrent related information to a Google LevelDB database that is kept on
  * the user's local storage within the home directory. This information is stored in a readibly parsable XML format.
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
  * @date 2017-07
  * @param gk_ti The BitTorrent related information to write to the database.
  * @return Whether the write operation proceeded successfully or not.
  */
-bool GekkoFyre::CmnRoutines::writeTorrentItem(GekkoFyre::GkTorrent::TorrentInfo &gk_ti)
+bool GekkoFyre::CmnRoutines::addTorrentItem(GekkoFyre::GkTorrent::TorrentInfo &gk_ti)
 {
     try {
-        GekkoFyre::GkFile::FileDb db_struct = openDatabase(CFG_HISTORY_DB_FILE);
-        leveldb::Status s;
         if (!gk_ti.general.down_dest.empty()) {
-            if (s.ok()) {
-                // Proceed, the database status is 'okay'!
-                if (gk_ti.general.dlStatus == GekkoFyre::DownloadStatus::Stopped || gk_ti.general.dlStatus == GekkoFyre::DownloadStatus::Invalid ||
-                    gk_ti.general.dlStatus == GekkoFyre::DownloadStatus::Unknown) {
-                    QDateTime now = QDateTime::currentDateTime();
-                    gk_ti.general.insert_timestamp = now.toTime_t();
+            GekkoFyre::GkFile::FileDb db_struct = openDatabase(CFG_HISTORY_DB_FILE);
+            QDateTime now = QDateTime::currentDateTime();
+            gk_ti.general.insert_timestamp = now.toTime_t();
 
-                    std::string download_key = add_download_id(gk_ti.general.down_dest, db_struct, true, gk_ti.general.unique_id);
-                    add_item_db(download_key, LEVELDB_KEY_TORRENT_INSERT_DATE, std::to_string(gk_ti.general.insert_timestamp), db_struct);
-                    add_item_db(download_key, LEVELDB_KEY_TORRENT_COMPLT_DATE, std::to_string(gk_ti.general.complt_timestamp), db_struct);
-                    add_item_db(download_key, LEVELDB_KEY_TORRENT_CREATN_DATE, std::to_string(gk_ti.general.creatn_timestamp), db_struct);
-                    add_item_db(download_key, LEVELDB_KEY_TORRENT_DLSTATUS, convDlStat_toString(gk_ti.general.dlStatus).toStdString(), db_struct);
-                    add_item_db(download_key, LEVELDB_KEY_TORRENT_TORRNT_COMMENT, gk_ti.general.comment, db_struct);
-                    add_item_db(download_key, LEVELDB_KEY_TORRENT_TORRNT_CREATOR, gk_ti.general.creator, db_struct);
-                    add_item_db(download_key, LEVELDB_KEY_TORRENT_MAGNET_URI, gk_ti.general.magnet_uri, db_struct);
-                    add_item_db(download_key, LEVELDB_KEY_TORRENT_TORRNT_NAME, gk_ti.general.torrent_name, db_struct);
-                    add_item_db(download_key, LEVELDB_KEY_TORRENT_NUM_FILES, std::to_string(gk_ti.general.num_files), db_struct);
-                    add_item_db(download_key, LEVELDB_KEY_TORRENT_TORRNT_PIECES, std::to_string(gk_ti.general.num_pieces), db_struct);
-                    add_item_db(download_key, LEVELDB_KEY_TORRENT_TORRNT_PIECE_LENGTH, std::to_string(gk_ti.general.piece_length), db_struct);
-
-                    //
-                    // Files and Trackers
-                    //
-                    return true;
-                }
-            } else {
-                // There is a problem with the database!
-                throw std::runtime_error(tr("There is an issue with the database! Error: %1").arg(QString::fromStdString(s.ToString())).toStdString());
+            std::string download_key = add_download_id(gk_ti.general.down_dest, db_struct, true, gk_ti.general.unique_id);
+            if (gk_ti.general.unique_id != download_key) {
+                throw std::invalid_argument(tr("Unique ID mismatch while adding a BitTorrent item!\n\n%1 != %2")
+                                                    .arg(QString::fromStdString(gk_ti.general.unique_id))
+                                                    .arg(QString::fromStdString(download_key)).toStdString());
             }
+
+            add_item_db(download_key, LEVELDB_KEY_TORRENT_INSERT_DATE, std::to_string(gk_ti.general.insert_timestamp), db_struct);
+            add_item_db(download_key, LEVELDB_KEY_TORRENT_COMPLT_DATE, std::to_string(gk_ti.general.complt_timestamp), db_struct);
+            add_item_db(download_key, LEVELDB_KEY_TORRENT_CREATN_DATE, std::to_string(gk_ti.general.creatn_timestamp), db_struct);
+            add_item_db(download_key, LEVELDB_KEY_TORRENT_DLSTATUS, convDlStat_toString(gk_ti.general.dlStatus).toStdString(), db_struct);
+            add_item_db(download_key, LEVELDB_KEY_TORRENT_TORRNT_COMMENT, gk_ti.general.comment, db_struct);
+            add_item_db(download_key, LEVELDB_KEY_TORRENT_TORRNT_CREATOR, gk_ti.general.creator, db_struct);
+            add_item_db(download_key, LEVELDB_KEY_TORRENT_MAGNET_URI, gk_ti.general.magnet_uri, db_struct);
+            add_item_db(download_key, LEVELDB_KEY_TORRENT_TORRNT_NAME, gk_ti.general.torrent_name, db_struct);
+            add_item_db(download_key, LEVELDB_KEY_TORRENT_NUM_FILES, std::to_string(gk_ti.general.num_files), db_struct);
+            add_item_db(download_key, LEVELDB_KEY_TORRENT_TORRNT_PIECES, std::to_string(gk_ti.general.num_pieces), db_struct);
+            add_item_db(download_key, LEVELDB_KEY_TORRENT_TORRNT_PIECE_LENGTH, std::to_string(gk_ti.general.piece_length), db_struct);
+
+            //
+            // Files
+            //
+            bool wtf_ret = write_torrent_files_addendum(gk_ti.files_vec, download_key, db_struct);
+
+            //
+            // Trackers
+            //
+            bool wtt_ret = write_torrent_trkrs_addendum(gk_ti.trackers, download_key, db_struct);
+
+            if (!wtf_ret || !wtt_ret) {
+                QMessageBox::warning(nullptr, tr("Error!"), tr("There was an error with inserting the following BitTorrent "
+                                                                       "item into the database: \"%1\".")
+                        .arg(QString::fromStdString(gk_ti.general.torrent_name)), QMessageBox::Ok);
+                return false;
+            }
+
+            return true;
         }
     } catch (const std::exception &e) {
         QMessageBox::warning(nullptr, tr("Error!"), e.what(), QMessageBox::Ok);
@@ -1276,7 +1302,7 @@ bool GekkoFyre::CmnRoutines::writeTorrentItem(GekkoFyre::GkTorrent::TorrentInfo 
 
 /**
  * @brief GekkoFyre::CmnRoutines::readTorrentItem extracts all of the users stored history relating to BitTorrent from a
- * Google LevelDB database and parses the XML therein, caching whatever it can in memory to speed up the process.
+ * Google LevelDB database and parses any CSV therein, caching whatever it can in memory to speed up the process.
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
  * @date 2017-07
  * @param minimal_readout only extracts the most vital history information, thus (potentially) saving CPU time and
@@ -1285,6 +1311,72 @@ bool GekkoFyre::CmnRoutines::writeTorrentItem(GekkoFyre::GkTorrent::TorrentInfo 
  */
 std::vector<GekkoFyre::GkTorrent::TorrentInfo> GekkoFyre::CmnRoutines::readTorrentItem(const bool &minimal_readout)
 {
+    try {
+        // TODO: Implement 'minimal_readout' as originally designed!
+        GekkoFyre::GkFile::FileDb db_struct = openDatabase(CFG_HISTORY_DB_FILE);
+        auto download_ids = extract_download_ids(db_struct, true);
+        if (!download_ids.empty()) {
+            std::vector<GekkoFyre::GkTorrent::TorrentInfo> output;
+            for (auto const &id: download_ids.toStdMap()) {
+                GekkoFyre::GkTorrent::TorrentInfo to_info;
+                if (!id.second.second) { // Therefore not a BitTorrent item
+                    std::string joined_key = id.first;
+                    size_t pos = 0;
+                    std::string delimeter = "_";
+                    std::string token;
+                    std::vector<std::string> split_key;
+                    while ((pos = joined_key.find(delimeter)) != std::string::npos) {
+                        token = joined_key.substr(0, pos);
+                        split_key.push_back(token);
+                        joined_key.erase(0, (pos + delimeter.length()));
+                    }
+
+                    split_key.push_back(joined_key);
+                    auto db_read = read_item_db(joined_key, db_struct);
+
+                    for (const auto &key: split_key) {
+                        GekkoFyre::GkTorrent::GeneralInfo gen_info;
+                        if (key == LEVELDB_KEY_TORRENT_INSERT_DATE) {
+                            gen_info.insert_timestamp = std::atoll(id.second.first.c_str());
+                        } else if (key == LEVELDB_KEY_TORRENT_COMPLT_DATE) {
+                            gen_info.complt_timestamp = std::atoll(id.second.first.c_str());
+                        } else if (key == LEVELDB_KEY_TORRENT_CREATN_DATE) {
+                            gen_info.creatn_timestamp = std::atol(id.second.first.c_str());
+                        } else if (key == LEVELDB_KEY_TORRENT_DLSTATUS) {
+                            gen_info.dlStatus = convDlStat_StringToEnum(QString::fromStdString(id.second.first));
+                        } else if (key == LEVELDB_KEY_TORRENT_TORRNT_COMMENT) {
+                            gen_info.comment = id.second.first;
+                        } else if (key == LEVELDB_KEY_TORRENT_TORRNT_CREATOR) {
+                            gen_info.creator = id.second.first;
+                        } else if (key == LEVELDB_KEY_TORRENT_MAGNET_URI) {
+                            gen_info.magnet_uri = id.second.first;
+                        } else if (key == LEVELDB_KEY_TORRENT_TORRNT_NAME) {
+                            gen_info.torrent_name = id.second.first;
+                        } else if (key == LEVELDB_KEY_TORRENT_NUM_FILES) {
+                            gen_info.num_files = std::atoi(id.second.first.c_str());
+                        } else if (key == LEVELDB_KEY_TORRENT_TORRNT_PIECES) {
+                            gen_info.num_pieces = std::atoi(id.second.first.c_str());
+                        } else if (key == LEVELDB_KEY_TORRENT_TORRNT_PIECE_LENGTH) {
+                            gen_info.piece_length = std::atoi(id.second.first.c_str());
+                        } else {
+                            // TODO: Make sure this actually reads as the file-location!
+                            gen_info.down_dest = id.second.first;
+                        }
+
+                        to_info.general = gen_info;
+                    }
+                }
+
+                output.push_back(to_info);
+            }
+
+            return output;
+        }
+    } catch (const std::exception &e) {
+        QMessageBox::warning(nullptr, tr("Error!"), e.what(), QMessageBox::Ok);
+        return std::vector<GekkoFyre::GkTorrent::TorrentInfo>();
+    }
+
     return std::vector<GekkoFyre::GkTorrent::TorrentInfo>();
 }
 
@@ -1594,4 +1686,160 @@ QString GekkoFyre::CmnRoutines::numberConverter(const double &value)
         QString conv = bytesToKilobytes(value);
         return conv;
     }
+}
+
+bool GekkoFyre::CmnRoutines::write_torrent_files_addendum(const std::vector<GekkoFyre::GkTorrent::TorrentFile> &to_files_vec,
+                                                          const std::string &download_key,
+                                                          const GekkoFyre::GkFile::FileDb &db_struct) noexcept
+{
+    if (!to_files_vec.empty()) {
+        static int counter;
+        counter = 0;
+        for (const auto &f: to_files_vec) {
+            ++counter;
+            std::string file_key, mapflepce_key;
+            std::ostringstream file_write_data, mapflepce_write_data;
+            leveldb::WriteOptions write_options;
+            leveldb::WriteBatch batch;
+
+            file_key = multipart_key({download_key, LEVELDB_KEY_TORRENT_TORRENT_FILES, std::to_string(counter)});
+            mapflepce_key = multipart_key({download_key, LEVELDB_CHILD_NODE_TORRENT_FILES_MAPFLEPCE, std::to_string(counter)});
+            write_options.sync = true;
+            batch.Delete(file_key);
+            batch.Delete(mapflepce_key);
+
+            file_write_data << LEVELDB_CSV_TORRENT_FILE_PATH << "," << LEVELDB_CSV_TORRENT_FILE_CONTENT_LENGTH << ",";
+            file_write_data << LEVELDB_CSV_TORRENT_FILE_SHA1 << "," << LEVELDB_CSV_TORRENT_FILE_FILE_OFFSET << ",";
+            file_write_data << LEVELDB_CSV_TORRENT_FILE_MTIME << "," << LEVELDB_CSV_TORRENT_FILE_MAPFLEPCE_KEY ",";
+            file_write_data << LEVELDB_CSV_TORRENT_FILE_BOOL_DLED << "," << LEVELDB_CSV_TORRENT_FILE_FLAGS << std::endl;
+            file_write_data << f.file_path << "," << std::to_string(f.content_length) << "," << f.sha1_hash_hex << ",";
+            file_write_data << std::to_string(f.file_offset) << "," << std::to_string(f.mtime) << ",";
+            file_write_data << mapflepce_key << "," << std::to_string(f.downloaded) << "," << std::to_string(f.flags);
+
+            mapflepce_write_data << LEVELDB_CSV_TORRENT_MAPFLEPCE_1 << "," << LEVELDB_CSV_TORRENT_MAPFLEPCE_2 << std::endl;
+            mapflepce_write_data << std::to_string(f.map_file_piece.first) << "," << std::to_string(f.map_file_piece.second);
+
+            batch.Put(file_key, file_write_data.str());
+            batch.Put(mapflepce_key, mapflepce_write_data.str());
+            leveldb::Status s;
+            s = db_struct.db->Write(write_options, &batch);
+            if (!s.ok()) {
+                std::cerr << tr("Error whilst processing files for BitTorrent item: \"%1\".\nError: ")
+                        .arg(QString::fromStdString(download_key)).toStdString() << s.ToString() << std::endl;
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    return false;
+}
+
+std::vector<GekkoFyre::GkTorrent::TorrentFile> GekkoFyre::CmnRoutines::read_torrent_files_addendum(const int &num_files, const std::string &download_key,
+                                                                                                   const GekkoFyre::GkFile::FileDb &db_struct) noexcept
+{
+    if (num_files > 0) {
+        static int counter;
+        counter = (num_files + 1);
+        std::vector<GekkoFyre::GkTorrent::TorrentFile> to_file;
+        while (counter != 0) {
+            --counter;
+            std::string file_key, csv_file_data;
+            leveldb::ReadOptions read_opt;
+            leveldb::Status s;
+            read_opt.verify_checksums = true;
+
+            file_key = multipart_key({download_key, LEVELDB_KEY_TORRENT_TORRENT_FILES, std::to_string(counter)});
+            s = db_struct.db->Get(read_opt, file_key, &csv_file_data);
+            if (!s.ok()) {
+                std::cerr << tr("Error whilst processing files for BitTorrent item: \"%1\".\nError: ")
+                        .arg(QString::fromStdString(download_key)).toStdString() << s.ToString() << std::endl;
+                return std::vector<GekkoFyre::GkTorrent::TorrentFile>();
+            }
+
+            io::CSVReader<LEVELDB_CSV_TORRENT_FILE_COLS> csv_parse(csv_file_data);
+            csv_parse.read_header(io::ignore_no_column, LEVELDB_CSV_TORRENT_FILE_PATH, LEVELDB_CSV_TORRENT_FILE_CONTENT_LENGTH,
+                                  LEVELDB_CSV_TORRENT_FILE_SHA1, LEVELDB_CSV_TORRENT_FILE_FILE_OFFSET, LEVELDB_CSV_TORRENT_FILE_MTIME,
+                                  LEVELDB_CSV_TORRENT_FILE_MAPFLEPCE_KEY, LEVELDB_CSV_TORRENT_FILE_BOOL_DLED, LEVELDB_CSV_TORRENT_FILE_FLAGS);
+            if (!csv_parse.has_column(LEVELDB_CSV_TORRENT_FILE_PATH) || !csv_parse.has_column(LEVELDB_CSV_TORRENT_FILE_CONTENT_LENGTH) ||
+                    !csv_parse.has_column(LEVELDB_CSV_TORRENT_FILE_FILE_OFFSET) || !csv_parse.has_column(LEVELDB_CSV_TORRENT_FILE_BOOL_DLED)) {
+                QMessageBox::warning(nullptr, tr("Error!"), tr("Missing vital data as FyreDL attempts to import BitTorrent item, \"%1\".")
+                        .arg(QString::fromStdString(download_key)), QMessageBox::Ok);
+            }
+
+            std::string file_path, sha1, flags, content_length, file_offset, mod_time, mapflepce_key, bool_dled;
+            while (csv_parse.read_row(file_path, content_length, sha1, file_offset, mod_time, mapflepce_key, bool_dled, flags)) {
+                GekkoFyre::GkTorrent::TorrentFile item;
+                item.file_path = file_path;
+                item.content_length = std::atol(content_length.c_str());
+                item.sha1_hash_hex = sha1;
+                item.file_offset = std::atol(file_offset.c_str());
+                item.mtime = std::atoi(mod_time.c_str());
+                item.downloaded = convertBool_fromInt(std::atoi(bool_dled.c_str()));
+                item.flags = std::atoi(flags.c_str());
+
+                std::string csv_mapflepce_data;
+                s = db_struct.db->Get(read_opt, mapflepce_key, &csv_mapflepce_data);
+                if (!s.ok()) {
+                    std::cerr << tr("Error whilst processing files for BitTorrent item: \"%1\".\nError: ")
+                            .arg(QString::fromStdString(download_key)).toStdString() << s.ToString() << std::endl;
+                    return std::vector<GekkoFyre::GkTorrent::TorrentFile>();
+                }
+
+                io::CSVReader<LEVELDB_CSV_TORRENT_MAPFLEPCE_COLS> csv_mapflepce_parse(csv_mapflepce_data);
+                csv_mapflepce_parse.read_header(io::ignore_no_column, LEVELDB_CSV_TORRENT_MAPFLEPCE_1, LEVELDB_CSV_TORRENT_MAPFLEPCE_2);
+                if (!csv_mapflepce_parse.has_column(LEVELDB_CSV_TORRENT_MAPFLEPCE_1) ||
+                        !csv_mapflepce_parse.has_column(LEVELDB_CSV_TORRENT_MAPFLEPCE_2)) {
+                    QMessageBox::warning(nullptr, tr("Error!"), tr("Missing vital data as FyreDL attempts to import BitTorrent item, \"%1\".")
+                            .arg(QString::fromStdString(download_key)), QMessageBox::Ok);
+                }
+
+                std::string mapflepce_1, mapflepce_2;
+                while (csv_mapflepce_parse.read_row(mapflepce_1, mapflepce_2)) {
+                    item.map_file_piece.first = std::atoi(mapflepce_1.c_str());
+                    item.map_file_piece.second = std::atoi(mapflepce_2.c_str());
+                    break;
+                }
+
+                to_file.push_back(item);
+            }
+        }
+
+        return to_file;
+    }
+
+    return std::vector<GekkoFyre::GkTorrent::TorrentFile>();
+}
+
+bool GekkoFyre::CmnRoutines::write_torrent_trkrs_addendum(const std::vector<GekkoFyre::GkTorrent::TorrentTrackers> &to_trackers_vec,
+                                                          const std::string &download_key,
+                                                          const GekkoFyre::GkFile::FileDb &db_struct) noexcept {
+    if (!to_trackers_vec.empty()) {
+        static int counter;
+        counter = 0;
+        for (const auto &t: to_trackers_vec) {
+            ++counter;
+            std::string tracker_key;
+            std::ostringstream tracker_write_data;
+            leveldb::WriteOptions write_options;
+            leveldb::WriteBatch batch;
+
+            tracker_key = multipart_key({download_key, LEVELDB_KEY_TORRENT_TRACKERS, std::to_string(counter)});
+            write_options.sync = true;
+            batch.Delete(tracker_key);
+
+            tracker_write_data << t.url << "," << std::to_string(t.tier) << "," << std::to_string(t.enabled);
+            batch.Put(tracker_key, tracker_write_data.str());
+            leveldb::Status s;
+            s = db_struct.db->Write(write_options, &batch);
+            if (!s.ok()) {
+                std::cerr << tr("Error whilst processing trackers for BitTorrent item: \"%1\".\nError: ")
+                        .arg(QString::fromStdString(download_key)).toStdString() << s.ToString() << std::endl;
+                return false;
+            }
+        }
+    }
+
+    return false;
 }

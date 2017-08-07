@@ -205,7 +205,7 @@ void AddURL::on_buttonBox_accepted()
                                                                             fs::path::preferred_separator +
                                                                             fs::path(gk_torrent_data.general.torrent_name).stem().string() +
                                                                             fs::path::preferred_separator);
-                    routines->writeTorrentItem(gk_torrent_data);
+                    routines->addTorrentItem(gk_torrent_data);
                     emit sendDetails(gk_torrent_data.general.torrent_name, ((double)gk_torrent_data.general.num_pieces * (double)gk_torrent_data.general.piece_length),
                                      0, 0, 0, 0, GekkoFyre::DownloadStatus::Stopped, gk_torrent_data.general.magnet_uri, gk_torrent_data.general.down_dest,
                                      GekkoFyre::HashType::None, "", 0, true, "", gk_torrent_data.general.unique_id, GekkoFyre::DownloadType::Torrent);

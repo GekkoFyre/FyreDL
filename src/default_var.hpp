@@ -125,16 +125,6 @@ extern "C" {
 
 #define LEVELDB_STORE_UNIQUE_ID "store-unique-id"
 
-#define LEVELDB_PARENT_NODE "fyredl-db"
-#define LEVELDB_CHILD_NODE_VERS "fyredl-xml"
-#define LEVELDB_CHILD_ITEM_VERS "version"
-#define LEVELDB_ITEM_ATTR_VERS_NO "supported"                 // The supported XML file version for this particular FyreDL build
-#define LEVELDB_XML_CHILD_NODE "item"
-#define LEVELDB_XML_ATTR_DL_TYPE "dl-type"
-#define LEVELDB_XML_ATTR_ITEM_VALUE "value"
-#define LEVELDB_ITEM_ATTR_UNIQUE_ID "unique-id"
-
-#define LEVELDB_KEY_CURL_FLOC "curl-floc"                     // Location of the file on user's storage disk
 #define LEVELDB_KEY_CURL_STAT "curl-stat"                     // The download status (i.e., downloading, completed, unknown, etc.)
 #define LEVELDB_KEY_CURL_INSERT_DATE "curl-insrt-date"        // Date and time upon which the download was added to the XML history file
 #define LEVELDB_KEY_CURL_COMPLT_DATE "curl-complt-date"       // Date and time upon which the download was completed
@@ -147,7 +137,6 @@ extern "C" {
 #define LEVELDB_KEY_CURL_HASH_VAL_RTRND "curl-hash-val-rtrnd" // The hash-value that was calculated after the download (presumably) succeeded
 #define LEVELDB_KEY_CURL_HASH_SUCC_TYPE "curl-hash-succ-type" // Whether the calculated hash of the download matched the given hash or not
 
-#define LEVELDB_KEY_TORRENT_FLOC "to-dest"
 #define LEVELDB_KEY_TORRENT_INSERT_DATE "to-insert-date"
 #define LEVELDB_KEY_TORRENT_COMPLT_DATE "to-complt-date"
 #define LEVELDB_KEY_TORRENT_CREATN_DATE "to-creatn-date"
@@ -160,20 +149,7 @@ extern "C" {
 #define LEVELDB_KEY_TORRENT_TORRNT_PIECES "num-pieces"
 #define LEVELDB_KEY_TORRENT_TORRNT_PIECE_LENGTH "piece-length"
 #define LEVELDB_KEY_TORRENT_TORRENT_FILES "to-files"
-#define LEVELDB_CHILD_FILES_PATH_TORRENT "path"
-#define LEVELDB_CHILD_FILES_HASH_TORRENT "hash"
-#define LEVELDB_CHILD_FILES_CONTLNGTH_TORRENT "size"
-#define LEVELDB_CHILD_FILES_MTIME_TORRENT "mtime"
 #define LEVELDB_CHILD_NODE_TORRENT_FILES_MAPFLEPCE "map-file-piece"
-#define LEVELDB_CHILD_NODE_TORRENT_TRACKERS "to-trackers"
-#define LEVELDB_CHILD_TRACKERS_URL_TORRENT "url"
-#define LEVELDB_CHILD_TRACKERS_AVAILABLE_TORRENT "enabled"
-#define LEVELDB_CHILD_FILES_FLAGS_TORRENT "flags"
-#define LEVELDB_CHILD_FILES_FILEOFFST_TORRENT "offset"
-#define LEVELDB_CHILD_FILES_MAPFLEPCE_1_TORRENT "first"
-#define LEVELDB_CHILD_FILES_MAPFLEPCE_2_TORRENT "second"
-#define LEVELDB_CHILD_FILES_DOWNBOOL_TORRENT "dled"
-#define LEVELDB_CHILD_TRACKERS_TIER_TORRENT "tier"
 #define LEVELDB_KEY_TORRENT_TRACKERS "to-extra-trackers"
 
 // XML configuration
@@ -214,7 +190,21 @@ extern "C" {
 #define LEVELDB_CSV_UNIQUE_ID_COLS 3
 #define LEVELDB_CSV_UID_KEY "unique-id"
 #define LEVELDB_CSV_UID_VALUE1 "file-loc"
-    #define LEVELDB_CSV_UID_VALUE2 "is-torrent"
+#define LEVELDB_CSV_UID_VALUE2 "is-torrent"
+
+#define LEVELDB_CSV_TORRENT_FILE_COLS 8
+#define LEVELDB_CSV_TORRENT_FILE_PATH "file-path"
+#define LEVELDB_CSV_TORRENT_FILE_SHA1 "sha1-hash"
+#define LEVELDB_CSV_TORRENT_FILE_FLAGS "flags"
+#define LEVELDB_CSV_TORRENT_FILE_CONTENT_LENGTH "content-length"
+#define LEVELDB_CSV_TORRENT_FILE_FILE_OFFSET "file-offset"
+#define LEVELDB_CSV_TORRENT_FILE_MTIME "mod-time"
+#define LEVELDB_CSV_TORRENT_FILE_MAPFLEPCE_KEY "mapflepce-key"
+#define LEVELDB_CSV_TORRENT_FILE_BOOL_DLED "downloaded-bool"
+
+#define LEVELDB_CSV_TORRENT_MAPFLEPCE_COLS 2
+#define LEVELDB_CSV_TORRENT_MAPFLEPCE_1 "mapflepce-1"
+#define LEVELDB_CSV_TORRENT_MAPFLEPCE_2 "mapflepce-2"
 
 // [ Enum values ]
 // Download Types
