@@ -159,7 +159,7 @@ void MainWindow::readFromHistoryFile()
     std::vector<GekkoFyre::GkCurl::CurlDlInfo> dl_history;
     std::vector<GekkoFyre::GkTorrent::TorrentInfo> gk_torrent_history;
     dl_history = routines->readCurlItems();
-    gk_torrent_history = routines->readTorrentItem(true);
+    gk_torrent_history = routines->readTorrentItems(true);
 
     dlModel->removeRows(0, (int)dl_history.size(), QModelIndex());
     for (size_t i = 0; i < dl_history.size(); ++i) {
@@ -457,7 +457,7 @@ void MainWindow::initCharts(const QString &unique_id, const QString &down_dest,
         } else if (download_type == GekkoFyre::DownloadType::Torrent ||
                 download_type == GekkoFyre::DownloadType::TorrentMagnetLink) {
             // Download type is BitTorrent
-            std::vector<GekkoFyre::GkTorrent::TorrentInfo> gk_torrent_info = routines->readTorrentItem(false);
+            std::vector<GekkoFyre::GkTorrent::TorrentInfo> gk_torrent_info = routines->readTorrentItems(false);
             for (size_t j = 0; j < gk_torrent_info.size(); ++j) {
                 if (gk_torrent_info.at(j).general.unique_id == graph_info.unique_id.toStdString()) {
                     graph_info.to_info = gk_torrent_info.at(j);
@@ -542,7 +542,7 @@ void MainWindow::contentsView_update()
                                     gk_dl_info_cache.at(k).dl_type == GekkoFyre::DownloadType::TorrentMagnetLink) {
 
                                 // Read the XML data into memory
-                                std::vector<GekkoFyre::GkTorrent::TorrentInfo> gk_ti = routines->readTorrentItem(false);
+                                std::vector<GekkoFyre::GkTorrent::TorrentInfo> gk_ti = routines->readTorrentItems(false);
                                 std::ostringstream oss_data;
                                 for (size_t i = 0; i < gk_ti.size(); ++i) {
                                     if (gk_ti.at(i).general.unique_id == unique_id.toStdString()) {
@@ -821,7 +821,7 @@ void MainWindow::startTorrentDl(const QString &unique_id, const bool &resumeDl)
 {
     QModelIndexList indexes = ui->downloadView->selectionModel()->selectedRows();
     QModelIndex index = dlModel->index(indexes.at(0).row(), MN_STATUS_COL, QModelIndex());
-    std::vector<GekkoFyre::GkTorrent::TorrentInfo> gk_ti = routines->readTorrentItem(false);
+    std::vector<GekkoFyre::GkTorrent::TorrentInfo> gk_ti = routines->readTorrentItems(false);
     for (auto const &indice: gk_ti) {
         if (indice.general.unique_id == unique_id.toStdString()) {
             QObject::connect(gk_torrent_client, SIGNAL(xfer_torrent_info(GekkoFyre::GkTorrent::TorrentResumeInfo)), this, SLOT(recvBitTorrent_XferStats(GekkoFyre::GkTorrent::TorrentResumeInfo)));

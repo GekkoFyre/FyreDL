@@ -84,12 +84,10 @@ extern "C" {
 #define FYREDL_USER_AGENT "FyreDL/0.0.1"                 // The user-agent displayed externally by FyreDL, along with the application version.
 #define FYREDL_FINGERPRINT "FyreDL"                      // Fingerprint for the client. Has to be no longer than 20-bytes or will be truncated otherwise.
 #define FYREDL_TORRENT_RESUME_FILE_EXT ".fyredl"         // The file extension used for 'resume data' by the BitTorrent side of the FyreDL application
-#define CFG_HISTORY_FILE "fyredl_history.xml"            // The history file-name used by FyreDL. Location is also set within the application's GUI.
 #define CFG_HISTORY_DB_FILE "history.db"
 #define CFG_FILES_DIR_LINUX ".fyredl"                    // The name of the settings directory under Linux systems. This can be found in the users home directory.
 #define CFG_FILES_DIR_WNDWS "FyreDL"                     // The name of the settings directory under Microsoft Windows. This can be found in the users home directory.
-#define CFG_SETTINGS_FILE "fyredl_settings.xml"          // The configuration file-name used by FyreDL. Location is also set within the application's GUI.
-#define CFG_XML_MIN_PARSE_SIZE 12
+#define CFG_CSV_MIN_PARSE_SIZE 12                        // DO NOT MODIFY! Unless you specifically know what you are doing!
 #define ENBL_GUI_CHARTS false                            // Whether to enable charts/graphs within the GUI, to chart the progress of downloads.
 #define ENBL_GUI_CONTENTS_VIEW true                      // Whether to enable the contents view of inside BitTorrents (located at the bottom) within the GUI.
 #define FYREDL_LIBCURL_VERBOSE 1L                        // Set to '1L' if you want libcurl to tell you what it's up to!
@@ -146,6 +144,7 @@ extern "C" {
 #define LEVELDB_KEY_TORRENT_MAGNET_URI "to-magnet-uri"
 #define LEVELDB_KEY_TORRENT_TORRNT_NAME "to-name"
 #define LEVELDB_KEY_TORRENT_NUM_FILES "num-files"
+#define LEVELDB_KEY_TORRENT_NUM_TRACKERS "num-trackers"
 #define LEVELDB_KEY_TORRENT_TORRNT_PIECES "num-pieces"
 #define LEVELDB_KEY_TORRENT_TORRNT_PIECE_LENGTH "piece-length"
 #define LEVELDB_KEY_TORRENT_TORRENT_FILES "to-files"
@@ -205,6 +204,11 @@ extern "C" {
 #define LEVELDB_CSV_TORRENT_MAPFLEPCE_COLS 2
 #define LEVELDB_CSV_TORRENT_MAPFLEPCE_1 "mapflepce-1"
 #define LEVELDB_CSV_TORRENT_MAPFLEPCE_2 "mapflepce-2"
+
+#define LEVELDB_CSV_TORRENT_TRACKER_COLS 3
+#define LEVELDB_CSV_TORRENT_TRACKER_TIER "tier"
+#define LEVELDB_CSV_TORRENT_TRACKER_URL "url"
+#define LEVELDB_CSV_TORRENT_TRACKER_BOOL_ENABLED "bool-enabled"
 
 // [ Enum values ]
 // Download Types
@@ -332,6 +336,7 @@ namespace GekkoFyre {
             std::string magnet_uri;                 // The 'BitTorrent Magnet Link' URI
             std::string torrent_name;               // Name of the torrent
             int num_files;                          // How many files are contained within this torrent
+            int num_trackers;                       // How many trackers are contained within this torrent
             int num_pieces;                         // How many pieces are contained within this torrent
             int piece_length;                       // The length of each piece
         };
