@@ -44,21 +44,21 @@
 #define GKCSV_HPP
 
 #include "default_var.hpp"
-#include <vector>
+
 #include <utility>
 #include <algorithm>
 #include <numeric>
+#include <list>
 #include <string>
 #include <sstream>
-#include <list>
 #include <unordered_map>
 
 namespace GekkoFyre {
-class GkLineReader {
-protected:
-    GkLineReader() = delete;
-    GkLineReader(const GkLineReader&) = delete;
-    explicit GkLineReader(const std::string &csv_data);
+class GkCsvReader {
+public:
+    GkCsvReader() = delete;
+    GkCsvReader(const GkCsvReader&) = delete;
+    explicit GkCsvReader(const std::string &csv_data);
 
     template<typename T>
     std::string to_string(const T &value) {
@@ -72,38 +72,29 @@ protected:
     }
 
     template<typename ...Ts>
-    void parse_headers(Ts... args) {
-        std::iota(columns.begin(), columns.end(), columns.back());
-        headers.insert(std::make_pair(columns.back(), to_string(args...)));
+    void parse_headers(const int &num_cols, Ts... args) {
+        columns_count = num_cols;
+        headers.push_back(to_string(args...));
     }
 
     virtual bool has_column(const std::string &name);
     virtual void parse_csv(std::string *args, ...);
+    virtual int determine_column(const std::string &header);
 
 private:
     std::stringstream csv_raw_data;
-    std::list<int> columns;
-    std::list<int> rows;
-    std::unordered_map<int, std::string> headers;                       // The key is the column number, whilst the value is the header associated with that column.
-    std::unordered_multimap<int, std::pair<int, std::string>> values;   // The key is the row number, whilst the values are the column number and comma-separated-values.
+    int columns_count;
+    int rows_count;
+    std::list<std::string> headers;                  // The key is the column number, whilst the value is the header associated with that column.
+    std::unordered_multimap<int, std::pair<int, std::string>> csv; // The key is the row number, whilst the values are the column number and comma-separated-values.
 
     template<typename Container>
     bool search_string(const Container &cont, const std::string &to_find) {
         return std::search(cont.begin(), cont.end(), to_find.begin(), to_find.end()) != cont.end();
     }
 
-    std::unordered_map<int, std::string> read_lines();
-};
-
-class GkCsvReader : GkLineReader {
-private:
-    GkLineReader parse;
-
-public:
-    GkCsvReader() = delete;
-    GkCsvReader(const GkCsvReader&) = delete;
-    template<class ...Args>
-    explicit GkCsvReader(Args&&...args);
+    std::unordered_map<int, std::string> read_rows();
+    std::unordered_map<int, std::string> split_values(std::stringstream raw_csv_line);
 };
 }
 

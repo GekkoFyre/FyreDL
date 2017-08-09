@@ -43,19 +43,41 @@
 #include "csv.hpp"
 #include <iostream>
 
-GekkoFyre::GkLineReader::GkLineReader(const std::string &csv_data)
+GekkoFyre::GkCsvReader::GkCsvReader(const std::string &csv_data)
 {
     if (!csv_data.empty()) {
         csv_raw_data << csv_data;
     }
 }
 
-bool GekkoFyre::GkLineReader::has_column(const std::string &name)
+bool GekkoFyre::GkCsvReader::has_column(const std::string &name)
 {
+    auto rows = read_rows();
+    if (!rows.empty()) {
+        for (const auto &row: rows) {
+            // Key is the row number and value is the row of raw data
+            auto cols = split_values(std::stringstream(row.second));
+            if (row.first == 0) {
+                // Determine headers
+                for (const auto &col: cols) {
+                    if (col.second == name) {
+                        return true;
+                    }
+                }
+            }
+        }
+    }
+
     return false;
 }
 
-std::unordered_map<int, std::string> GekkoFyre::GkLineReader::read_lines()
+/**
+ * @brief GekkoFyre::GkCvsReader::read_rows reads each row of the CSV data and outputs them into a STL container.
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @date 2017-08-09
+ * @return A std::unordered_map where the key is the row number, and the value is the row of raw data.
+ */
+std::unordered_map<int, std::string> GekkoFyre::GkCsvReader::read_rows()
 {
     std::unordered_map<int, std::string> lines;
     if (!csv_raw_data.str().empty()) {
@@ -66,17 +88,92 @@ std::unordered_map<int, std::string> GekkoFyre::GkLineReader::read_lines()
             throw std::invalid_argument("Unable to find any suitable line-endings for the given CSV data!");
         }
 
+        if (rows_count != 0) {
+            rows_count = 0;
+        }
+
         std::string row;
         while (std::getline(csv_raw_data, row, '\n')) {
-            std::iota(rows.begin(), rows.end(), rows.back());
-            lines.insert(std::make_pair(rows.back(), row));
+            ++rows_count;
+            lines.insert(std::make_pair(rows_count, row));
         }
     }
 
     return lines;
 }
 
-void GekkoFyre::GkLineReader::parse_csv(std::string *args, ...)
+void GekkoFyre::GkCsvReader::parse_csv(std::string *args, ...)
 {
+    auto rows = read_rows();
+    if (!rows.empty()) {
+        for (const auto &row: rows) {
+            // Key is the row number and value is the row of raw data
+            auto cols = split_values(std::stringstream(row.second));
+            if (row.first == 0) {
+                // Determine headers
+                for (const auto &col: cols) {
+                    for (const auto &header: headers) {
+                        if (col.second != header) {
+                            std::cerr << "Unattributed column found, \"" << col.second << "\" whilst parsing CSV data! Ignoring..." << std::endl;
+                        }
+                    }
+                }
+            } else {
+                for (const auto &col: cols) {
+                    csv.insert(std::make_pair(row.first, std::make_pair(col.first, col.second)));
+                }
+            }
+        }
+    }
+
     return;
+}
+
+/**
+ * @brief GekkoFyre::GkCvsReader::determine_column will determine the given column number for a header.
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @date 2017-08-09
+ * @param header The header you wish to determine the column number for.
+ * @return The column number for a given header. If integer '-1' is returned, the header was not found.
+ */
+int GekkoFyre::GkCsvReader::determine_column(const std::string &header)
+{
+    auto rows = read_rows();
+    if (!rows.empty()) {
+        for (const auto &row: rows) {
+            // Key is the row number and value is the row of raw data
+            auto cols = split_values(std::stringstream(row.second));
+            if (row.first == 0) {
+                // Determine headers
+                for (const auto &col: cols) {
+                    if (col.second == header) {
+                        return col.first;
+                    }
+                }
+            }
+        }
+    }
+
+    return -1;
+}
+
+/**
+ * @brief GekkoFyre::GkCvsReader::split_values splits a single row into its individual columns.
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @date 2017-08-09
+ * @param raw_csv_line The raw line of CSV data to parse.
+ * @return Outputs a std::unordered_map with the key being the column number and the value being the information
+ * in that column.
+ */
+std::unordered_map<int, std::string> GekkoFyre::GkCsvReader::split_values(std::stringstream raw_csv_line)
+{
+    std::string csv;
+    std::unordered_map<int, std::string> output;
+    int col = 0;
+    while (std::getline(raw_csv_line, csv, ',')) {
+        ++col;
+        output.insert(std::make_pair(col, csv));
+    }
+
+    return output;
 }
