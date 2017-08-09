@@ -34,7 +34,7 @@
  ********************************************************************************/
 
 /**
- * @file cmnroutines.hpp
+ * @file cmnroutines.cpp
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
  * @date 2016-09
  * @brief Commonly encountered routines that are used throughout this application are defined here.
@@ -425,9 +425,6 @@ std::string GekkoFyre::CmnRoutines::add_download_id(const std::string &file_path
 
     std::string csv_read_data;
     s = db_struct.db->Get(read_opt, LEVELDB_STORE_UNIQUE_ID, &csv_read_data);
-    if (!s.ok()) {
-        throw std::runtime_error(s.ToString());
-    }
 
     std::stringstream csv_out;
     if (!csv_read_data.empty() && csv_read_data.size() > CFG_CSV_MIN_PARSE_SIZE) {

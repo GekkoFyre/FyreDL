@@ -85,6 +85,8 @@ set(SOURCE_FILES
         curl_easy.cpp
         curl_multi.hpp
         curl_multi.cpp
+        csv.hpp
+        csv.cpp
         default_var.hpp
         dl_view.hpp
         dl_view.cpp
