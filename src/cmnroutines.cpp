@@ -42,6 +42,7 @@
 
 #include "cmnroutines.hpp"
 #include "default_var.hpp"
+#include "csv.hpp"
 #include "../utils/fast-cpp-csv-parser/csv.h"
 #include <leveldb/db.h>
 #include <leveldb/write_batch.h>
@@ -429,31 +430,11 @@ std::string GekkoFyre::CmnRoutines::add_download_id(const std::string &file_path
     std::stringstream csv_out;
     if (!csv_read_data.empty() && csv_read_data.size() > CFG_CSV_MIN_PARSE_SIZE) {
         QMap<std::string, std::pair<std::string, bool>> cache;
-        io::CSVReader<LEVELDB_CSV_UNIQUE_ID_COLS> csv_in(csv_read_data);
-        csv_in.read_header(io::ignore_no_column, LEVELDB_CSV_UID_KEY, LEVELDB_CSV_UID_VALUE1, LEVELDB_CSV_UID_VALUE2); // If a column with a name is not in the file but is in the argument list, then read_row will not modify the corresponding variable.
-        if (!csv_in.has_column(LEVELDB_CSV_UID_KEY) || !csv_in.has_column(LEVELDB_CSV_UID_VALUE1) ||
-                !csv_in.has_column(LEVELDB_CSV_UID_VALUE2)) {
+        GkCsvReader csv_reader(csv_read_data);
+        csv_reader.add_headers(LEVELDB_CSV_UID_KEY, LEVELDB_CSV_UID_VALUE1, LEVELDB_CSV_UID_VALUE2);
+        if (!csv_reader.has_column(LEVELDB_CSV_UID_KEY) || !csv_reader.has_column(LEVELDB_CSV_UID_VALUE1) ||
+                !csv_reader.has_column(LEVELDB_CSV_UID_VALUE2)) {
             throw std::invalid_argument(tr("Information provided from database is invalid!").toStdString());
-        }
-
-        std::string unique_id, path;
-        int is_torrent_csv;
-        while (csv_in.read_row(unique_id, path, is_torrent_csv)) {
-            if (!cache.contains(unique_id)) {
-                cache.insert(unique_id, std::make_pair(path, convertBool_fromInt(is_torrent_csv)));
-            } else {
-                // The Unique ID already exists! Thus we need to repeat the process and create a new digit until we
-                // find one that is NOT in the database.
-                std::cerr << tr("Unique ID already exists in database! Creating new Unique ID...").toStdString() << std::endl;
-                return add_download_id(file_path, db_struct, is_torrent, override_unique_id);
-            }
-        }
-
-        csv_out << LEVELDB_CSV_UID_KEY << "," << LEVELDB_CSV_UID_VALUE1 << "," << LEVELDB_CSV_UID_VALUE2 << std::endl;
-        for (const auto &item: cache.toStdMap()) {
-            csv_out << item.first << ",";
-            csv_out << item.second.first << ",";
-            csv_out << item.second.second << std::endl;
         }
     }
 

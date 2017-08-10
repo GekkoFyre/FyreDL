@@ -102,17 +102,26 @@ std::unordered_map<int, std::string> GekkoFyre::GkCsvReader::read_rows()
     return lines;
 }
 
-void GekkoFyre::GkCsvReader::parse_csv(std::string *args, ...)
+/**
+ * @brief GekkoFyre::GkCsvReader::parse_csv will parse the CSV data line-by-line and separate out the columns before
+ * inserting them into an std::unordered_map, ready for immediate use or ideally, further processing.
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @date 2017-08-10
+ * @return An std::unordered_map where the key is the row number whilst the values are are the column number and the
+ * comma-separated-values.
+ */
+std::unordered_multimap<int, std::pair<int, std::string>> GekkoFyre::GkCsvReader::parse_csv()
 {
     auto rows = read_rows();
     if (!rows.empty()) {
+        std::unordered_multimap<int, std::pair<int, std::string>> csv;
         for (const auto &row: rows) {
             // Key is the row number and value is the row of raw data
             auto cols = split_values(std::stringstream(row.second));
             if (row.first == 0) {
                 // Determine headers
                 for (const auto &col: cols) {
-                    for (const auto &header: headers) {
+                    for (const auto &header: headers) { // Check that the given headers match what is found in the CSV data
                         if (col.second != header) {
                             std::cerr << "Unattributed column found, \"" << col.second << "\" whilst parsing CSV data! Ignoring..." << std::endl;
                         }
@@ -124,9 +133,11 @@ void GekkoFyre::GkCsvReader::parse_csv(std::string *args, ...)
                 }
             }
         }
+
+        return csv;
     }
 
-    return;
+    return std::unordered_multimap<int, std::pair<int, std::string>>();
 }
 
 /**

@@ -60,6 +60,16 @@ public:
     GkCsvReader(const GkCsvReader&) = delete;
     explicit GkCsvReader(const std::string &csv_data);
 
+    template<typename ...Ts>
+    void add_headers(Ts... args) {
+        headers = { to_string(args)... };
+    }
+
+    virtual bool has_column(const std::string &name);
+    virtual int determine_column(const std::string &header);
+    virtual std::unordered_multimap<int, std::pair<int, std::string>> parse_csv();
+
+private:
     template<typename T>
     std::string to_string(const T &value) {
         std::ostringstream ss;
@@ -71,22 +81,9 @@ public:
         return value;
     }
 
-    template<typename ...Ts>
-    void parse_headers(const int &num_cols, Ts... args) {
-        columns_count = num_cols;
-        headers.push_back(to_string(args...));
-    }
-
-    virtual bool has_column(const std::string &name);
-    virtual void parse_csv(std::string *args, ...);
-    virtual int determine_column(const std::string &header);
-
-private:
     std::stringstream csv_raw_data;
-    int columns_count;
     int rows_count;
-    std::list<std::string> headers;                  // The key is the column number, whilst the value is the header associated with that column.
-    std::unordered_multimap<int, std::pair<int, std::string>> csv; // The key is the row number, whilst the values are the column number and comma-separated-values.
+    std::list<std::string> headers; // The key is the column number, whilst the value is the header associated with that column.
 
     template<typename Container>
     bool search_string(const Container &cont, const std::string &to_find) {
