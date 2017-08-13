@@ -431,7 +431,7 @@ std::string GekkoFyre::CmnRoutines::add_download_id(const std::string &file_path
     if (!csv_read_data.empty() && csv_read_data.size() > CFG_CSV_MIN_PARSE_SIZE) {
         QMap<std::string, std::pair<std::string, bool>> cache;
         GkCsvReader csv_reader(csv_read_data);
-        csv_reader.add_headers(LEVELDB_CSV_UID_KEY, LEVELDB_CSV_UID_VALUE1, LEVELDB_CSV_UID_VALUE2);
+        csv_reader.add_headers(3, LEVELDB_CSV_UID_KEY, LEVELDB_CSV_UID_VALUE1, LEVELDB_CSV_UID_VALUE2);
         if (!csv_reader.has_column(LEVELDB_CSV_UID_KEY) || !csv_reader.has_column(LEVELDB_CSV_UID_VALUE1) ||
                 !csv_reader.has_column(LEVELDB_CSV_UID_VALUE2)) {
             throw std::invalid_argument(tr("Information provided from database is invalid!").toStdString());
