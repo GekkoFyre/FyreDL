@@ -43,7 +43,6 @@
 #include "cmnroutines.hpp"
 #include "default_var.hpp"
 #include "csv.hpp"
-#include "../utils/fast-cpp-csv-parser/csv.h"
 #include <leveldb/db.h>
 #include <leveldb/write_batch.h>
 #include <leveldb/cache.h>
@@ -432,9 +431,17 @@ std::string GekkoFyre::CmnRoutines::add_download_id(const std::string &file_path
         QMap<std::string, std::pair<std::string, bool>> cache;
         GkCsvReader csv_reader(csv_read_data);
         csv_reader.add_headers(3, LEVELDB_CSV_UID_KEY, LEVELDB_CSV_UID_VALUE1, LEVELDB_CSV_UID_VALUE2);
-        if (!csv_reader.has_column(LEVELDB_CSV_UID_KEY) || !csv_reader.has_column(LEVELDB_CSV_UID_VALUE1) ||
-                !csv_reader.has_column(LEVELDB_CSV_UID_VALUE2)) {
-            throw std::invalid_argument(tr("Information provided from database is invalid!").toStdString());
+
+        std::string uid_key, path, is_torrent_bool;
+        while (csv_reader.read_row(uid_key, path, is_torrent_bool)) {
+            if (!uid_key.empty() && !path.empty()) {
+                if (!cache.contains(uid_key)) {
+                    cache.insert(uid_key, std::make_pair(path, convertBool_fromInt(std::atoi(is_torrent_bool.c_str()))));
+                } else {
+                    std::cerr << tr("Unique ID already exists in database! Creating new Unique ID...").toStdString() << std::endl;
+                    return add_download_id(file_path, db_struct, is_torrent, override_unique_id);
+                }
+            }
         }
     }
 
@@ -574,16 +581,16 @@ std::pair<std::string, bool> GekkoFyre::CmnRoutines::determine_download_id(const
     read_opt.verify_checksums = true;
 
     std::string key = createId(FYREDL_UNIQUE_ID_DIGIT_COUNT);
-    std::string csv_read_xml;
-    s = db_struct.db->Get(read_opt, LEVELDB_STORE_UNIQUE_ID, &csv_read_xml);
+    std::string csv_read_data;
+    s = db_struct.db->Get(read_opt, LEVELDB_STORE_UNIQUE_ID, &csv_read_data);
     if (!s.ok()) {
         throw std::runtime_error(s.ToString());
     }
 
-    if (!csv_read_xml.empty() && csv_read_xml.size() > CFG_CSV_MIN_PARSE_SIZE) {
+    if (!csv_read_data.empty() && csv_read_data.size() > CFG_CSV_MIN_PARSE_SIZE) {
         QMap<std::string, std::pair<std::string, bool>> cache;
-        io::CSVReader<LEVELDB_CSV_UNIQUE_ID_COLS> csv_in(csv_read_xml);
-        csv_in.read_header(io::ignore_no_column, LEVELDB_CSV_UID_KEY, LEVELDB_CSV_UID_VALUE1, LEVELDB_CSV_UID_VALUE2); // If a column with a name is not in the file but is in the argument list, then read_row will not modify the corresponding variable.
+        GkCsvReader csv_in(csv_read_data);
+        csv_in.add_headers(LEVELDB_CSV_UID_KEY, LEVELDB_CSV_UID_VALUE1, LEVELDB_CSV_UID_VALUE2);
         if (!csv_in.has_column(LEVELDB_CSV_UID_KEY) || !csv_in.has_column(LEVELDB_CSV_UID_VALUE1) ||
                 !csv_in.has_column(LEVELDB_CSV_UID_VALUE2)) {
             throw std::invalid_argument(tr("Information provided from database is invalid!").toStdString());
@@ -631,13 +638,8 @@ QMap<std::string, std::pair<std::string, bool>> GekkoFyre::CmnRoutines::extract_
     QMap<std::string, std::pair<std::string, bool>> cache;
     std::stringstream csv_out;
     if (!csv_read_data.empty() && csv_read_data.size() > CFG_CSV_MIN_PARSE_SIZE) {
-        io::CSVReader<LEVELDB_CSV_UNIQUE_ID_COLS> csv_in(csv_read_data);
-        csv_in.read_header(io::ignore_missing_column, LEVELDB_CSV_UID_KEY, LEVELDB_CSV_UID_VALUE1,
-                           LEVELDB_CSV_UID_VALUE2); // If a column with a name is not in the file but is in the argument list, then read_row will not modify the corresponding variable.
-        if (!csv_in.has_column(LEVELDB_CSV_UID_KEY) || !csv_in.has_column(LEVELDB_CSV_UID_VALUE1) ||
-            !csv_in.has_column(LEVELDB_CSV_UID_VALUE2)) {
-            throw std::invalid_argument(tr("Information provided from database is invalid!").toStdString());
-        }
+        GkCsvReader csv_in(csv_read_data);
+        csv_in.add_headers(LEVELDB_CSV_UID_KEY, LEVELDB_CSV_UID_VALUE1, LEVELDB_CSV_UID_VALUE2);
 
         std::string unique_id, path;
         int is_torrent_csv;
@@ -1744,8 +1746,8 @@ std::vector<GekkoFyre::GkTorrent::TorrentFile> GekkoFyre::CmnRoutines::read_torr
             }
 
             if (!csv_file_data.empty() && csv_file_data.size() > CFG_CSV_MIN_PARSE_SIZE) {
-                io::CSVReader<LEVELDB_CSV_TORRENT_FILE_COLS> csv_parse(csv_file_data);
-                csv_parse.read_header(io::ignore_no_column, LEVELDB_CSV_TORRENT_FILE_PATH, LEVELDB_CSV_TORRENT_FILE_CONTENT_LENGTH,
+                GkCsvReader csv_parse(csv_file_data);
+                csv_parse.add_headers(LEVELDB_CSV_TORRENT_FILE_PATH, LEVELDB_CSV_TORRENT_FILE_CONTENT_LENGTH,
                                       LEVELDB_CSV_TORRENT_FILE_SHA1, LEVELDB_CSV_TORRENT_FILE_FILE_OFFSET, LEVELDB_CSV_TORRENT_FILE_MTIME,
                                       LEVELDB_CSV_TORRENT_FILE_MAPFLEPCE_KEY, LEVELDB_CSV_TORRENT_FILE_BOOL_DLED, LEVELDB_CSV_TORRENT_FILE_FLAGS);
                 if (!csv_parse.has_column(LEVELDB_CSV_TORRENT_FILE_PATH) || !csv_parse.has_column(LEVELDB_CSV_TORRENT_FILE_CONTENT_LENGTH) ||
@@ -1774,8 +1776,8 @@ std::vector<GekkoFyre::GkTorrent::TorrentFile> GekkoFyre::CmnRoutines::read_torr
                         return std::vector<GekkoFyre::GkTorrent::TorrentFile>();
                     }
 
-                    io::CSVReader<LEVELDB_CSV_TORRENT_MAPFLEPCE_COLS> csv_mapflepce_parse(csv_mapflepce_data);
-                    csv_mapflepce_parse.read_header(io::ignore_no_column, LEVELDB_CSV_TORRENT_MAPFLEPCE_1, LEVELDB_CSV_TORRENT_MAPFLEPCE_2);
+                    GkCsvReader csv_mapflepce_parse(csv_mapflepce_data);
+                    csv_mapflepce_parse.add_headers(LEVELDB_CSV_TORRENT_MAPFLEPCE_1, LEVELDB_CSV_TORRENT_MAPFLEPCE_2);
                     if (!csv_mapflepce_parse.has_column(LEVELDB_CSV_TORRENT_MAPFLEPCE_1) ||
                         !csv_mapflepce_parse.has_column(LEVELDB_CSV_TORRENT_MAPFLEPCE_2)) {
                         QMessageBox::warning(nullptr, tr("Error!"), tr("Missing vital data as FyreDL attempts to import BitTorrent item, \"%1\".")
@@ -1857,9 +1859,8 @@ std::vector<GekkoFyre::GkTorrent::TorrentTrackers> GekkoFyre::CmnRoutines::read_
             }
 
             if (!csv_tracker_data.empty() && csv_tracker_data.size() > CFG_CSV_MIN_PARSE_SIZE) {
-                io::CSVReader<LEVELDB_CSV_TORRENT_TRACKER_COLS> csv_parse(csv_tracker_data);
-                csv_parse.read_header(io::ignore_no_column, LEVELDB_CSV_TORRENT_TRACKER_URL, LEVELDB_CSV_TORRENT_TRACKER_TIER,
-                                      LEVELDB_CSV_TORRENT_TRACKER_BOOL_ENABLED);
+                GkCsvReader csv_parse(csv_tracker_data);
+                csv_parse.add_headers(LEVELDB_CSV_TORRENT_TRACKER_URL, LEVELDB_CSV_TORRENT_TRACKER_TIER, LEVELDB_CSV_TORRENT_TRACKER_BOOL_ENABLED);
                 if (!csv_parse.has_column(LEVELDB_CSV_TORRENT_TRACKER_URL) || !csv_parse.has_column(LEVELDB_CSV_TORRENT_TRACKER_TIER) ||
                         !csv_parse.has_column(LEVELDB_CSV_TORRENT_TRACKER_BOOL_ENABLED)) {
                     QMessageBox::warning(nullptr, tr("Error!"), tr("Missing vital data as FyreDL attempts to import BitTorrent item, \"%1\".")

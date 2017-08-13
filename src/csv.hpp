@@ -84,10 +84,10 @@ public:
      * @return When to abort or repeat the while() loop.
      */
     template<typename ...ColType>
-    bool read_row(ColType& ...cols) {
+    bool read_row(ColType&& ...cols) {
         int num_args = sizeof...(cols);
         if ((num_args > 0) && (!csv_data.empty()) && (rows_parsed <= rows_count)) {
-            read_row_helper(rows_parsed, 0, std::forward<ColType>(cols)...);
+            read_row_helper(rows_parsed, 1, std::forward<ColType>(cols)...);
             ++rows_parsed;
             return true;
         }
@@ -120,9 +120,9 @@ private:
     }
 
     std::stringstream csv_raw_data;
-    size_t cols_count;
-    size_t rows_count;
-    size_t rows_parsed;
+    int cols_count;
+    int rows_count;
+    int rows_parsed;
     std::list<std::string> headers;                           // The key is the column number, whilst the value is the header associated with that column.
     std::multimap<int, std::pair<int, std::string>> csv_data; // The key is the row number whilst the values are are the column number and the comma-separated-values.
 
@@ -135,28 +135,14 @@ private:
     std::map<int, std::string> split_values(std::stringstream raw_csv_line);
     void parse_csv();
 
-    template<typename ...ColType>
-    void read_row_helper(std::size_t row, std::size_t last_col, std::string &&new_col, ColType&& ...cols) {
-        static size_t last_col_store;
-        if ((last_col != 0) && (last_col_store >= last_col)) {
-            if (!csv_data.empty() && row <= rows_count) {
-                auto range = csv_data.equal_range(row);
-                for (const auto &value: as_range(range)) {
-                    last_col_store = last_col;
-                    new_col = value.second.second;
-                    read_row_helper(row, last_col, std::forward<std::string>(new_col), std::forward<ColType>(cols)...);
+    template<typename T, typename ...ColType>
+    void read_row_helper(const int &row, const int &col, T&& new_col, ColType&& ...cols) {
+        if (((col - 1) <= cols_count) && (!csv_data.empty()) && (row <= rows_count)) {
+            for (auto id: csv_data) {
+                if ((id.first == row) && (id.second.first == col)) {
+                    read_row_helper(row, (col + 1), std::forward<T>(id.second.second), std::forward<ColType>(cols)...);
                 }
             }
-        } else {
-            // We are not dealing with the first column, and we've already dealt with the current column
-            if (last_col != cols_count) {
-                read_row_helper(row, (last_col + 1), std::forward<std::string>(new_col), std::forward<ColType>(cols)...);
-            }
-        }
-
-        if (last_col_store >= cols_count) {
-            last_col_store = 0;
-            return;
         }
 
         return;

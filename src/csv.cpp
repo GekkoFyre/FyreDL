@@ -192,5 +192,6 @@ std::map<int, std::string> GekkoFyre::GkCsvReader::split_values(std::stringstrea
 bool GekkoFyre::GkCsvReader::force_cache_reload()
 {
     parse_csv();
+    rows_parsed = 0;
     return !csv_data.empty();
 }
