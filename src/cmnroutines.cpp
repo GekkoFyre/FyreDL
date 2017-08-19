@@ -429,8 +429,8 @@ std::string GekkoFyre::CmnRoutines::add_download_id(const std::string &file_path
     std::stringstream csv_out;
     if (!csv_read_data.empty() && csv_read_data.size() > CFG_CSV_MIN_PARSE_SIZE) {
         QMap<std::string, std::pair<std::string, bool>> cache;
-        GkCsvReader csv_reader(csv_read_data);
-        csv_reader.add_headers(3, LEVELDB_CSV_UID_KEY, LEVELDB_CSV_UID_VALUE1, LEVELDB_CSV_UID_VALUE2);
+        GkCsvReader csv_reader(3, csv_read_data);
+        csv_reader.add_headers(LEVELDB_CSV_UID_KEY, LEVELDB_CSV_UID_VALUE1, LEVELDB_CSV_UID_VALUE2);
 
         std::string uid_key, path, is_torrent_bool;
         while (csv_reader.read_row(uid_key, path, is_torrent_bool)) {
@@ -589,7 +589,7 @@ std::pair<std::string, bool> GekkoFyre::CmnRoutines::determine_download_id(const
 
     if (!csv_read_data.empty() && csv_read_data.size() > CFG_CSV_MIN_PARSE_SIZE) {
         QMap<std::string, std::pair<std::string, bool>> cache;
-        GkCsvReader csv_in(csv_read_data);
+        GkCsvReader csv_in(3, csv_read_data);
         csv_in.add_headers(LEVELDB_CSV_UID_KEY, LEVELDB_CSV_UID_VALUE1, LEVELDB_CSV_UID_VALUE2);
         if (!csv_in.has_column(LEVELDB_CSV_UID_KEY) || !csv_in.has_column(LEVELDB_CSV_UID_VALUE1) ||
                 !csv_in.has_column(LEVELDB_CSV_UID_VALUE2)) {
@@ -597,7 +597,7 @@ std::pair<std::string, bool> GekkoFyre::CmnRoutines::determine_download_id(const
         }
 
         std::string unique_id, path;
-        int is_torrent_csv;
+        int is_torrent_csv = 0;
         while (csv_in.read_row(unique_id, path, is_torrent_csv)) {
             cache.insert(unique_id, std::make_pair(path, convertBool_fromInt(is_torrent_csv)));
         }
@@ -638,11 +638,11 @@ QMap<std::string, std::pair<std::string, bool>> GekkoFyre::CmnRoutines::extract_
     QMap<std::string, std::pair<std::string, bool>> cache;
     std::stringstream csv_out;
     if (!csv_read_data.empty() && csv_read_data.size() > CFG_CSV_MIN_PARSE_SIZE) {
-        GkCsvReader csv_in(csv_read_data);
+        GkCsvReader csv_in(3, csv_read_data);
         csv_in.add_headers(LEVELDB_CSV_UID_KEY, LEVELDB_CSV_UID_VALUE1, LEVELDB_CSV_UID_VALUE2);
 
         std::string unique_id, path;
-        int is_torrent_csv;
+        int is_torrent_csv = 0;
         while (csv_in.read_row(unique_id, path, is_torrent_csv)) {
             if (torrentsOnly) {
                 // Only accept download items marked as 'BitTorrent'
@@ -1746,7 +1746,7 @@ std::vector<GekkoFyre::GkTorrent::TorrentFile> GekkoFyre::CmnRoutines::read_torr
             }
 
             if (!csv_file_data.empty() && csv_file_data.size() > CFG_CSV_MIN_PARSE_SIZE) {
-                GkCsvReader csv_parse(csv_file_data);
+                GkCsvReader csv_parse(8, csv_file_data);
                 csv_parse.add_headers(LEVELDB_CSV_TORRENT_FILE_PATH, LEVELDB_CSV_TORRENT_FILE_CONTENT_LENGTH,
                                       LEVELDB_CSV_TORRENT_FILE_SHA1, LEVELDB_CSV_TORRENT_FILE_FILE_OFFSET, LEVELDB_CSV_TORRENT_FILE_MTIME,
                                       LEVELDB_CSV_TORRENT_FILE_MAPFLEPCE_KEY, LEVELDB_CSV_TORRENT_FILE_BOOL_DLED, LEVELDB_CSV_TORRENT_FILE_FLAGS);
@@ -1776,7 +1776,7 @@ std::vector<GekkoFyre::GkTorrent::TorrentFile> GekkoFyre::CmnRoutines::read_torr
                         return std::vector<GekkoFyre::GkTorrent::TorrentFile>();
                     }
 
-                    GkCsvReader csv_mapflepce_parse(csv_mapflepce_data);
+                    GkCsvReader csv_mapflepce_parse(2, csv_mapflepce_data);
                     csv_mapflepce_parse.add_headers(LEVELDB_CSV_TORRENT_MAPFLEPCE_1, LEVELDB_CSV_TORRENT_MAPFLEPCE_2);
                     if (!csv_mapflepce_parse.has_column(LEVELDB_CSV_TORRENT_MAPFLEPCE_1) ||
                         !csv_mapflepce_parse.has_column(LEVELDB_CSV_TORRENT_MAPFLEPCE_2)) {
@@ -1859,7 +1859,7 @@ std::vector<GekkoFyre::GkTorrent::TorrentTrackers> GekkoFyre::CmnRoutines::read_
             }
 
             if (!csv_tracker_data.empty() && csv_tracker_data.size() > CFG_CSV_MIN_PARSE_SIZE) {
-                GkCsvReader csv_parse(csv_tracker_data);
+                GkCsvReader csv_parse(3, csv_tracker_data);
                 csv_parse.add_headers(LEVELDB_CSV_TORRENT_TRACKER_URL, LEVELDB_CSV_TORRENT_TRACKER_TIER, LEVELDB_CSV_TORRENT_TRACKER_BOOL_ENABLED);
                 if (!csv_parse.has_column(LEVELDB_CSV_TORRENT_TRACKER_URL) || !csv_parse.has_column(LEVELDB_CSV_TORRENT_TRACKER_TIER) ||
                         !csv_parse.has_column(LEVELDB_CSV_TORRENT_TRACKER_BOOL_ENABLED)) {

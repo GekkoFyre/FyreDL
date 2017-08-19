@@ -44,7 +44,6 @@
 #define GKCSV_HPP
 
 #include "default_var.hpp"
-
 #include <utility>
 #include <algorithm>
 #include <numeric>
@@ -53,20 +52,24 @@
 #include <sstream>
 #include <unordered_map>
 #include <map>
+#include <array>
+#include <tuple>
 
 namespace GekkoFyre {
 class GkCsvReader {
 public:
     GkCsvReader() = delete;
     GkCsvReader(const GkCsvReader&) = delete;
-    explicit GkCsvReader(const std::string &csv_data);
+    explicit GkCsvReader(const int &column_count, const std::string &csv_data);
 
-    template<typename I, typename ...ColNames>
-    void add_headers(const I &given_cols, ColNames... args) {
+    template<typename ...ColNames>
+    void add_headers(ColNames... args) {
         headers.clear();
         headers = { to_string(args)... };
-        cols_count = sizeof...(args);
+        constexpr int args_count = sizeof...(args);
+        cols_count = args_count;
         rows_parsed = 0;
+        already_run = false;
         parse_csv();
     }
 
@@ -85,9 +88,9 @@ public:
      */
     template<typename ...ColType>
     bool read_row(ColType&& ...cols) {
-        int num_args = sizeof...(cols);
+        constexpr size_t num_args = sizeof...(cols);
         if ((num_args > 0) && (!csv_data.empty()) && (rows_parsed <= rows_count)) {
-            read_row_helper(rows_parsed, 1, std::forward<ColType>(cols)...);
+            read_row_helper<ColType...>(rows_parsed, cols...);
             ++rows_parsed;
             return true;
         }
@@ -123,6 +126,7 @@ private:
     int cols_count;
     int rows_count;
     int rows_parsed;
+    bool already_run;
     std::list<std::string> headers;                           // The key is the column number, whilst the value is the header associated with that column.
     std::multimap<int, std::pair<int, std::string>> csv_data; // The key is the row number whilst the values are are the column number and the comma-separated-values.
 
@@ -135,13 +139,61 @@ private:
     std::map<int, std::string> split_values(std::stringstream raw_csv_line);
     void parse_csv();
 
-    template<typename T, typename ...ColType>
-    void read_row_helper(const int &row, const int &col, T&& new_col, ColType&& ...cols) {
-        if (((col - 1) <= cols_count) && (!csv_data.empty()) && (row <= rows_count)) {
-            for (auto id: csv_data) {
-                if ((id.first == row) && (id.second.first == col)) {
-                    read_row_helper(row, (col + 1), std::forward<T>(id.second.second), std::forward<ColType>(cols)...);
+    // Create a tuple from the array
+    template<typename Array, size_t ...I>
+    auto array_to_tuple_helper(const Array &array, std::index_sequence<I...>) {
+        return std::make_tuple(array[I]...);
+    };
+
+    template<class... T>
+    using index_sequence_for = std::make_index_sequence<sizeof...(T)>;
+
+    // Create an index sequence for the array, and pass it to the implementation function helper
+    template<typename T, size_t N>
+    auto array_to_tuple(const std::array<T, N> &array) {
+        return array_to_tuple_helper(array, std::make_index_sequence<N>());
+    };
+
+    // https://stackoverflow.com/questions/687490/how-do-i-expand-a-tuple-into-variadic-template-functions-arguments
+    // http://aherrmann.github.io/programming/2016/02/28/unpacking-tuples-in-cpp14/
+    template <class F, size_t ...Is>
+    constexpr auto index_apply_impl(F f, std::index_sequence<Is...>) {
+        return f(std::integral_constant<size_t, Is> {}...);
+    }
+
+    template <size_t N, class F>
+    constexpr auto index_apply(F f) {
+        return index_apply_impl(f, std::make_index_sequence<N>());
+    }
+
+    template<class Tuple>
+    constexpr auto tuple_size(Tuple t) {
+        return std::min({std::tuple_size<Tuple>{}});
+    }
+
+    template<typename ...ColType>
+    void read_row_helper(const int &row, ColType ...cols) {
+        if (!csv_data.empty() && !already_run) {
+            int col = 1;
+            constexpr size_t num_args = sizeof...(cols);
+            std::array<std::string, num_args> col_data;
+            if (((col - 1) <= cols_count) && (row <= rows_count)) {
+                for (auto id: csv_data) {
+                    if ((id.first == row) && (id.second.first == col)) {
+                        col_data[col - 1] = id.second.second;
+                        ++col;
+                    }
                 }
+            }
+
+            if (!col_data.empty() && (col == (cols_count + 1))) {
+                auto tuple = array_to_tuple<std::string, num_args>(col_data);
+                const auto len = tuple_size(tuple);
+                index_apply<len>([&](auto ...Is) {
+                    already_run = true;
+                    read_row(std::forward<std::string>(std::get<Is>(tuple))...);
+                });
+                return;
             }
         }
 
