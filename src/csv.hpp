@@ -69,7 +69,7 @@ public:
         constexpr int args_count = sizeof...(args);
         cols_count = args_count;
         rows_parsed = 0;
-        already_run = false;
+        already_called = false;
         parse_csv();
     }
 
@@ -90,12 +90,19 @@ public:
     bool read_row(ColType&& ...cols) {
         constexpr size_t num_args = sizeof...(cols);
         if ((num_args > 0) && (!csv_data.empty()) && (rows_parsed <= rows_count)) {
-            read_row_helper<ColType...>(rows_parsed, cols...);
-            ++rows_parsed;
-            return true;
+            auto array = read_row_helper<ColType...>(rows_parsed, cols...);
+
+            if (mutex.try_lock()) {
+                ++rows_parsed;
+                auto binder = std::bind(&GkCsvReader::read_row<GkCsvReader::invoke_type_t<ColType>...>, this, std::forward<ColType>(*array.data())...);
+                binder();
+                mutex.unlock();
+                return false;
+            }
         }
 
-        return false;
+        mutex.unlock();
+        return true;
     }
 
 private:
@@ -110,23 +117,12 @@ private:
         return value;
     }
 
-    template<class Iter>
-    struct iter_for_range : std::pair<Iter, Iter> {
-        iter_for_range(std::pair<Iter, Iter> const &x) : std::pair<Iter, Iter>(x) {}
-        Iter begin() const { return this->first; }
-        Iter end() const { return this->second; }
-    };
-
-    template<class Iter>
-    inline iter_for_range<Iter> as_range(std::pair<Iter, Iter> const &x) {
-        return iter_for_range<Iter>(x);
-    }
-
     std::stringstream csv_raw_data;
     int cols_count;
     int rows_count;
     int rows_parsed;
-    bool already_run;
+    std::mutex mutex;
+    static bool already_called;
     std::list<std::string> headers;                           // The key is the column number, whilst the value is the header associated with that column.
     std::multimap<int, std::pair<int, std::string>> csv_data; // The key is the row number whilst the values are are the column number and the comma-separated-values.
 
@@ -139,65 +135,44 @@ private:
     std::map<int, std::string> split_values(std::stringstream raw_csv_line);
     void parse_csv();
 
-    // Create a tuple from the array
-    template<typename Array, size_t ...I>
-    auto array_to_tuple_helper(const Array &array, std::index_sequence<I...>) {
-        return std::make_tuple(array[I]...);
+    template <typename Arg>
+    struct invoke_type
+            : std::add_lvalue_reference<Arg> { };
+
+    template <typename T>
+    struct invoke_type<std::reference_wrapper<T>> {
+        using type = T&;
     };
 
-    template<class... T>
-    using index_sequence_for = std::make_index_sequence<sizeof...(T)>;
+    template <typename T>
+    using invoke_type_t = typename invoke_type<T>::type;
 
-    // Create an index sequence for the array, and pass it to the implementation function helper
-    template<typename T, size_t N>
-    auto array_to_tuple(const std::array<T, N> &array) {
-        return array_to_tuple_helper(array, std::make_index_sequence<N>());
-    };
-
-    // https://stackoverflow.com/questions/687490/how-do-i-expand-a-tuple-into-variadic-template-functions-arguments
-    // http://aherrmann.github.io/programming/2016/02/28/unpacking-tuples-in-cpp14/
-    template <class F, size_t ...Is>
-    constexpr auto index_apply_impl(F f, std::index_sequence<Is...>) {
-        return f(std::integral_constant<size_t, Is> {}...);
-    }
-
-    template <size_t N, class F>
-    constexpr auto index_apply(F f) {
-        return index_apply_impl(f, std::make_index_sequence<N>());
-    }
-
-    template<class Tuple>
-    constexpr auto tuple_size(Tuple t) {
-        return std::min({std::tuple_size<Tuple>{}});
+    template<typename ...T>
+    auto wrapper(T&& ...arg)
+    {
+        return std::bind(&GkCsvReader::read_row<invoke_type_t<T>...>, this, std::forward<decltype(std::forward<std::string>(arg))>(std::forward<std::string>(arg))...);
     }
 
     template<typename ...ColType>
-    void read_row_helper(const int &row, ColType ...cols) {
-        if (!csv_data.empty() && !already_run) {
-            int col = 1;
-            constexpr size_t num_args = sizeof...(cols);
-            std::array<std::string, num_args> col_data;
+    auto read_row_helper(const int &row, ColType ...cols) {
+        int col = 1;
+        constexpr size_t num_args = sizeof...(cols);
+        std::array<std::string, num_args> col_data;
+        if (!csv_data.empty() && !already_called) {
             if (((col - 1) <= cols_count) && (row <= rows_count)) {
                 for (auto id: csv_data) {
-                    if ((id.first == row) && (id.second.first == col)) {
+                    if ((id.first == (row + 1)) && (id.second.first == col)) {
+                        mutex.lock();
                         col_data[col - 1] = id.second.second;
                         ++col;
+                        mutex.unlock();
                     }
                 }
             }
-
-            if (!col_data.empty() && (col == (cols_count + 1))) {
-                auto tuple = array_to_tuple<std::string, num_args>(col_data);
-                const auto len = tuple_size(tuple);
-                index_apply<len>([&](auto ...Is) {
-                    already_run = true;
-                    read_row(std::forward<std::string>(std::get<Is>(tuple))...);
-                });
-                return;
-            }
         }
 
-        return;
+        already_called = true;
+        return col_data;
     }
 };
 }

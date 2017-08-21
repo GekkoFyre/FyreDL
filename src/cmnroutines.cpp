@@ -596,9 +596,10 @@ std::pair<std::string, bool> GekkoFyre::CmnRoutines::determine_download_id(const
             throw std::invalid_argument(tr("Information provided from database is invalid!").toStdString());
         }
 
-        std::string unique_id, path;
+        std::string unique_id, path, is_torrent_csv_str;
         int is_torrent_csv = 0;
-        while (csv_in.read_row(unique_id, path, is_torrent_csv)) {
+        while (csv_in.read_row(unique_id, path, is_torrent_csv_str)) {
+            is_torrent_csv = std::atoi(is_torrent_csv_str.c_str());
             cache.insert(unique_id, std::make_pair(path, convertBool_fromInt(is_torrent_csv)));
         }
 
@@ -641,12 +642,13 @@ QMap<std::string, std::pair<std::string, bool>> GekkoFyre::CmnRoutines::extract_
         GkCsvReader csv_in(3, csv_read_data);
         csv_in.add_headers(LEVELDB_CSV_UID_KEY, LEVELDB_CSV_UID_VALUE1, LEVELDB_CSV_UID_VALUE2);
 
-        std::string unique_id, path;
+        std::string unique_id, path, is_torrent_csv_str;
         int is_torrent_csv = 0;
-        while (csv_in.read_row(unique_id, path, is_torrent_csv)) {
+        while (csv_in.read_row(unique_id, path, is_torrent_csv_str)) {
             if (torrentsOnly) {
                 // Only accept download items marked as 'BitTorrent'
                 if (is_torrent_csv) {
+                    is_torrent_csv = std::atoi(is_torrent_csv_str.c_str());
                     cache.insert(unique_id, std::make_pair(path, convertBool_fromInt(is_torrent_csv)));
                 }
             }
@@ -654,6 +656,7 @@ QMap<std::string, std::pair<std::string, bool>> GekkoFyre::CmnRoutines::extract_
             if (!torrentsOnly) {
                 // Only accept download items marked as 'HTTP/FTP'
                 if (!is_torrent_csv) {
+                    is_torrent_csv = std::atoi(is_torrent_csv_str.c_str());
                     cache.insert(unique_id, std::make_pair(path, convertBool_fromInt(is_torrent_csv)));
                 }
             }
