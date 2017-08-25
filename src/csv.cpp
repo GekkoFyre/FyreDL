@@ -43,8 +43,6 @@
 #include "csv.hpp"
 #include <iostream>
 
-bool GekkoFyre::GkCsvReader::already_called;
-
 GekkoFyre::GkCsvReader::GkCsvReader(const int &column_count, const std::string &csv_data)
 {
     cols_count = column_count;
@@ -195,7 +193,5 @@ std::map<int, std::string> GekkoFyre::GkCsvReader::split_values(std::stringstrea
 bool GekkoFyre::GkCsvReader::force_cache_reload()
 {
     parse_csv();
-    rows_parsed = 0;
-    already_called = false;
     return !csv_data.empty();
 }

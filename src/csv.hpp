@@ -68,8 +68,6 @@ public:
         headers = { to_string(args)... };
         constexpr int args_count = sizeof...(args);
         cols_count = args_count;
-        rows_parsed = 0;
-        already_called = false;
         parse_csv();
     }
 
@@ -86,26 +84,33 @@ public:
      * which column to draw the data from.
      * @return When to abort or repeat the while() loop.
      */
-    template<typename ...ColType>
-    bool read_row(ColType&& ...cols) {
-        constexpr size_t num_args = sizeof...(cols);
-        if ((num_args > 0) && (!csv_data.empty()) && (rows_parsed <= rows_count)) {
-            auto array = read_row_helper<ColType...>(rows_parsed, cols...);
+    template<typename ...ColTypes>
+    bool read_row(ColTypes& ...cols) {
+        static int rows_parsed = 0;
+        if (!csv_data.empty()) {
+            ++rows_parsed;
+            if (rows_parsed <= rows_count) {
+                static int col_no = -1;
+                while (col_no <= (cols_count - 1)) {
+                    ++col_no;
+                    parse_cols<std::string>(col_no, parse_helper(parse_cols_ptr<std::string>(col_no, read_row_helper<std::string>(rows_parsed, col_no, cols)...), cols)...);
+                };
 
-            if (mutex.try_lock()) {
-                ++rows_parsed;
-                auto binder = std::bind(&GkCsvReader::read_row<GkCsvReader::invoke_type_t<ColType>...>, this, std::forward<ColType>(*array.data())...);
-                binder();
-                mutex.unlock();
-                return false;
+                if (col_no >= cols_count) {
+                    return true;
+                }
             }
         }
 
-        mutex.unlock();
-        return true;
+        return false;
     }
 
 private:
+    template<typename ...Ts>
+    auto dummy_func(Ts ...args) {
+        return std::make_tuple(args...);
+    }
+
     template<typename T>
     std::string to_string(const T &value) {
         std::ostringstream ss;
@@ -120,9 +125,7 @@ private:
     std::stringstream csv_raw_data;
     int cols_count;
     int rows_count;
-    int rows_parsed;
     std::mutex mutex;
-    static bool already_called;
     std::list<std::string> headers;                           // The key is the column number, whilst the value is the header associated with that column.
     std::multimap<int, std::pair<int, std::string>> csv_data; // The key is the row number whilst the values are are the column number and the comma-separated-values.
 
@@ -135,44 +138,56 @@ private:
     std::map<int, std::string> split_values(std::stringstream raw_csv_line);
     void parse_csv();
 
-    template <typename Arg>
-    struct invoke_type
-            : std::add_lvalue_reference<Arg> { };
+    template<typename T, typename X>
+    auto parse_helper(T *value, X& col) {
+        if (value != nullptr) {
+            col = *value;
+            return *value;
+        }
 
-    template <typename T>
-    struct invoke_type<std::reference_wrapper<T>> {
-        using type = T&;
+        return std::string();
     };
 
-    template <typename T>
-    using invoke_type_t = typename invoke_type<T>::type;
-
-    template<typename ...T>
-    auto wrapper(T&& ...arg)
-    {
-        return std::bind(&GkCsvReader::read_row<invoke_type_t<T>...>, this, std::forward<decltype(std::forward<std::string>(arg))>(std::forward<std::string>(arg))...);
-    }
-
-    template<typename ...ColType>
-    auto read_row_helper(const int &row, ColType ...cols) {
-        int col = 1;
-        constexpr size_t num_args = sizeof...(cols);
-        std::array<std::string, num_args> col_data;
-        if (!csv_data.empty() && !already_called) {
-            if (((col - 1) <= cols_count) && (row <= rows_count)) {
-                for (auto id: csv_data) {
-                    if ((id.first == (row + 1)) && (id.second.first == col)) {
-                        mutex.lock();
-                        col_data[col - 1] = id.second.second;
-                        ++col;
-                        mutex.unlock();
-                    }
-                }
+    template<typename T, typename ...Ts>
+    auto parse_cols(const int &col_no, Ts ...values) {
+        std::array<T, 15> init_array { values... };
+        T val_ret;
+        for (size_t i = 0; i < init_array.size(); ++i) {
+            if (col_no == (int)i) {
+                val_ret = init_array[col_no];
             }
         }
 
-        already_called = true;
-        return col_data;
+        return val_ret;
+    }
+
+    template<typename T, typename ...Ts>
+    auto parse_cols_ptr(const int &col_no, Ts* ...values) {
+        std::array<T*, 15> init_array { values... };
+        T *val_ret = nullptr;
+        for (size_t i = 0; i < init_array.size(); ++i) {
+            if (col_no == (int)i) {
+                val_ret = init_array[col_no];
+            }
+        }
+
+        return val_ret;
+    }
+
+    template<typename T>
+    T* read_row_helper(const int &row_no, const int &col_no, T& col) {
+        if (!csv_data.empty() && (row_no <= rows_count)) {
+            T val;
+            for (auto id: csv_data) {
+                if ((id.first == row_no) && (id.second.first == (col_no + 1))) {
+                    val = id.second.second;
+                }
+            }
+
+            return new T(std::forward<T>(val));
+        }
+
+        return new T(std::forward<T>(col));
     }
 };
 }
