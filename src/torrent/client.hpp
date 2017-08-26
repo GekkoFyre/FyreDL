@@ -62,7 +62,7 @@ class GkTorrentClient: public QObject {
     Q_OBJECT
 
 public:
-    GkTorrentClient(QObject *parent = 0);
+    GkTorrentClient(const GekkoFyre::GkFile::FileDb &database, QObject *parent = 0);
     ~GkTorrentClient();
 
     void startTorrentDl(const GekkoFyre::GkTorrent::TorrentInfo &item);

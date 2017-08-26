@@ -69,7 +69,7 @@ class CmnRoutines : public QObject
     Q_OBJECT
 
 public:
-    CmnRoutines(QObject *parent = 0);
+    CmnRoutines(const GekkoFyre::GkFile::FileDb &database, QObject *parent = 0);
     ~CmnRoutines();
 
     QString extractFilename(const QString &url);
@@ -111,6 +111,7 @@ public:
     GekkoFyre::GkFile::FileDb openDatabase(const std::string &dbFile = CFG_HISTORY_DB_FILE);
     void leveldb_lock_remove(const std::string &dbFile = CFG_HISTORY_DB_FILE) noexcept;
 
+    std::string leveldb_location(const std::string &dbFile = CFG_HISTORY_DB_FILE) noexcept;
     void add_item_db(const std::string download_id, const std::string &key, const std::string &value,
                      const GekkoFyre::GkFile::FileDb &db_struct);
     void del_item_db(const std::string download_id, const std::string &key, const GekkoFyre::GkFile::FileDb &db_struct);
@@ -140,7 +141,6 @@ private:
 
     bool convertBool_fromInt(const int &value) noexcept;
     std::string multipart_key(const std::initializer_list<std::string> &args);
-    std::string leveldb_location(const std::string &dbFile = CFG_HISTORY_DB_FILE) noexcept;
     std::string add_download_id(const std::string &file_path, const GekkoFyre::GkFile::FileDb &db_struct,
                                 const bool &is_torrent = false, const std::string &override_unique_id = "");
     bool del_download_id(const std::string &unique_id, const GekkoFyre::GkFile::FileDb &db_struct,
@@ -155,6 +155,7 @@ private:
     std::vector<GkTorrent::TorrentTrackers> read_torrent_trkrs_addendum(const int &num_trackers, const std::string &download_key,
                                                                         const GekkoFyre::GkFile::FileDb &db_struct) noexcept;
 
+    GekkoFyre::GkFile::FileDb db;
     QMutex mutex;
 };
 }

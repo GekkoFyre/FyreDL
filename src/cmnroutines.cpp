@@ -96,12 +96,21 @@ using namespace libtorrent;
 namespace sys = boost::system;
 namespace fs = boost::filesystem;
 
-GekkoFyre::CmnRoutines::CmnRoutines(QObject *parent) : QObject(parent)
+GekkoFyre::CmnRoutines::CmnRoutines(const GekkoFyre::GkFile::FileDb &database, QObject *parent) : QObject(parent)
 {
     setlocale (LC_ALL, "");
+
+    try {
+        db = database;
+    } catch (const std::exception &e) {
+        QMessageBox::warning(nullptr, tr("Error!"), e.what(), QMessageBox::Ok);
+        QApplication::exit(-1);
+    }
+
+    return;
 }
 
-GekkoFyre::CmnRoutines::~CmnRoutines(   )
+GekkoFyre::CmnRoutines::~CmnRoutines()
 {
     // curl_global_cleanup(); // We're done with libcurl, globally, so clean it up!
 }
@@ -260,6 +269,8 @@ GekkoFyre::GkFile::FileDb GekkoFyre::CmnRoutines::openDatabase(const std::string
     db_struct.options.create_if_missing = true;
     std::shared_ptr<leveldb::Cache>(db_struct.options.block_cache).reset(leveldb::NewLRUCache(LEVELDB_CFG_CACHE_SIZE));
     db_struct.options.compression = leveldb::CompressionType::kSnappyCompression;
+
+    mutex.lock();
     if (!dbFileName.empty()) {
         std::string db_location = leveldb_location(dbFileName);
         sys::error_code ec;
@@ -270,6 +281,7 @@ GekkoFyre::GkFile::FileDb GekkoFyre::CmnRoutines::openDatabase(const std::string
         s = leveldb::DB::Open(db_struct.options, db_location, &raw_db_ptr);
         db_struct.db.reset(raw_db_ptr);
         if (!s.ok()) {
+            mutex.unlock();
             throw std::runtime_error(tr("Unable to open/create database! %1").arg(QString::fromStdString(s.ToString())).toStdString());
         }
 
@@ -278,6 +290,7 @@ GekkoFyre::GkFile::FileDb GekkoFyre::CmnRoutines::openDatabase(const std::string
         }
     }
 
+    mutex.unlock();
     return db_struct;
 }
 
@@ -390,8 +403,10 @@ bool GekkoFyre::CmnRoutines::convertBool_fromInt(const int &value) noexcept {
     switch (value) {
         case 0:
             bool_convert = false;
+            break;
         case 1:
             bool_convert = true;
+            break;
         default:
             std::cerr << tr("An invalid integer was provided to convert from to a boolean value.").toStdString() << std::endl;
             return false;
@@ -643,12 +658,12 @@ QMap<std::string, std::pair<std::string, bool>> GekkoFyre::CmnRoutines::extract_
         csv_in.add_headers(LEVELDB_CSV_UID_KEY, LEVELDB_CSV_UID_VALUE1, LEVELDB_CSV_UID_VALUE2);
 
         std::string unique_id, path, is_torrent_csv_str;
-        int is_torrent_csv = 0;
+        bool is_torrent_csv = 0;
         while (csv_in.read_row(unique_id, path, is_torrent_csv_str)) {
+            is_torrent_csv = convertBool_fromInt(std::atoi(is_torrent_csv_str.c_str()));
             if (torrentsOnly) {
                 // Only accept download items marked as 'BitTorrent'
                 if (is_torrent_csv) {
-                    is_torrent_csv = std::atoi(is_torrent_csv_str.c_str());
                     cache.insert(unique_id, std::make_pair(path, convertBool_fromInt(is_torrent_csv)));
                 }
             }
@@ -656,7 +671,6 @@ QMap<std::string, std::pair<std::string, bool>> GekkoFyre::CmnRoutines::extract_
             if (!torrentsOnly) {
                 // Only accept download items marked as 'HTTP/FTP'
                 if (!is_torrent_csv) {
-                    is_torrent_csv = std::atoi(is_torrent_csv_str.c_str());
                     cache.insert(unique_id, std::make_pair(path, convertBool_fromInt(is_torrent_csv)));
                 }
             }
@@ -1018,8 +1032,7 @@ std::vector<GekkoFyre::GkCurl::CurlDlInfo> GekkoFyre::CmnRoutines::readCurlItems
 {
     try {
         // TODO: Implement 'hashesOnly' as originally designed!
-        GekkoFyre::GkFile::FileDb db_struct = openDatabase(CFG_HISTORY_DB_FILE);
-        auto download_ids = extract_download_ids(db_struct, false);
+        auto download_ids = extract_download_ids(db, false);
         if (!download_ids.empty()) {
             std::vector<GekkoFyre::GkCurl::CurlDlInfo> output;
             for (auto const &id: download_ids.toStdMap()) {
@@ -1029,17 +1042,17 @@ std::vector<GekkoFyre::GkCurl::CurlDlInfo> GekkoFyre::CmnRoutines::readCurlItems
                             hash_val_given, hash_val_rtrnd, hash_succ_type, down_dest;
 
                     down_dest = id.second.first;
-                    curl_stat = read_item_db(id.first, LEVELDB_KEY_CURL_STAT, db_struct);
-                    insert_date = read_item_db(id.first, LEVELDB_KEY_CURL_INSERT_DATE, db_struct);
-                    complt_date = read_item_db(id.first, LEVELDB_KEY_CURL_COMPLT_DATE, db_struct);
-                    stat_msg = read_item_db(id.first, LEVELDB_KEY_CURL_STATMSG, db_struct);
-                    effec_url = read_item_db(id.first, LEVELDB_KEY_CURL_EFFEC_URL, db_struct);
-                    resp_code = read_item_db(id.first, LEVELDB_KEY_CURL_RESP_CODE, db_struct);
-                    cont_lgnth = read_item_db(id.first, LEVELDB_KEY_CURL_CONT_LNGTH, db_struct);
-                    hash_type = read_item_db(id.first, LEVELDB_KEY_CURL_HASH_TYPE, db_struct);
-                    hash_val_given = read_item_db(id.first, LEVELDB_KEY_CURL_HASH_VAL_GIVEN, db_struct);
-                    hash_val_rtrnd = read_item_db(id.first, LEVELDB_KEY_CURL_HASH_VAL_RTRND, db_struct);
-                    hash_succ_type = read_item_db(id.first, LEVELDB_KEY_CURL_HASH_SUCC_TYPE, db_struct);
+                    curl_stat = read_item_db(id.first, LEVELDB_KEY_CURL_STAT, db);
+                    insert_date = read_item_db(id.first, LEVELDB_KEY_CURL_INSERT_DATE, db);
+                    complt_date = read_item_db(id.first, LEVELDB_KEY_CURL_COMPLT_DATE, db);
+                    stat_msg = read_item_db(id.first, LEVELDB_KEY_CURL_STATMSG, db);
+                    effec_url = read_item_db(id.first, LEVELDB_KEY_CURL_EFFEC_URL, db);
+                    resp_code = read_item_db(id.first, LEVELDB_KEY_CURL_RESP_CODE, db);
+                    cont_lgnth = read_item_db(id.first, LEVELDB_KEY_CURL_CONT_LNGTH, db);
+                    hash_type = read_item_db(id.first, LEVELDB_KEY_CURL_HASH_TYPE, db);
+                    hash_val_given = read_item_db(id.first, LEVELDB_KEY_CURL_HASH_VAL_GIVEN, db);
+                    hash_val_rtrnd = read_item_db(id.first, LEVELDB_KEY_CURL_HASH_VAL_RTRND, db);
+                    hash_succ_type = read_item_db(id.first, LEVELDB_KEY_CURL_HASH_SUCC_TYPE, db);
 
                     dl_info.dlStatus = convDlStat_IntToEnum(std::atoi(curl_stat.c_str()));
                     dl_info.insert_timestamp = std::atoll(insert_date.c_str());
@@ -1088,19 +1101,18 @@ bool GekkoFyre::CmnRoutines::addCurlItem(GekkoFyre::GkCurl::CurlDlInfo &dl_info)
                 dl_info.ext_info.status_msg = "";
 
                 std::string unique_id = dl_info.unique_id;
-                GekkoFyre::GkFile::FileDb db_struct = openDatabase(CFG_HISTORY_DB_FILE);
-                std::string download_key = add_download_id(dl_info.file_loc, db_struct, false, dl_info.unique_id);
-                add_item_db(download_key, LEVELDB_KEY_CURL_STAT, std::to_string(convDlStat_toInt(dl_info.dlStatus)), db_struct);
-                add_item_db(download_key, LEVELDB_KEY_CURL_INSERT_DATE, std::to_string(dl_info.insert_timestamp), db_struct);
-                add_item_db(download_key, LEVELDB_KEY_CURL_COMPLT_DATE, std::to_string(dl_info.complt_timestamp), db_struct);
-                add_item_db(download_key, LEVELDB_KEY_CURL_STATMSG, dl_info.ext_info.status_msg, db_struct);
-                add_item_db(download_key, LEVELDB_KEY_CURL_EFFEC_URL, dl_info.ext_info.effective_url, db_struct);
-                add_item_db(download_key, LEVELDB_KEY_CURL_RESP_CODE, std::to_string(dl_info.ext_info.response_code), db_struct);
-                add_item_db(download_key, LEVELDB_KEY_CURL_CONT_LNGTH, std::to_string(dl_info.ext_info.content_length), db_struct);
-                add_item_db(download_key, LEVELDB_KEY_CURL_HASH_TYPE, std::to_string(dl_info.hash_type), db_struct);
-                add_item_db(download_key, LEVELDB_KEY_CURL_HASH_VAL_GIVEN, dl_info.hash_val_given, db_struct);
-                add_item_db(download_key, LEVELDB_KEY_CURL_HASH_VAL_RTRND, dl_info.hash_val_rtrnd, db_struct);
-                add_item_db(download_key, LEVELDB_KEY_CURL_HASH_SUCC_TYPE, std::to_string(dl_info.hash_succ_type), db_struct);
+                std::string download_key = add_download_id(dl_info.file_loc, db, false, dl_info.unique_id);
+                add_item_db(download_key, LEVELDB_KEY_CURL_STAT, std::to_string(convDlStat_toInt(dl_info.dlStatus)), db);
+                add_item_db(download_key, LEVELDB_KEY_CURL_INSERT_DATE, std::to_string(dl_info.insert_timestamp), db);
+                add_item_db(download_key, LEVELDB_KEY_CURL_COMPLT_DATE, std::to_string(dl_info.complt_timestamp), db);
+                add_item_db(download_key, LEVELDB_KEY_CURL_STATMSG, dl_info.ext_info.status_msg, db);
+                add_item_db(download_key, LEVELDB_KEY_CURL_EFFEC_URL, dl_info.ext_info.effective_url, db);
+                add_item_db(download_key, LEVELDB_KEY_CURL_RESP_CODE, std::to_string(dl_info.ext_info.response_code), db);
+                add_item_db(download_key, LEVELDB_KEY_CURL_CONT_LNGTH, std::to_string(dl_info.ext_info.content_length), db);
+                add_item_db(download_key, LEVELDB_KEY_CURL_HASH_TYPE, std::to_string(dl_info.hash_type), db);
+                add_item_db(download_key, LEVELDB_KEY_CURL_HASH_VAL_GIVEN, dl_info.hash_val_given, db);
+                add_item_db(download_key, LEVELDB_KEY_CURL_HASH_VAL_RTRND, dl_info.hash_val_rtrnd, db);
+                add_item_db(download_key, LEVELDB_KEY_CURL_HASH_SUCC_TYPE, std::to_string(dl_info.hash_succ_type), db);
                 return true;
             } catch (const std::exception &e) {
                 QMessageBox::warning(nullptr, tr("Error!"), e.what(), QMessageBox::Ok);
@@ -1125,10 +1137,9 @@ bool GekkoFyre::CmnRoutines::addCurlItem(GekkoFyre::GkCurl::CurlDlInfo &dl_info)
 bool GekkoFyre::CmnRoutines::delCurlItem(const QString &file_dest, const std::string &unique_id_backup)
 {
     try {
-        GekkoFyre::GkFile::FileDb db_struct = openDatabase(CFG_HISTORY_DB_FILE);
         std::string download_id;
         if (unique_id_backup.empty() && !file_dest.isEmpty()) {
-            auto identifier = determine_download_id(file_dest.toStdString(), db_struct);
+            auto identifier = determine_download_id(file_dest.toStdString(), db);
             download_id = identifier.first;
         } else {
             // TODO: An empty 'unique_id_backup' can still possibly be provided, as-is dealt with by the exception below!
@@ -1140,18 +1151,18 @@ bool GekkoFyre::CmnRoutines::delCurlItem(const QString &file_dest, const std::st
                                                    "storage path, \"%1\".").arg(file_dest).toStdString());
         }
 
-        del_item_db(download_id, LEVELDB_KEY_CURL_STAT, db_struct);
-        del_item_db(download_id, LEVELDB_KEY_CURL_INSERT_DATE, db_struct);
-        del_item_db(download_id, LEVELDB_KEY_CURL_COMPLT_DATE, db_struct);
-        del_item_db(download_id, LEVELDB_KEY_CURL_STATMSG, db_struct);
-        del_item_db(download_id, LEVELDB_KEY_CURL_EFFEC_URL, db_struct);
-        del_item_db(download_id, LEVELDB_KEY_CURL_RESP_CODE, db_struct);
-        del_item_db(download_id, LEVELDB_KEY_CURL_CONT_LNGTH, db_struct);
-        del_item_db(download_id, LEVELDB_KEY_CURL_HASH_TYPE, db_struct);
-        del_item_db(download_id, LEVELDB_KEY_CURL_HASH_VAL_GIVEN, db_struct);
-        del_item_db(download_id, LEVELDB_KEY_CURL_HASH_VAL_RTRND, db_struct);
-        del_item_db(download_id, LEVELDB_KEY_CURL_HASH_SUCC_TYPE, db_struct);
-        bool ret = del_download_id(download_id, db_struct, false);
+        del_item_db(download_id, LEVELDB_KEY_CURL_STAT, db);
+        del_item_db(download_id, LEVELDB_KEY_CURL_INSERT_DATE, db);
+        del_item_db(download_id, LEVELDB_KEY_CURL_COMPLT_DATE, db);
+        del_item_db(download_id, LEVELDB_KEY_CURL_STATMSG, db);
+        del_item_db(download_id, LEVELDB_KEY_CURL_EFFEC_URL, db);
+        del_item_db(download_id, LEVELDB_KEY_CURL_RESP_CODE, db);
+        del_item_db(download_id, LEVELDB_KEY_CURL_CONT_LNGTH, db);
+        del_item_db(download_id, LEVELDB_KEY_CURL_HASH_TYPE, db);
+        del_item_db(download_id, LEVELDB_KEY_CURL_HASH_VAL_GIVEN, db);
+        del_item_db(download_id, LEVELDB_KEY_CURL_HASH_VAL_RTRND, db);
+        del_item_db(download_id, LEVELDB_KEY_CURL_HASH_SUCC_TYPE, db);
+        bool ret = del_download_id(download_id, db, false);
         return ret;
     } catch (const std::exception &e) {
         QMessageBox::warning(nullptr, tr("Error!"), e.what(), QMessageBox::Ok);
@@ -1183,25 +1194,24 @@ bool GekkoFyre::CmnRoutines::modifyCurlItem(const std::string &file_loc, const G
                                             const GekkoFyre::HashVerif &ret_succ_type)
 {
     try {
-        GekkoFyre::GkFile::FileDb db_struct = openDatabase(CFG_HISTORY_DB_FILE);
-        auto identifier = determine_download_id(file_loc, db_struct);
+        auto identifier = determine_download_id(file_loc, db);
         if (!identifier.first.empty()) {
             std::string dl_id = identifier.first;
 
             //
             // General
-            add_item_db(dl_id, LEVELDB_KEY_CURL_STAT, std::to_string(convDlStat_toInt(status)), db_struct);
+            add_item_db(dl_id, LEVELDB_KEY_CURL_STAT, std::to_string(convDlStat_toInt(status)), db);
             if (complt_timestamp > 0) {
-                add_item_db(dl_id, LEVELDB_KEY_CURL_COMPLT_DATE, std::to_string(complt_timestamp), db_struct);
+                add_item_db(dl_id, LEVELDB_KEY_CURL_COMPLT_DATE, std::to_string(complt_timestamp), db);
             }
 
             //
             // Hash Values
             if (ret_succ_type != GekkoFyre::HashVerif::NotApplicable) {
-                add_item_db(dl_id, LEVELDB_KEY_CURL_HASH_TYPE, std::to_string(convHashType_toInt(hash_type)), db_struct);
-                add_item_db(dl_id, LEVELDB_KEY_CURL_HASH_VAL_GIVEN, hash_given, db_struct);
-                add_item_db(dl_id, LEVELDB_KEY_CURL_HASH_VAL_RTRND, hash_rtrnd, db_struct);
-                add_item_db(dl_id, LEVELDB_KEY_CURL_HASH_SUCC_TYPE, std::to_string(convHashVerif_toInt(ret_succ_type)), db_struct);
+                add_item_db(dl_id, LEVELDB_KEY_CURL_HASH_TYPE, std::to_string(convHashType_toInt(hash_type)), db);
+                add_item_db(dl_id, LEVELDB_KEY_CURL_HASH_VAL_GIVEN, hash_given, db);
+                add_item_db(dl_id, LEVELDB_KEY_CURL_HASH_VAL_RTRND, hash_rtrnd, db);
+                add_item_db(dl_id, LEVELDB_KEY_CURL_HASH_SUCC_TYPE, std::to_string(convHashVerif_toInt(ret_succ_type)), db);
             }
 
             return true;
@@ -1243,39 +1253,38 @@ bool GekkoFyre::CmnRoutines::addTorrentItem(GekkoFyre::GkTorrent::TorrentInfo &g
 {
     try {
         if (!gk_ti.general.down_dest.empty()) {
-            GekkoFyre::GkFile::FileDb db_struct = openDatabase(CFG_HISTORY_DB_FILE);
             QDateTime now = QDateTime::currentDateTime();
             gk_ti.general.insert_timestamp = now.toTime_t();
 
-            std::string download_key = add_download_id(gk_ti.general.down_dest, db_struct, true, gk_ti.general.unique_id);
+            std::string download_key = add_download_id(gk_ti.general.down_dest, db, true, gk_ti.general.unique_id);
             if (gk_ti.general.unique_id != download_key) {
                 throw std::invalid_argument(tr("Unique ID mismatch while adding a BitTorrent item!\n\n%1 != %2")
                                                     .arg(QString::fromStdString(gk_ti.general.unique_id))
                                                     .arg(QString::fromStdString(download_key)).toStdString());
             }
 
-            add_item_db(download_key, LEVELDB_KEY_TORRENT_INSERT_DATE, std::to_string(gk_ti.general.insert_timestamp), db_struct);
-            add_item_db(download_key, LEVELDB_KEY_TORRENT_COMPLT_DATE, std::to_string(gk_ti.general.complt_timestamp), db_struct);
-            add_item_db(download_key, LEVELDB_KEY_TORRENT_CREATN_DATE, std::to_string(gk_ti.general.creatn_timestamp), db_struct);
-            add_item_db(download_key, LEVELDB_KEY_TORRENT_DLSTATUS, convDlStat_toString(gk_ti.general.dlStatus).toStdString(), db_struct);
-            add_item_db(download_key, LEVELDB_KEY_TORRENT_TORRNT_COMMENT, gk_ti.general.comment, db_struct);
-            add_item_db(download_key, LEVELDB_KEY_TORRENT_TORRNT_CREATOR, gk_ti.general.creator, db_struct);
-            add_item_db(download_key, LEVELDB_KEY_TORRENT_MAGNET_URI, gk_ti.general.magnet_uri, db_struct);
-            add_item_db(download_key, LEVELDB_KEY_TORRENT_TORRNT_NAME, gk_ti.general.torrent_name, db_struct);
-            add_item_db(download_key, LEVELDB_KEY_TORRENT_NUM_FILES, std::to_string(gk_ti.general.num_files), db_struct);
-            add_item_db(download_key, LEVELDB_KEY_TORRENT_NUM_TRACKERS, std::to_string(gk_ti.general.num_trackers), db_struct);
-            add_item_db(download_key, LEVELDB_KEY_TORRENT_TORRNT_PIECES, std::to_string(gk_ti.general.num_pieces), db_struct);
-            add_item_db(download_key, LEVELDB_KEY_TORRENT_TORRNT_PIECE_LENGTH, std::to_string(gk_ti.general.piece_length), db_struct);
+            add_item_db(download_key, LEVELDB_KEY_TORRENT_INSERT_DATE, std::to_string(gk_ti.general.insert_timestamp), db);
+            add_item_db(download_key, LEVELDB_KEY_TORRENT_COMPLT_DATE, std::to_string(gk_ti.general.complt_timestamp), db);
+            add_item_db(download_key, LEVELDB_KEY_TORRENT_CREATN_DATE, std::to_string(gk_ti.general.creatn_timestamp), db);
+            add_item_db(download_key, LEVELDB_KEY_TORRENT_DLSTATUS, convDlStat_toString(gk_ti.general.dlStatus).toStdString(), db);
+            add_item_db(download_key, LEVELDB_KEY_TORRENT_TORRNT_COMMENT, gk_ti.general.comment, db);
+            add_item_db(download_key, LEVELDB_KEY_TORRENT_TORRNT_CREATOR, gk_ti.general.creator, db);
+            add_item_db(download_key, LEVELDB_KEY_TORRENT_MAGNET_URI, gk_ti.general.magnet_uri, db);
+            add_item_db(download_key, LEVELDB_KEY_TORRENT_TORRNT_NAME, gk_ti.general.torrent_name, db);
+            add_item_db(download_key, LEVELDB_KEY_TORRENT_NUM_FILES, std::to_string(gk_ti.general.num_files), db);
+            add_item_db(download_key, LEVELDB_KEY_TORRENT_NUM_TRACKERS, std::to_string(gk_ti.general.num_trackers), db);
+            add_item_db(download_key, LEVELDB_KEY_TORRENT_TORRNT_PIECES, std::to_string(gk_ti.general.num_pieces), db);
+            add_item_db(download_key, LEVELDB_KEY_TORRENT_TORRNT_PIECE_LENGTH, std::to_string(gk_ti.general.piece_length), db);
 
             //
             // Files
             //
-            bool wtf_ret = write_torrent_files_addendum(gk_ti.files_vec, download_key, db_struct);
+            bool wtf_ret = write_torrent_files_addendum(gk_ti.files_vec, download_key, db);
 
             //
             // Trackers
             //
-            bool wtt_ret = write_torrent_trkrs_addendum(gk_ti.trackers, download_key, db_struct);
+            bool wtt_ret = write_torrent_trkrs_addendum(gk_ti.trackers, download_key, db);
 
             if (!wtf_ret || !wtt_ret) {
                 QMessageBox::warning(nullptr, tr("Error!"), tr("There was an error with inserting the following BitTorrent "
@@ -1307,8 +1316,7 @@ std::vector<GekkoFyre::GkTorrent::TorrentInfo> GekkoFyre::CmnRoutines::readTorre
 {
     try {
         // TODO: Implement 'minimal_readout' as originally designed! Use boost::optional<>() for this.
-        GekkoFyre::GkFile::FileDb db_struct = openDatabase(CFG_HISTORY_DB_FILE);
-        auto download_ids = extract_download_ids(db_struct, true);
+        auto download_ids = extract_download_ids(db, true);
         if (!download_ids.empty()) {
             std::vector<GekkoFyre::GkTorrent::TorrentInfo> output;
             for (auto const &id: download_ids.toStdMap()) {
@@ -1318,18 +1326,18 @@ std::vector<GekkoFyre::GkTorrent::TorrentInfo> GekkoFyre::CmnRoutines::readTorre
                     std::string insert_date, complt_date, creatn_date, dlstatus, comment, creator, magnet_uri, torrent_name,
                             num_files, num_trackers, num_pieces, piece_length;
 
-                    insert_date = read_item_db(id.first, LEVELDB_KEY_TORRENT_INSERT_DATE, db_struct);
-                    complt_date = read_item_db(id.first, LEVELDB_KEY_TORRENT_COMPLT_DATE, db_struct);
-                    creatn_date = read_item_db(id.first, LEVELDB_KEY_TORRENT_CREATN_DATE, db_struct);
-                    dlstatus = read_item_db(id.first, LEVELDB_KEY_TORRENT_DLSTATUS, db_struct);
-                    comment = read_item_db(id.first, LEVELDB_KEY_TORRENT_TORRNT_COMMENT, db_struct);
-                    creator = read_item_db(id.first, LEVELDB_KEY_TORRENT_TORRNT_CREATOR, db_struct);
-                    magnet_uri = read_item_db(id.first, LEVELDB_KEY_TORRENT_MAGNET_URI, db_struct);
-                    torrent_name = read_item_db(id.first, LEVELDB_KEY_TORRENT_TORRNT_NAME, db_struct);
-                    num_files = read_item_db(id.first, LEVELDB_KEY_TORRENT_NUM_FILES, db_struct);
-                    num_trackers = read_item_db(id.first, LEVELDB_KEY_TORRENT_NUM_TRACKERS, db_struct);
-                    num_pieces = read_item_db(id.first, LEVELDB_KEY_TORRENT_TORRNT_PIECES, db_struct);
-                    piece_length = read_item_db(id.first, LEVELDB_KEY_TORRENT_TORRNT_PIECE_LENGTH, db_struct);
+                    insert_date = read_item_db(id.first, LEVELDB_KEY_TORRENT_INSERT_DATE, db);
+                    complt_date = read_item_db(id.first, LEVELDB_KEY_TORRENT_COMPLT_DATE, db);
+                    creatn_date = read_item_db(id.first, LEVELDB_KEY_TORRENT_CREATN_DATE, db);
+                    dlstatus = read_item_db(id.first, LEVELDB_KEY_TORRENT_DLSTATUS, db);
+                    comment = read_item_db(id.first, LEVELDB_KEY_TORRENT_TORRNT_COMMENT, db);
+                    creator = read_item_db(id.first, LEVELDB_KEY_TORRENT_TORRNT_CREATOR, db);
+                    magnet_uri = read_item_db(id.first, LEVELDB_KEY_TORRENT_MAGNET_URI, db);
+                    torrent_name = read_item_db(id.first, LEVELDB_KEY_TORRENT_TORRNT_NAME, db);
+                    num_files = read_item_db(id.first, LEVELDB_KEY_TORRENT_NUM_FILES, db);
+                    num_trackers = read_item_db(id.first, LEVELDB_KEY_TORRENT_NUM_TRACKERS, db);
+                    num_pieces = read_item_db(id.first, LEVELDB_KEY_TORRENT_TORRNT_PIECES, db);
+                    piece_length = read_item_db(id.first, LEVELDB_KEY_TORRENT_TORRNT_PIECE_LENGTH, db);
 
                     gen_info.down_dest = id.second.first;
                     gen_info.insert_timestamp = std::atoll(insert_date.c_str());
@@ -1347,11 +1355,11 @@ std::vector<GekkoFyre::GkTorrent::TorrentInfo> GekkoFyre::CmnRoutines::readTorre
 
                     //
                     // Files
-                    auto files_info_vec = read_torrent_files_addendum(gen_info.num_files, id.first, db_struct);
+                    auto files_info_vec = read_torrent_files_addendum(gen_info.num_files, id.first, db);
 
                     //
                     // Trackers
-                    auto trackers_info_vec = read_torrent_trkrs_addendum(gen_info.num_trackers, id.first, db_struct);
+                    auto trackers_info_vec = read_torrent_trkrs_addendum(gen_info.num_trackers, id.first, db);
 
                     to_info.general = gen_info;
                     to_info.files_vec = files_info_vec;

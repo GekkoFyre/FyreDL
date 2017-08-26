@@ -45,6 +45,9 @@
 #include "settings.hpp"
 #include "./../curl_easy.hpp"
 #include "about.hpp"
+#include <leveldb/db.h>
+#include <leveldb/write_batch.h>
+#include <leveldb/cache.h>
 #include <boost/filesystem.hpp>
 #include <boost/exception/all.hpp>
 #include <boost/system/error_code.hpp>
@@ -73,14 +76,15 @@ namespace fs = boost::filesystem;
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
-    routines = std::make_shared<GekkoFyre::CmnRoutines>(this);
+    database = openDatabase();
+    routines = std::make_shared<GekkoFyre::CmnRoutines>(database, this);
 
     QMessageBox::warning(this, tr("FyreDL"), tr("FyreDL is currently under intense development at this "
                                                 "time! Please only use at your own risk."),
                          QMessageBox::Ok);
 
     curl_multi = new GekkoFyre::CurlMulti();
-    gk_torrent_client = new GekkoFyre::GkTorrentClient(this);
+    gk_torrent_client = new GekkoFyre::GkTorrentClient(database, this);
 
     // http://wiki.qt.io/QThreads_general_usage
     // https://mayaposch.wordpress.com/2011/11/01/how-to-really-truly-use-qthreads-the-full-explanation/
@@ -130,6 +134,38 @@ MainWindow::~MainWindow()
     gk_dl_info_cache.clear();
 }
 
+GekkoFyre::GkFile::FileDb MainWindow::openDatabase(const std::string &dbFileName)
+{
+    leveldb::Status s;
+    GekkoFyre::GkFile::FileDb db_struct;
+    db_struct.options.create_if_missing = true;
+    std::shared_ptr<leveldb::Cache>(db_struct.options.block_cache).reset(leveldb::NewLRUCache(LEVELDB_CFG_CACHE_SIZE));
+    db_struct.options.compression = leveldb::CompressionType::kSnappyCompression;
+
+    mutex.lock();
+    if (!dbFileName.empty()) {
+        std::string db_location = routines->leveldb_location(dbFileName);
+        sys::error_code ec;
+        bool doesExist;
+        doesExist = !fs::exists(db_location, ec) ? false : true;
+
+        leveldb::DB *raw_db_ptr;
+        s = leveldb::DB::Open(db_struct.options, db_location, &raw_db_ptr);
+        db_struct.db.reset(raw_db_ptr);
+        if (!s.ok()) {
+            mutex.unlock();
+            throw std::runtime_error(tr("Unable to open/create database! %1").arg(QString::fromStdString(s.ToString())).toStdString());
+        }
+
+        if (fs::exists(db_location, ec) && fs::is_directory(db_location) && !doesExist) {
+            std::cout << tr("Database object created. Status: ").toStdString() << s.ToString() << std::endl;
+        }
+    }
+
+    mutex.unlock();
+    return db_struct;
+}
+
 /**
  * @brief MainWindow::addDownload adds a URL and its properties/information to the 'downloadView' TableView widget.
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
@@ -141,7 +177,7 @@ MainWindow::~MainWindow()
  */
 void MainWindow::addDownload()
 {
-    QPointer<AddURL> add_url = new AddURL(this);
+    QPointer<AddURL> add_url = new AddURL(database, this);
     QObject::connect(add_url, SIGNAL(sendDetails(std::string,double,int,double,int,int,GekkoFyre::DownloadStatus,std::string,std::string,GekkoFyre::HashType,std::string,long long,bool,std::string,std::string,GekkoFyre::DownloadType)),
                      this, SLOT(sendDetails(std::string,double,int,double,int,int,GekkoFyre::DownloadStatus,std::string,std::string,GekkoFyre::HashType,std::string,long long,bool,std::string,std::string,GekkoFyre::DownloadType)));
     add_url->setAttribute(Qt::WA_DeleteOnClose, true);

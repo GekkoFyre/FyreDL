@@ -227,6 +227,7 @@ std::string GekkoFyre::GkCsvReader::read_row_helper(const int &row_no)
                     return val;
                 }
             } else {
+                mutex.unlock();
                 return "";
             }
         }
@@ -234,6 +235,7 @@ std::string GekkoFyre::GkCsvReader::read_row_helper(const int &row_no)
         std::cerr << e.what() << std::endl;
     }
 
+    ++cols_parsed;
     mutex.unlock();
     return "";
 }
@@ -246,6 +248,7 @@ std::string GekkoFyre::GkCsvReader::read_row_helper(const int &row_no)
  */
 bool GekkoFyre::GkCsvReader::force_cache_reload()
 {
+    rows_parsed = 0;
     parse_csv();
     return !csv_data.empty();
 }

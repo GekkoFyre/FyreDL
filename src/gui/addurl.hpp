@@ -57,7 +57,7 @@ class AddURL : public QDialog
     Q_OBJECT
 
 public:
-    explicit AddURL(QWidget *parent = 0);
+    explicit AddURL(const GekkoFyre::GkFile::FileDb &database, QWidget *parent = 0);
     ~AddURL();
 
 private slots:

@@ -52,6 +52,7 @@
 #include <vector>
 #include <string>
 #include <memory>
+#include <mutex>
 #include <QMainWindow>
 #include <QString>
 #include <QThread>
@@ -73,6 +74,8 @@ public:
     ~MainWindow();
 
 private:
+    GekkoFyre::GkFile::FileDb openDatabase(const std::string &dbFileName = CFG_HISTORY_DB_FILE);
+
     void addDownload();
     void readFromHistoryFile();
     void modifyHistoryFile();
@@ -114,6 +117,8 @@ private:
     QPointer<GekkoFyre::CurlMulti> curl_multi;
     QPointer<GekkoFyre::GkTorrentClient> gk_torrent_client;
     std::vector<GekkoFyre::Global::DownloadInfo> gk_dl_info_cache;
+    std::mutex mutex;
+    GekkoFyre::GkFile::FileDb database;
 
     // http://stackoverflow.com/questions/10121560/stdthread-naming-your-thread
     QPointer<QThread> curl_multi_thread;

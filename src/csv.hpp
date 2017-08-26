@@ -68,6 +68,7 @@ public:
         headers = { to_string(args)... };
         constexpr int args_count = sizeof...(args);
         cols_count = args_count;
+        rows_parsed = 0;
         parse_csv();
     }
 
@@ -87,13 +88,11 @@ public:
      */
     template<typename T, typename ...ColTypes>
     bool read_row(T& x, ColTypes& ...cols) {
-        static int rows_parsed = 0;
         if (!csv_data.empty()) {
-            ++rows_parsed;
             cols_parsed = 0;
-            if (rows_parsed <= rows_count) {
+            if ((rows_parsed + 1) <= rows_count) {
                 while (cols_parsed < (cols_count + 1)) {
-                    auto ret = read_row_helper(rows_parsed);
+                    auto ret = read_row_helper(rows_parsed + 1);
                     if (!ret.empty()) {
                         x = ret;
                         read_row(cols...);
@@ -104,6 +103,7 @@ public:
                 };
 
                 if (cols_parsed >= cols_count) {
+                    ++rows_parsed;
                     return true;
                 }
             }
@@ -128,6 +128,7 @@ private:
     int cols_count;
     int rows_count;
     static int cols_parsed;
+    int rows_parsed;
     std::mutex mutex;
     std::list<std::string> headers;                           // The key is the column number, whilst the value is the header associated with that column.
     std::multimap<int, std::pair<int, std::string>> csv_data; // The key is the row number whilst the values are are the column number and the comma-separated-values.

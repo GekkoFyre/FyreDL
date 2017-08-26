@@ -63,9 +63,9 @@ using clk = std::chrono::steady_clock;
  *       <http://libtorrent.org/reference-Core.html#save_resume_data()>
  *       <http://libtorrent.org/reference-Core.html#session_handle>
  */
-GekkoFyre::GkTorrentClient::GkTorrentClient(QObject *parent) : QObject(parent)
+GekkoFyre::GkTorrentClient::GkTorrentClient(const GekkoFyre::GkFile::FileDb &database, QObject *parent) : QObject(parent)
 {
-    routines = std::make_shared<GekkoFyre::CmnRoutines>();
+    routines = std::make_shared<GekkoFyre::CmnRoutines>(database, this);
     async_active = false;
 
     // http://libtorrent.org/reference-Settings.html#settings_pack

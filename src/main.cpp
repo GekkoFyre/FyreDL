@@ -74,7 +74,7 @@ int main(int argc, char *argv[])
     int width = s->width;
     double ratio = ((double)width / FYREDL_DEFAULT_RESOLUTION_WIDTH);
     if (ratio > 1.1) {
-        qputenv("QT_DEVICE_PIXEL_RATIO", QString::number(ratio).toLatin1());
+        qputenv("QT_SCALE_FACTOR", QString::number(ratio).toLatin1());
     }
 
     #else

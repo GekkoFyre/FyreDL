@@ -55,12 +55,12 @@
 #include <QDir>
 
 namespace fs = boost::filesystem;
-AddURL::AddURL(QWidget *parent) :
+AddURL::AddURL(const GekkoFyre::GkFile::FileDb &database, QWidget *parent) :
     QDialog(parent),
     ui(new Ui::AddURL)
 {
     ui->setupUi(this);
-    routines = std::make_shared<GekkoFyre::CmnRoutines>(this);
+    routines = std::make_shared<GekkoFyre::CmnRoutines>(database, this);
 
     ui->url_dest_lineEdit->setText(QDir::homePath());
     ui->file_dest_lineEdit->setText(QDir::homePath());
