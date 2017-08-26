@@ -447,6 +447,7 @@ std::string GekkoFyre::CmnRoutines::add_download_id(const std::string &file_path
         GkCsvReader csv_reader(3, csv_read_data);
         csv_reader.add_headers(LEVELDB_CSV_UID_KEY, LEVELDB_CSV_UID_VALUE1, LEVELDB_CSV_UID_VALUE2);
 
+        csv_reader.force_cache_reload();
         std::string uid_key, path, is_torrent_bool;
         while (csv_reader.read_row(uid_key, path, is_torrent_bool)) {
             if (!uid_key.empty() && !path.empty()) {
@@ -515,9 +516,13 @@ bool GekkoFyre::CmnRoutines::del_download_id(const std::string &unique_id, const
  * @param value The value you wish to store in the database along with the key.
  * @param db_struct The database object used for connecting to the Google LevelDB database.
  */
-void GekkoFyre::CmnRoutines::add_item_db(const std::string download_id, const std::string &key, const std::string &value,
+void GekkoFyre::CmnRoutines::add_item_db(const std::string download_id, const std::string &key, std::string value,
                                          const GekkoFyre::GkFile::FileDb &db_struct)
 {
+    if (value.empty()) {
+        value = "";
+    }
+
     leveldb::WriteOptions write_options;
     write_options.sync = true;
     leveldb::WriteBatch batch;
@@ -567,7 +572,7 @@ std::string GekkoFyre::CmnRoutines::read_item_db(const std::string download_id, 
     read_opt.verify_checksums = true;
     std::string key_joined = multipart_key({download_id, key});
     std::string read_data;
-    s = db_struct.db->Get(read_opt, download_id, &read_data);
+    s = db_struct.db->Get(read_opt, key_joined, &read_data);
     if (!s.ok()) {
         throw std::runtime_error(s.ToString());
     }
@@ -611,6 +616,7 @@ std::pair<std::string, bool> GekkoFyre::CmnRoutines::determine_download_id(const
             throw std::invalid_argument(tr("Information provided from database is invalid!").toStdString());
         }
 
+        csv_in.force_cache_reload();
         std::string unique_id, path, is_torrent_csv_str;
         int is_torrent_csv = 0;
         while (csv_in.read_row(unique_id, path, is_torrent_csv_str)) {
@@ -657,6 +663,7 @@ QMap<std::string, std::pair<std::string, bool>> GekkoFyre::CmnRoutines::extract_
         GkCsvReader csv_in(3, csv_read_data);
         csv_in.add_headers(LEVELDB_CSV_UID_KEY, LEVELDB_CSV_UID_VALUE1, LEVELDB_CSV_UID_VALUE2);
 
+        csv_in.force_cache_reload();
         std::string unique_id, path, is_torrent_csv_str;
         bool is_torrent_csv = 0;
         while (csv_in.read_row(unique_id, path, is_torrent_csv_str)) {
@@ -1767,6 +1774,7 @@ std::vector<GekkoFyre::GkTorrent::TorrentFile> GekkoFyre::CmnRoutines::read_torr
                             .arg(QString::fromStdString(download_key)), QMessageBox::Ok);
                 }
 
+                csv_parse.force_cache_reload();
                 std::string file_path, sha1, flags, content_length, file_offset, mod_time, mapflepce_key, bool_dled;
                 GekkoFyre::GkTorrent::TorrentFile item;
                 while (csv_parse.read_row(file_path, content_length, sha1, file_offset, mod_time, mapflepce_key, bool_dled, flags)) {
@@ -1878,6 +1886,7 @@ std::vector<GekkoFyre::GkTorrent::TorrentTrackers> GekkoFyre::CmnRoutines::read_
                             .arg(QString::fromStdString(download_key)), QMessageBox::Ok);
                 }
 
+                csv_parse.force_cache_reload();
                 std::string tracker_url, tracker_tier, tracker_bool_enabled;
                 GekkoFyre::GkTorrent::TorrentTrackers item;
                 while (csv_parse.read_row(tracker_url, tracker_tier, tracker_bool_enabled)) {

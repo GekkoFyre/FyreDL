@@ -44,6 +44,7 @@
 #include <iostream>
 
 int GekkoFyre::GkCsvReader::cols_parsed;
+QMultiMap<int, int> GekkoFyre::GkCsvReader::proc_cols;
 
 GekkoFyre::GkCsvReader::GkCsvReader(const int &column_count, const std::string &csv_data)
 {
@@ -68,7 +69,7 @@ bool GekkoFyre::GkCsvReader::has_column(const std::string &name)
         for (const auto &row: rows) {
             // Key is the row number and value is the row of raw data
             auto cols = split_values(std::stringstream(row.second));
-            if (row.first == 0) {
+            if (row.first == 1) {
                 // Determine headers
                 for (const auto &col: cols) {
                     if (col.second == name) {
@@ -76,6 +77,12 @@ bool GekkoFyre::GkCsvReader::has_column(const std::string &name)
                     }
                 }
             }
+        }
+    }
+
+    for (size_t i = 0; i < headers.size(); ++i) {
+        if (headers[i] == name) {
+            return true;
         }
     }
 
@@ -91,11 +98,13 @@ bool GekkoFyre::GkCsvReader::has_column(const std::string &name)
 std::unordered_map<int, std::string> GekkoFyre::GkCsvReader::read_rows()
 {
     std::unordered_map<int, std::string> lines;
-    if (!csv_raw_data.str().empty()) {
-        if (search_string(csv_raw_data.str(), "\r\n")) {
-            csv_raw_data.str().erase(std::remove(csv_raw_data.str().begin(), csv_raw_data.str().end(), '\r'),
-                                     csv_raw_data.str().end());
-        } else if (!search_string(csv_raw_data.str(), "\n")) {
+    std::stringstream raw_data;
+    raw_data << csv_raw_data.str();
+    if (!raw_data.str().empty()) {
+        if (search_string(raw_data.str(), "\r\n")) {
+            raw_data.str().erase(std::remove(raw_data.str().begin(), raw_data.str().end(), '\r'),
+                                     raw_data.str().end());
+        } else if (!search_string(raw_data.str(), "\n")) {
             throw std::invalid_argument("Unable to find any suitable line-endings for the given CSV data!");
         }
 
@@ -104,7 +113,7 @@ std::unordered_map<int, std::string> GekkoFyre::GkCsvReader::read_rows()
         }
 
         std::string row;
-        while (std::getline(csv_raw_data, row, '\n')) {
+        while (std::getline(raw_data, row, '\n')) {
             ++rows_count;
             lines.insert(std::make_pair(rows_count, row));
         }
@@ -194,13 +203,10 @@ std::map<int, std::string> GekkoFyre::GkCsvReader::split_values(std::stringstrea
     return output;
 }
 
-std::string GekkoFyre::GkCsvReader::read_row_helper(const int &row_no)
+std::string GekkoFyre::GkCsvReader::read_row_helper(int col_no, const int &row_no)
 {
     try {
-        if (cols_parsed == 0) {
-            mutex.lock();
-            ++cols_parsed;
-            mutex.unlock();
+        if (col_no == 0) {
             return "";
         }
 
@@ -208,34 +214,28 @@ std::string GekkoFyre::GkCsvReader::read_row_helper(const int &row_no)
             static std::string val;
             if (mutex.try_lock()) {
                 for (auto id: csv_data) {
-                    if ((id.first == row_no) && (id.second.first == cols_parsed)) {
-                        if (!val.empty()) {
+                    if (!proc_cols.contains(row_no, col_no)) {
+                        if ((id.first == row_no) && (id.second.first == col_no)) {
                             if (std::strcmp(val.c_str(), id.second.second.c_str()) == 0) {
-                                ++cols_parsed;
-                                mutex.unlock();
                                 return "";
                             }
-                        }
 
-                        val = id.second.second;
+                            val = id.second.second;
+
+                            if (!val.empty()) {
+                                proc_cols.insertMulti(row_no, col_no);
+                                mutex.unlock();
+                                return val;
+                            }
+                        }
                     }
                 }
-
-                if (!val.empty()) {
-                    ++cols_parsed;
-                    mutex.unlock();
-                    return val;
-                }
-            } else {
-                mutex.unlock();
-                return "";
             }
         }
     } catch (const std::exception &e) {
         std::cerr << e.what() << std::endl;
     }
 
-    ++cols_parsed;
     mutex.unlock();
     return "";
 }
@@ -249,6 +249,7 @@ std::string GekkoFyre::GkCsvReader::read_row_helper(const int &row_no)
 bool GekkoFyre::GkCsvReader::force_cache_reload()
 {
     rows_parsed = 0;
+    proc_cols.clear();
     parse_csv();
     return !csv_data.empty();
 }

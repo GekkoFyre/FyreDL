@@ -112,7 +112,7 @@ public:
     void leveldb_lock_remove(const std::string &dbFile = CFG_HISTORY_DB_FILE) noexcept;
 
     std::string leveldb_location(const std::string &dbFile = CFG_HISTORY_DB_FILE) noexcept;
-    void add_item_db(const std::string download_id, const std::string &key, const std::string &value,
+    void add_item_db(const std::string download_id, const std::string &key, std::string value,
                      const GekkoFyre::GkFile::FileDb &db_struct);
     void del_item_db(const std::string download_id, const std::string &key, const GekkoFyre::GkFile::FileDb &db_struct);
     std::string read_item_db(const std::string download_id, const std::string &key, const GekkoFyre::GkFile::FileDb &db_struct);

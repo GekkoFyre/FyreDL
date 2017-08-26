@@ -54,6 +54,7 @@
 #include <map>
 #include <array>
 #include <memory>
+#include <QMultiMap>
 
 namespace GekkoFyre {
 class GkCsvReader {
@@ -64,11 +65,12 @@ public:
 
     template<typename ...ColNames>
     void add_headers(ColNames... args) {
-        headers.clear();
         headers = { to_string(args)... };
         constexpr int args_count = sizeof...(args);
         cols_count = args_count;
         rows_parsed = 0;
+        key = (has_column(LEVELDB_CSV_UID_KEY) && has_column(LEVELDB_CSV_UID_VALUE1) && has_column(LEVELDB_CSV_UID_VALUE2));
+        proc_cols.clear();
         parse_csv();
     }
 
@@ -92,18 +94,23 @@ public:
             cols_parsed = 0;
             if ((rows_parsed + 1) <= rows_count) {
                 while (cols_parsed < (cols_count + 1)) {
-                    auto ret = read_row_helper(rows_parsed + 1);
+                    T ret;
+                    if (key) {
+                        ret = read_row_helper(cols_parsed, rows_parsed + 1);
+                    } else {
+                        ret = read_row_helper(cols_parsed, rows_parsed + 2);
+                    }
+
+                    ++cols_parsed;
                     if (!ret.empty()) {
                         x = ret;
                         read_row(cols...);
-                        continue;
                     }
-
-                    continue;
                 };
 
                 if (cols_parsed >= cols_count) {
                     ++rows_parsed;
+                    cols_parsed = 0;
                     return true;
                 }
             }
@@ -130,7 +137,9 @@ private:
     static int cols_parsed;
     int rows_parsed;
     std::mutex mutex;
-    std::list<std::string> headers;                           // The key is the column number, whilst the value is the header associated with that column.
+    bool key;
+    std::array<std::string, 15> headers;                           // The key is the column number, whilst the value is the header associated with that column.
+    static QMultiMap<int, int> proc_cols;
     std::multimap<int, std::pair<int, std::string>> csv_data; // The key is the row number whilst the values are are the column number and the comma-separated-values.
 
     template<typename Container>
@@ -141,7 +150,7 @@ private:
     std::unordered_map<int, std::string> read_rows();
     std::map<int, std::string> split_values(std::stringstream raw_csv_line);
     void parse_csv();
-    std::string read_row_helper(const int &row_no);
+    std::string read_row_helper(int col_no, const int &row_no);
 };
 }
 
