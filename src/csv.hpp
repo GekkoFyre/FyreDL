@@ -53,7 +53,7 @@
 #include <unordered_map>
 #include <map>
 #include <array>
-#include <tuple>
+#include <memory>
 
 namespace GekkoFyre {
 class GkCsvReader {
@@ -74,6 +74,7 @@ public:
     virtual bool has_column(const std::string &name);
     virtual int determine_column(const std::string &header);
     virtual bool force_cache_reload();
+    void read_row();
 
     /**
      * @brief GekkoFyre::GkCsvReader::read_row will output the CSV data via the arguments in a variadic fashion, and is intended
@@ -84,19 +85,25 @@ public:
      * which column to draw the data from.
      * @return When to abort or repeat the while() loop.
      */
-    template<typename ...ColTypes>
-    bool read_row(ColTypes& ...cols) {
+    template<typename T, typename ...ColTypes>
+    bool read_row(T& x, ColTypes& ...cols) {
         static int rows_parsed = 0;
         if (!csv_data.empty()) {
             ++rows_parsed;
+            cols_parsed = 0;
             if (rows_parsed <= rows_count) {
-                static int col_no = -1;
-                while (col_no <= (cols_count - 1)) {
-                    ++col_no;
-                    parse_cols<std::string>(col_no, parse_helper(parse_cols_ptr<std::string>(col_no, read_row_helper<std::string>(rows_parsed, col_no, cols)...), cols)...);
+                while (cols_parsed < (cols_count + 1)) {
+                    auto ret = read_row_helper(rows_parsed);
+                    if (!ret.empty()) {
+                        x = ret;
+                        read_row(cols...);
+                        continue;
+                    }
+
+                    continue;
                 };
 
-                if (col_no >= cols_count) {
+                if (cols_parsed >= cols_count) {
                     return true;
                 }
             }
@@ -106,11 +113,6 @@ public:
     }
 
 private:
-    template<typename ...Ts>
-    auto dummy_func(Ts ...args) {
-        return std::make_tuple(args...);
-    }
-
     template<typename T>
     std::string to_string(const T &value) {
         std::ostringstream ss;
@@ -125,6 +127,7 @@ private:
     std::stringstream csv_raw_data;
     int cols_count;
     int rows_count;
+    static int cols_parsed;
     std::mutex mutex;
     std::list<std::string> headers;                           // The key is the column number, whilst the value is the header associated with that column.
     std::multimap<int, std::pair<int, std::string>> csv_data; // The key is the row number whilst the values are are the column number and the comma-separated-values.
@@ -137,58 +140,7 @@ private:
     std::unordered_map<int, std::string> read_rows();
     std::map<int, std::string> split_values(std::stringstream raw_csv_line);
     void parse_csv();
-
-    template<typename T, typename X>
-    auto parse_helper(T *value, X& col) {
-        if (value != nullptr) {
-            col = *value;
-            return *value;
-        }
-
-        return std::string();
-    };
-
-    template<typename T, typename ...Ts>
-    auto parse_cols(const int &col_no, Ts ...values) {
-        std::array<T, 15> init_array { values... };
-        T val_ret;
-        for (size_t i = 0; i < init_array.size(); ++i) {
-            if (col_no == (int)i) {
-                val_ret = init_array[col_no];
-            }
-        }
-
-        return val_ret;
-    }
-
-    template<typename T, typename ...Ts>
-    auto parse_cols_ptr(const int &col_no, Ts* ...values) {
-        std::array<T*, 15> init_array { values... };
-        T *val_ret = nullptr;
-        for (size_t i = 0; i < init_array.size(); ++i) {
-            if (col_no == (int)i) {
-                val_ret = init_array[col_no];
-            }
-        }
-
-        return val_ret;
-    }
-
-    template<typename T>
-    T* read_row_helper(const int &row_no, const int &col_no, T& col) {
-        if (!csv_data.empty() && (row_no <= rows_count)) {
-            T val;
-            for (auto id: csv_data) {
-                if ((id.first == row_no) && (id.second.first == (col_no + 1))) {
-                    val = id.second.second;
-                }
-            }
-
-            return new T(std::forward<T>(val));
-        }
-
-        return new T(std::forward<T>(col));
-    }
+    std::string read_row_helper(const int &row_no);
 };
 }
 

@@ -43,12 +43,22 @@
 #include "csv.hpp"
 #include <iostream>
 
+int GekkoFyre::GkCsvReader::cols_parsed;
+
 GekkoFyre::GkCsvReader::GkCsvReader(const int &column_count, const std::string &csv_data)
 {
     cols_count = column_count;
     if (!csv_data.empty()) {
         csv_raw_data << csv_data;
+        return;
     }
+
+    return;
+}
+
+void GekkoFyre::GkCsvReader::read_row()
+{
+    return;
 }
 
 bool GekkoFyre::GkCsvReader::has_column(const std::string &name)
@@ -182,6 +192,50 @@ std::map<int, std::string> GekkoFyre::GkCsvReader::split_values(std::stringstrea
     }
 
     return output;
+}
+
+std::string GekkoFyre::GkCsvReader::read_row_helper(const int &row_no)
+{
+    try {
+        if (cols_parsed == 0) {
+            mutex.lock();
+            ++cols_parsed;
+            mutex.unlock();
+            return "";
+        }
+
+        if (!csv_data.empty() && (row_no <= rows_count)) {
+            static std::string val;
+            if (mutex.try_lock()) {
+                for (auto id: csv_data) {
+                    if ((id.first == row_no) && (id.second.first == cols_parsed)) {
+                        if (!val.empty()) {
+                            if (std::strcmp(val.c_str(), id.second.second.c_str()) == 0) {
+                                ++cols_parsed;
+                                mutex.unlock();
+                                return "";
+                            }
+                        }
+
+                        val = id.second.second;
+                    }
+                }
+
+                if (!val.empty()) {
+                    ++cols_parsed;
+                    mutex.unlock();
+                    return val;
+                }
+            } else {
+                return "";
+            }
+        }
+    } catch (const std::exception &e) {
+        std::cerr << e.what() << std::endl;
+    }
+
+    mutex.unlock();
+    return "";
 }
 
 /**
