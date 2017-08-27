@@ -54,6 +54,7 @@
 #include <map>
 #include <array>
 #include <memory>
+#include <mutex>
 #include <QMultiMap>
 
 namespace GekkoFyre {
@@ -91,15 +92,10 @@ public:
     template<typename T, typename ...ColTypes>
     bool read_row(T& x, ColTypes& ...cols) {
         if (!csv_data.empty()) {
-            cols_parsed = 0;
+            static int cols_parsed = 0;
             if ((rows_parsed + 1) <= rows_count) {
                 while (cols_parsed < (cols_count + 1)) {
-                    T ret;
-                    if (key) {
-                        ret = read_row_helper(cols_parsed, rows_parsed + 1);
-                    } else {
-                        ret = read_row_helper(cols_parsed, rows_parsed + 2);
-                    }
+                    auto ret = read_row_helper(cols_parsed, (rows_parsed + 1));
 
                     ++cols_parsed;
                     if (!ret.empty()) {
@@ -109,8 +105,8 @@ public:
                 };
 
                 if (cols_parsed >= cols_count) {
-                    ++rows_parsed;
                     cols_parsed = 0;
+                    ++rows_parsed;
                     return true;
                 }
             }
@@ -134,11 +130,10 @@ private:
     std::stringstream csv_raw_data;
     int cols_count;
     int rows_count;
-    static int cols_parsed;
-    int rows_parsed;
+    static int rows_parsed;
     std::mutex mutex;
     bool key;
-    std::array<std::string, 15> headers;                           // The key is the column number, whilst the value is the header associated with that column.
+    std::array<std::string, 15> headers;                      // The key is the column number, whilst the value is the header associated with that column.
     static QMultiMap<int, int> proc_cols;
     std::multimap<int, std::pair<int, std::string>> csv_data; // The key is the row number whilst the values are are the column number and the comma-separated-values.
 
@@ -150,7 +145,7 @@ private:
     std::unordered_map<int, std::string> read_rows();
     std::map<int, std::string> split_values(std::stringstream raw_csv_line);
     void parse_csv();
-    std::string read_row_helper(int col_no, const int &row_no);
+    std::string read_row_helper(int &col_no, const int &row_no);
 };
 }
 

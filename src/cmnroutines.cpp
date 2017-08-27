@@ -1860,7 +1860,7 @@ std::vector<GekkoFyre::GkTorrent::TorrentFile> GekkoFyre::CmnRoutines::read_torr
                 }
 
                 csv_parse.force_cache_reload();
-                std::string file_path, sha1, flags, content_length, file_offset, mod_time, mapflepce_key, bool_dled;
+                std::string file_path, content_length, sha1, file_offset, mod_time, mapflepce_key, bool_dled, flags;
                 GekkoFyre::GkTorrent::TorrentFile item;
                 while (csv_parse.read_row(file_path, content_length, sha1, file_offset, mod_time, mapflepce_key, bool_dled, flags)) {
                     if (!download_key.empty()) {
@@ -1947,16 +1947,16 @@ std::vector<GekkoFyre::GkTorrent::TorrentTrackers> GekkoFyre::CmnRoutines::read_
 {
     if (num_trackers > 0) {
         static int counter;
-        counter = (num_trackers + 1);
+        counter = num_trackers;
         std::vector<GekkoFyre::GkTorrent::TorrentTrackers> to_trackers;
-        while (counter != 0) {
+        while (counter == num_trackers) {
             --counter;
             std::string tracker_key, csv_tracker_data;
             leveldb::ReadOptions read_opt;
             leveldb::Status s;
             read_opt.verify_checksums = true;
 
-            tracker_key = multipart_key({download_key, LEVELDB_KEY_TORRENT_TORRENT_FILES, std::to_string(counter)});
+            tracker_key = multipart_key({download_key, LEVELDB_KEY_TORRENT_TRACKERS, std::to_string(counter + 1)});
             s = db_struct.db->Get(read_opt, tracker_key, &csv_tracker_data);
             if (!s.ok()) {
                 std::cerr << tr("Error whilst processing files for BitTorrent item: \"%1\".\nError: ")
