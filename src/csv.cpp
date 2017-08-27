@@ -231,6 +231,8 @@ std::string GekkoFyre::GkCsvReader::read_row_helper(int col_no, const int &row_n
                     }
                 }
             }
+        } else {
+            return "";
         }
     } catch (const std::exception &e) {
         std::cerr << e.what() << std::endl;

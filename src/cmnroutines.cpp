@@ -216,30 +216,12 @@ QString GekkoFyre::CmnRoutines::timeBeautify(const double &secondsToConvert)
 }
 
 /**
- * @brief GekkoFyre::CmnRoutines::print_exception_qmsgbox recursively prints out all the exceptions from the
- * immediate cause.
- * @date 2016-11-12
- * @note <http://en.cppreference.com/w/cpp/error/throw_with_nested>
- * @param e
- * @param level
- */
-void GekkoFyre::CmnRoutines::print_exception(const std::exception &e, int level)
-{
-    std::cerr << std::string((unsigned long)level, ' ') << tr("exception: ").toStdString() << e.what() << std::endl;
-    try {
-        std::rethrow_if_nested(e);
-    } catch (const std::exception &e) {
-        print_exception(e, (level + 1));
-    } catch (...) {}
-}
-
-/**
  * @brief GekkoFyre::CmnRoutines::createId generates a unique ID and returns the value.
  * @date 2016-12-12
  * @note <http://stackoverflow.com/questions/13445688/how-to-generate-a-random-number-in-c>
  * @return The uniquely generated ID.
  */
-std::string GekkoFyre::CmnRoutines::createId(const size_t &id_length) noexcept
+std::string GekkoFyre::CmnRoutines::createId(const size_t &id_length)
 {
     std::mt19937 rng;
     rng.seed(std::random_device()());
@@ -248,6 +230,10 @@ std::string GekkoFyre::CmnRoutines::createId(const size_t &id_length) noexcept
 
     for (size_t i = 0; i < (id_length - 1); ++i) {
         oss << dist10(rng);
+    }
+
+    if (oss.str().empty()) {
+        throw std::invalid_argument(tr("An invalid Unique Identifier has been created! It is empty.").toStdString());
     }
 
     return oss.str();
@@ -916,7 +902,7 @@ int GekkoFyre::CmnRoutines::load_file(const std::string &filename, std::vector<c
  */
 GekkoFyre::GkTorrent::TorrentInfo GekkoFyre::CmnRoutines::torrentFileInfo(const std::string &file_dest,
                                                                           const int &item_limit,
-                                                                          const int &depth_limit) noexcept
+                                                                          const int &depth_limit)
 {
     GekkoFyre::GkTorrent::TorrentInfo gk_torrent_struct;
     gk_torrent_struct.general.comment = "";
@@ -935,13 +921,12 @@ GekkoFyre::GkTorrent::TorrentInfo GekkoFyre::CmnRoutines::torrentFileInfo(const 
     error_code ec;
     int ret = load_file(file_dest, buf, ec, 40 * 1000000);
     if (ret == -1) {
-        QMessageBox::warning(nullptr, tr("Error!"), tr("File too big, aborting..."), QMessageBox::Ok);
-        return gk_torrent_struct;
+        throw std::runtime_error(tr("BitTorrent file, \"%1\", too big. Aborting...")
+                                         .arg(QString::fromStdString(file_dest)).toStdString());
     }
 
     if (ret != 0) {
-        QMessageBox::warning(nullptr, tr("Error!"), tr("Failed to load file: %1").arg(QString::fromStdString(file_dest)), QMessageBox::Ok);
-        return gk_torrent_struct;
+        throw std::runtime_error(tr("Failed to load file, \"%1\".").arg(QString::fromStdString(file_dest)).toStdString());
     }
 
     bdecode_node e;
@@ -951,15 +936,13 @@ GekkoFyre::GkTorrent::TorrentInfo GekkoFyre::CmnRoutines::torrentFileInfo(const 
     ret = bdecode(&buf[0], &buf[0] + buf.size(), e, ec, &pos, depth_limit, item_limit);
 
     if (ret != 0) {
-        QMessageBox::warning(nullptr, tr("Error!"), tr("Failed to decode: '%1' at character: %2")
-                .arg(QString::fromStdString(ec.message())).arg(QString::number(pos)), QMessageBox::Ok);
-        return gk_torrent_struct;
+        throw std::invalid_argument(tr("Failed to decode: '%1' at character: %2")
+                                            .arg(QString::fromStdString(ec.message())).arg(QString::number(pos)).toStdString());
     }
 
     torrent_info t(e, ec);
     if (ec) {
-        QMessageBox::warning(nullptr, tr("Error!"), QString("%1").arg(QString::fromStdString(ec.message())), QMessageBox::Ok);
-        return gk_torrent_struct;
+        throw ec.message();
     }
 
     e.clear();
@@ -976,50 +959,136 @@ GekkoFyre::GkTorrent::TorrentInfo GekkoFyre::CmnRoutines::torrentFileInfo(const 
         gk_torrent_struct.nodes.push_back(std::make_pair(i->first, i->second));
     }
 
+    std::string unique_id = createId(FYREDL_UNIQUE_ID_DIGIT_COUNT);
+
     // Trackers
-    for (std::vector<announce_entry>::const_iterator i = t.trackers().begin(); i != t.trackers().end(); ++i) {
+    mutex.lock();
+    int num_trackers = 0;
+    size_t bad_trackers = 0;
+    for (const auto &i: t.trackers()) {
         GekkoFyre::GkTorrent::TorrentTrackers gk_torrent_tracker;
-        gk_torrent_tracker.tier = i->tier;
-        gk_torrent_tracker.url = i->url;
-        gk_torrent_tracker.enabled = true;
-        gk_torrent_struct.trackers.push_back(gk_torrent_tracker);
+        if (i.tier >= 0 && !i.url.empty()) {
+            gk_torrent_tracker.tier = i.tier;
+            gk_torrent_tracker.url = i.url;
+            gk_torrent_tracker.enabled = true;
+            gk_torrent_tracker.unique_id = unique_id;
+            ++num_trackers;
+            gk_torrent_struct.trackers.push_back(gk_torrent_tracker);
+        } else {
+            ++bad_trackers;
+
+            if (t.trackers().size() >= bad_trackers) {
+                throw std::invalid_argument(tr("No trackers were given for BitTorrent download, \"%1\".")
+                                                    .arg(QString::fromStdString(file_dest)).toStdString());
+            }
+
+            continue;
+        }
     }
 
+    mutex.unlock();
     // std::ostringstream ih;
     // to_hex((char const*)&t.info_hash()[0], 20, ih);
     // ih << std::hex << t.info_hash();
 
-    std::string unique_id = createId(FYREDL_UNIQUE_ID_DIGIT_COUNT);
-    gk_torrent_struct.general.num_pieces = t.num_pieces();
-    gk_torrent_struct.general.piece_length = t.piece_length();
-    gk_torrent_struct.general.comment = t.comment();
-    gk_torrent_struct.general.creator = t.creator();
-    gk_torrent_struct.general.magnet_uri = make_magnet_uri(t);
-    gk_torrent_struct.general.num_files = t.num_files();
+    if (t.num_pieces() >= 0) {
+        gk_torrent_struct.general.num_pieces = t.num_pieces();
+    } else {
+        throw std::invalid_argument(tr("No downloadable items were specified for BitTorrent item, \"%1\".")
+                                            .arg(QString::fromStdString(gk_torrent_struct.general.torrent_name)).toStdString());
+    }
+
+    if (t.piece_length() >= 0) {
+        gk_torrent_struct.general.piece_length = t.piece_length();
+    } else {
+        throw std::invalid_argument(tr("No downloadable items were specified for BitTorrent item, \"%1\".")
+                                            .arg(QString::fromStdString(gk_torrent_struct.general.torrent_name)).toStdString());
+    }
+
+    if (!t.name().empty()) {
+        gk_torrent_struct.general.torrent_name = t.name();
+    } else {
+        gk_torrent_struct.general.torrent_name = "";
+    }
+
+    if (!t.comment().empty()) {
+        gk_torrent_struct.general.comment = t.comment();
+    } else {
+        gk_torrent_struct.general.comment = "";
+    }
+
+    if (!t.creator().empty()) {
+        gk_torrent_struct.general.creator = t.creator();
+    } else {
+        gk_torrent_struct.general.creator = "";
+    }
+
+    if (!make_magnet_uri(t).empty()) {
+        gk_torrent_struct.general.magnet_uri = make_magnet_uri(t);
+    } else {
+        throw std::invalid_argument(tr("An invalid Magnet URI was given for BitTorrent item, \"%1\".")
+                                            .arg(QString::fromStdString(gk_torrent_struct.general.torrent_name)).toStdString());
+    }
+
+    if (t.num_files() >= 0) {
+        gk_torrent_struct.general.num_files = t.num_files();
+    } else {
+        throw std::invalid_argument(tr("No downloadable items were specified for BitTorrent item, \"%1\".")
+                                            .arg(QString::fromStdString(gk_torrent_struct.general.torrent_name)).toStdString());
+    }
+
     // gk_torrent_struct.creatn_timestamp = t.creation_date().get();
-    gk_torrent_struct.general.torrent_name = t.name();
     gk_torrent_struct.general.unique_id = unique_id;
+    gk_torrent_struct.general.num_trackers = num_trackers;
 
     const file_storage &st = t.files();
     for (int i = 0; i < st.num_files(); ++i) {
         const int first = st.map_file(i, 0, 0).piece;
         const int last = st.map_file(i, (std::max)(boost::int64_t(st.file_size(i))-1, boost::int64_t(0)), 0).piece;
-        const int flags = st.file_flags(i);
-        const int64_t file_offset = st.file_offset(i);
-        const int64_t file_size = st.file_size(i);
-        uint32_t mod_time = (uint32_t)st.mtime(i);
-
         GekkoFyre::GkTorrent::TorrentFile gk_tf;
-        std::ostringstream sha1_hex;
-        sha1_hex << std::hex << st.hash(i).to_string();
+        gk_tf.flags = 0;
+        gk_tf.map_file_piece = std::make_pair(0, 0);
+
         gk_tf.unique_id = unique_id;
-        gk_tf.sha1_hash_hex = sha1_hex.str();
-        gk_tf.file_path = st.file_path(i);
-        gk_tf.file_offset = file_offset;
-        gk_tf.content_length = file_size;
-        gk_tf.mtime = mod_time;
+
+        if (!st.hash(i).to_string().empty()) {
+            std::ostringstream sha1_hex;
+            sha1_hex << std::hex << st.hash(i).to_string();
+            if (!sha1_hex.str().empty()) {
+                gk_tf.sha1_hash_hex = sha1_hex.str();
+            } else {
+                gk_tf.sha1_hash_hex = "";
+            }
+        } else {
+            gk_tf.sha1_hash_hex = "";
+        }
+
+        if (!st.file_path(i).empty()) {
+            gk_tf.file_path = st.file_path(i);
+        }
+
+        if (st.file_offset(i) >= 0) {
+            gk_tf.file_offset = st.file_offset(i);
+        } else {
+            gk_tf.file_offset = 0;
+        }
+
+        if (st.file_size(i) >= 0) {
+            gk_tf.content_length = st.file_size(i);
+        } else {
+            gk_tf.content_length = 0;
+            std::cerr << tr("Invalid content length of zero-bytes has been given! File: \"%1\".")
+                    .arg(QString::fromStdString(gk_tf.file_path)).toStdString() << std::endl;
+        }
+
+        if (st.mtime(i) >= 0) {
+            gk_tf.mtime = (uint32_t)st.mtime(i);
+        } else {
+            gk_tf.mtime = 0;
+        }
+
         gk_tf.map_file_piece = std::make_pair(first, last);
-        gk_tf.flags = flags;
+        gk_tf.flags = st.file_flags(i);
         gk_tf.downloaded = false;
         gk_torrent_struct.files_vec.push_back(gk_tf);
     }
@@ -1369,8 +1438,20 @@ std::vector<GekkoFyre::GkTorrent::TorrentInfo> GekkoFyre::CmnRoutines::readTorre
                     auto trackers_info_vec = read_torrent_trkrs_addendum(gen_info.num_trackers, id.first, db);
 
                     to_info.general = gen_info;
-                    to_info.files_vec = files_info_vec;
-                    to_info.trackers = trackers_info_vec;
+                    if (!files_info_vec.empty()) {
+                        to_info.files_vec = files_info_vec;
+                    } else {
+                        throw std::invalid_argument(tr("Unable to interpret the internal file-layout for BitTorrent item, \"%1\".")
+                                                            .arg(QString::fromStdString(gen_info.torrent_name)).toStdString());
+                    }
+
+                    if (!trackers_info_vec.empty()) {
+                        to_info.trackers = trackers_info_vec;
+                    } else {
+                        throw std::invalid_argument(tr("Unable to determine the trackers for BitTorrent item, \"%1\".")
+                                                            .arg(QString::fromStdString(gen_info.torrent_name)).toStdString());
+                    }
+
                     output.push_back(to_info);
                 }
             }
@@ -1693,14 +1774,14 @@ QString GekkoFyre::CmnRoutines::numberConverter(const double &value)
     }
 }
 
-bool GekkoFyre::CmnRoutines::write_torrent_files_addendum(const std::vector<GekkoFyre::GkTorrent::TorrentFile> &to_files_vec,
+bool GekkoFyre::CmnRoutines::write_torrent_files_addendum(std::vector<GekkoFyre::GkTorrent::TorrentFile> &to_files_vec,
                                                           const std::string &download_key,
                                                           const GekkoFyre::GkFile::FileDb &db_struct) noexcept
 {
     if (!to_files_vec.empty()) {
         static int counter;
         counter = 0;
-        for (const auto &f: to_files_vec) {
+        for (auto &f: to_files_vec) {
             ++counter;
             std::string file_key, mapflepce_key;
             std::ostringstream file_write_data, mapflepce_write_data;
@@ -1712,6 +1793,10 @@ bool GekkoFyre::CmnRoutines::write_torrent_files_addendum(const std::vector<Gekk
             write_options.sync = true;
             batch.Delete(file_key);
             batch.Delete(mapflepce_key);
+
+            if (f.sha1_hash_hex.empty()) {
+                f.sha1_hash_hex = "";
+            }
 
             file_write_data << LEVELDB_CSV_TORRENT_FILE_PATH << "," << LEVELDB_CSV_TORRENT_FILE_CONTENT_LENGTH << ",";
             file_write_data << LEVELDB_CSV_TORRENT_FILE_SHA1 << "," << LEVELDB_CSV_TORRENT_FILE_FILE_OFFSET << ",";
@@ -1778,36 +1863,38 @@ std::vector<GekkoFyre::GkTorrent::TorrentFile> GekkoFyre::CmnRoutines::read_torr
                 std::string file_path, sha1, flags, content_length, file_offset, mod_time, mapflepce_key, bool_dled;
                 GekkoFyre::GkTorrent::TorrentFile item;
                 while (csv_parse.read_row(file_path, content_length, sha1, file_offset, mod_time, mapflepce_key, bool_dled, flags)) {
-                    item.unique_id = download_key;
-                    item.file_path = file_path;
-                    item.content_length = std::atol(content_length.c_str());
-                    item.sha1_hash_hex = sha1;
-                    item.file_offset = std::atol(file_offset.c_str());
-                    item.mtime = std::atoi(mod_time.c_str());
-                    item.downloaded = convertBool_fromInt(std::atoi(bool_dled.c_str()));
-                    item.flags = std::atoi(flags.c_str());
+                    if (!download_key.empty()) {
+                        item.unique_id = download_key; // This is needed because we are not extracting the key in the CSV data itself
+                        item.file_path = file_path;
+                        item.content_length = std::atol(content_length.c_str());
+                        item.sha1_hash_hex = sha1;
+                        item.file_offset = std::atol(file_offset.c_str());
+                        item.mtime = std::atoi(mod_time.c_str());
+                        item.downloaded = convertBool_fromInt(std::atoi(bool_dled.c_str()));
+                        item.flags = std::atoi(flags.c_str());
 
-                    std::string csv_mapflepce_data;
-                    s = db_struct.db->Get(read_opt, mapflepce_key, &csv_mapflepce_data);
-                    if (!s.ok()) {
-                        std::cerr << tr("Error whilst processing files for BitTorrent item: \"%1\".\nError: ")
-                                .arg(QString::fromStdString(download_key)).toStdString() << s.ToString() << std::endl;
-                        return std::vector<GekkoFyre::GkTorrent::TorrentFile>();
-                    }
+                        std::string csv_mapflepce_data;
+                        s = db_struct.db->Get(read_opt, mapflepce_key, &csv_mapflepce_data);
+                        if (!s.ok()) {
+                            std::cerr << tr("Error whilst processing files for BitTorrent item: \"%1\".\nError: ")
+                                    .arg(QString::fromStdString(download_key)).toStdString() << s.ToString() << std::endl;
+                            return std::vector<GekkoFyre::GkTorrent::TorrentFile>();
+                        }
 
-                    GkCsvReader csv_mapflepce_parse(2, csv_mapflepce_data);
-                    csv_mapflepce_parse.add_headers(LEVELDB_CSV_TORRENT_MAPFLEPCE_1, LEVELDB_CSV_TORRENT_MAPFLEPCE_2);
-                    if (!csv_mapflepce_parse.has_column(LEVELDB_CSV_TORRENT_MAPFLEPCE_1) ||
-                        !csv_mapflepce_parse.has_column(LEVELDB_CSV_TORRENT_MAPFLEPCE_2)) {
-                        QMessageBox::warning(nullptr, tr("Error!"), tr("Missing vital data as FyreDL attempts to import BitTorrent item, \"%1\".")
-                                .arg(QString::fromStdString(download_key)), QMessageBox::Ok);
-                    }
+                        GkCsvReader csv_mapflepce_parse(2, csv_mapflepce_data);
+                        csv_mapflepce_parse.add_headers(LEVELDB_CSV_TORRENT_MAPFLEPCE_1, LEVELDB_CSV_TORRENT_MAPFLEPCE_2);
+                        if (!csv_mapflepce_parse.has_column(LEVELDB_CSV_TORRENT_MAPFLEPCE_1) ||
+                            !csv_mapflepce_parse.has_column(LEVELDB_CSV_TORRENT_MAPFLEPCE_2)) {
+                            QMessageBox::warning(nullptr, tr("Error!"), tr("Missing vital data as FyreDL attempts to import BitTorrent item, \"%1\".")
+                                    .arg(QString::fromStdString(download_key)), QMessageBox::Ok);
+                        }
 
-                    std::string mapflepce_1, mapflepce_2;
-                    while (csv_mapflepce_parse.read_row(mapflepce_1, mapflepce_2)) {
-                        item.map_file_piece.first = std::atoi(mapflepce_1.c_str());
-                        item.map_file_piece.second = std::atoi(mapflepce_2.c_str());
-                        break;
+                        std::string mapflepce_1, mapflepce_2;
+                        while (csv_mapflepce_parse.read_row(mapflepce_1, mapflepce_2)) {
+                            item.map_file_piece.first = std::atoi(mapflepce_1.c_str());
+                            item.map_file_piece.second = std::atoi(mapflepce_2.c_str());
+                            break;
+                        }
                     }
                 }
 

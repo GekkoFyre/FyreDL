@@ -82,9 +82,6 @@ public:
                              const double &down_speed);
     QString timeBeautify(const double &secondsToConvert);
 
-    void print_exception(const std::exception &e, int level = 0);
-    static std::string createId(const size_t &id_length = FYREDL_UNIQUE_ID_DIGIT_COUNT) noexcept;
-
     int convDlStat_toInt(const GekkoFyre::DownloadStatus &status);
     int convHashType_toInt(const GekkoFyre::HashType &hash_type);
     int convHashVerif_toInt(const GekkoFyre::HashVerif &hash_verif);
@@ -106,8 +103,9 @@ public:
                                                const QString &given_hash_val);
     GekkoFyre::GkTorrent::TorrentInfo torrentFileInfo(const std::string &file_dest,
                                                       const int &item_limit = 500000,
-                                                      const int &depth_limit = 1000) noexcept;
+                                                      const int &depth_limit = 1000);
 
+    static std::string createId(const size_t &id_length = FYREDL_UNIQUE_ID_DIGIT_COUNT);
     GekkoFyre::GkFile::FileDb openDatabase(const std::string &dbFile = CFG_HISTORY_DB_FILE);
     void leveldb_lock_remove(const std::string &dbFile = CFG_HISTORY_DB_FILE) noexcept;
 
@@ -146,7 +144,7 @@ private:
     bool del_download_id(const std::string &unique_id, const GekkoFyre::GkFile::FileDb &db_struct,
                          const bool &is_torrent = false) noexcept;
 
-    bool write_torrent_files_addendum(const std::vector<GekkoFyre::GkTorrent::TorrentFile> &to_files_vec,
+    bool write_torrent_files_addendum(std::vector<GekkoFyre::GkTorrent::TorrentFile> &to_files_vec,
                                       const std::string &download_key, const GekkoFyre::GkFile::FileDb &db_struct) noexcept;
     std::vector<GkTorrent::TorrentFile> read_torrent_files_addendum(const int &num_files, const std::string &download_key,
                                                                     const GekkoFyre::GkFile::FileDb &db_struct) noexcept;
