@@ -46,17 +46,6 @@
 int GekkoFyre::GkCsvReader::rows_parsed;
 QMultiMap<int, int> GekkoFyre::GkCsvReader::proc_cols;
 
-GekkoFyre::GkCsvReader::GkCsvReader(const int &column_count, const std::string &csv_data)
-{
-    cols_count = column_count;
-    if (!csv_data.empty()) {
-        csv_raw_data << csv_data;
-        return;
-    }
-
-    return;
-}
-
 void GekkoFyre::GkCsvReader::read_row()
 {
     return;
@@ -64,7 +53,7 @@ void GekkoFyre::GkCsvReader::read_row()
 
 bool GekkoFyre::GkCsvReader::has_column(const std::string &name)
 {
-    auto rows = read_rows();
+    auto rows = read_rows(csv_raw_data.str());
     if (!rows.empty()) {
         for (const auto &row: rows) {
             // Key is the row number and value is the row of raw data
@@ -95,16 +84,14 @@ bool GekkoFyre::GkCsvReader::has_column(const std::string &name)
  * @date 2017-08-09
  * @return A std::unordered_map where the key is the row number, and the value is the row of raw data.
  */
-std::unordered_map<int, std::string> GekkoFyre::GkCsvReader::read_rows()
+std::unordered_map<int, std::string> GekkoFyre::GkCsvReader::read_rows(std::string raw_data)
 {
     std::unordered_map<int, std::string> lines;
-    std::stringstream raw_data;
-    raw_data << csv_raw_data.str();
-    if (!raw_data.str().empty()) {
-        if (search_string(raw_data.str(), "\r\n")) {
-            raw_data.str().erase(std::remove(raw_data.str().begin(), raw_data.str().end(), '\r'),
-                                     raw_data.str().end());
-        } else if (!search_string(raw_data.str(), "\n")) {
+    if (!raw_data.empty()) {
+        if (search_string(raw_data, "\r\n")) {
+            raw_data.erase(std::remove(raw_data.begin(), raw_data.end(), '\r'),
+                                     raw_data.end());
+        } else if (!search_string(raw_data, "\n")) {
             throw std::invalid_argument("Unable to find any suitable line-endings for the given CSV data!");
         }
 
@@ -113,7 +100,9 @@ std::unordered_map<int, std::string> GekkoFyre::GkCsvReader::read_rows()
         }
 
         std::string row;
-        while (std::getline(raw_data, row, '\n')) {
+        std::stringstream istring;
+        istring << raw_data;
+        while (std::getline(istring, row, '\n')) {
             ++rows_count;
             lines.insert(std::make_pair(rows_count, row));
         }
@@ -130,7 +119,7 @@ std::unordered_map<int, std::string> GekkoFyre::GkCsvReader::read_rows()
  */
 void GekkoFyre::GkCsvReader::parse_csv()
 {
-    auto rows = read_rows();
+    auto rows = read_rows(csv_raw_data.str());
     if (!rows.empty()) {
         csv_data.clear();
         int col_no = 0;
@@ -174,7 +163,7 @@ void GekkoFyre::GkCsvReader::parse_csv()
  */
 int GekkoFyre::GkCsvReader::determine_column(const std::string &header)
 {
-    auto rows = read_rows();
+    auto rows = read_rows(csv_raw_data.str());
     if (!rows.empty()) {
         for (const auto &row: rows) {
             // Key is the row number and value is the row of raw data
@@ -233,7 +222,6 @@ std::string GekkoFyre::GkCsvReader::read_row_helper(int &col_no, const int &row_
 
                         val = col.second.second;
                         proc_cols.insertMulti(row_no, col_no);
-                        mutex.unlock();
                         return val;
                     }
                 }

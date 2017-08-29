@@ -62,17 +62,17 @@ class GkCsvReader {
 public:
     GkCsvReader() = delete;
     GkCsvReader(const GkCsvReader&) = delete;
-    explicit GkCsvReader(const int &column_count, const std::string &csv_data);
 
-    template<typename ...ColNames>
-    void add_headers(ColNames... args) {
-        headers = { to_string(args)... };
-        constexpr int args_count = sizeof...(args);
-        cols_count = args_count;
-        rows_parsed = 0;
-        key = (has_column(LEVELDB_CSV_UID_KEY) && has_column(LEVELDB_CSV_UID_VALUE1) && has_column(LEVELDB_CSV_UID_VALUE2));
-        proc_cols.clear();
-        parse_csv();
+    template<typename ...Headers>
+    explicit GkCsvReader(const int &column_count, const std::string &csv_data, const Headers& ...headers) {
+        cols_count = column_count;
+        if (!csv_data.empty()) {
+            csv_raw_data << csv_data;
+            add_headers(headers...);
+            return;
+        }
+
+        return;
     }
 
     virtual bool has_column(const std::string &name);
@@ -142,7 +142,18 @@ private:
         return std::search(cont.begin(), cont.end(), to_find.begin(), to_find.end()) != cont.end();
     }
 
-    std::unordered_map<int, std::string> read_rows();
+    template<typename ...Headers>
+    void add_headers(const Headers& ...args) {
+        headers = { to_string(args)... };
+        constexpr int args_count = sizeof...(args);
+        cols_count = args_count;
+        rows_parsed = 0;
+        key = (has_column(LEVELDB_CSV_UID_KEY) && has_column(LEVELDB_CSV_UID_VALUE1) && has_column(LEVELDB_CSV_UID_VALUE2));
+        proc_cols.clear();
+        parse_csv();
+    }
+
+    std::unordered_map<int, std::string> read_rows(std::string raw_data);
     std::map<int, std::string> split_values(std::stringstream raw_csv_line);
     void parse_csv();
     std::string read_row_helper(int &col_no, const int &row_no);

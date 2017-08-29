@@ -142,16 +142,16 @@ private:
     std::string add_download_id(const std::string &file_path, const GekkoFyre::GkFile::FileDb &db_struct,
                                 const bool &is_torrent = false, const std::string &override_unique_id = "");
     bool del_download_id(const std::string &unique_id, const GekkoFyre::GkFile::FileDb &db_struct,
-                         const bool &is_torrent = false) noexcept;
+                         const bool &is_torrent = false);
 
     bool write_torrent_files_addendum(std::vector<GekkoFyre::GkTorrent::TorrentFile> &to_files_vec,
                                       const std::string &download_key, const GekkoFyre::GkFile::FileDb &db_struct) noexcept;
     std::vector<GkTorrent::TorrentFile> read_torrent_files_addendum(const int &num_files, const std::string &download_key,
-                                                                    const GekkoFyre::GkFile::FileDb &db_struct) noexcept;
+                                                                    const GekkoFyre::GkFile::FileDb &db_struct);
     bool write_torrent_trkrs_addendum(const std::vector<GekkoFyre::GkTorrent::TorrentTrackers> &to_trackers_vec,
                                       const std::string &download_key, const GekkoFyre::GkFile::FileDb &db_struct) noexcept;
     std::vector<GkTorrent::TorrentTrackers> read_torrent_trkrs_addendum(const int &num_trackers, const std::string &download_key,
-                                                                        const GekkoFyre::GkFile::FileDb &db_struct) noexcept;
+                                                                        const GekkoFyre::GkFile::FileDb &db_struct);
 
     GekkoFyre::GkFile::FileDb db;
     QMutex mutex;
