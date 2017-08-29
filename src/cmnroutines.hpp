@@ -105,7 +105,7 @@ public:
                                                       const int &item_limit = 500000,
                                                       const int &depth_limit = 1000);
 
-    static std::string createId(const size_t &id_length = FYREDL_UNIQUE_ID_DIGIT_COUNT);
+    std::string createId(const size_t &id_length = FYREDL_UNIQUE_ID_DIGIT_COUNT);
     GekkoFyre::GkFile::FileDb openDatabase(const std::string &dbFile = CFG_HISTORY_DB_FILE);
     void leveldb_lock_remove(const std::string &dbFile = CFG_HISTORY_DB_FILE) noexcept;
 

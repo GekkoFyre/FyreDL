@@ -228,12 +228,17 @@ std::string GekkoFyre::CmnRoutines::createId(const size_t &id_length)
     std::uniform_int_distribution<std::mt19937::result_type> dist10(0,9);
     std::ostringstream oss;
 
-    for (size_t i = 0; i < (id_length - 1); ++i) {
-        oss << dist10(rng);
-    }
+    if (to_info_mutex.tryLock()) {
+        for (size_t i = 0; i < (id_length - 1); ++i) {
+            oss << dist10(rng);
+        }
 
-    if (oss.str().empty()) {
-        throw std::invalid_argument(tr("An invalid Unique Identifier has been created! It is empty.").toStdString());
+        if (oss.str().empty()) {
+            to_info_mutex.unlock();
+            throw std::invalid_argument(tr("An invalid Unique Identifier has been created! It is empty.").toStdString());
+        }
+
+        to_info_mutex.unlock();
     }
 
     return oss.str();
@@ -255,28 +260,23 @@ GekkoFyre::GkFile::FileDb GekkoFyre::CmnRoutines::openDatabase(const std::string
     db_struct.options.create_if_missing = true;
     std::shared_ptr<leveldb::Cache>(db_struct.options.block_cache).reset(leveldb::NewLRUCache(LEVELDB_CFG_CACHE_SIZE));
     db_struct.options.compression = leveldb::CompressionType::kSnappyCompression;
+    if (!dbFileName.empty()) {
+        std::string db_location = leveldb_location(dbFileName);
+        sys::error_code ec;
+        bool doesExist;
+        doesExist = !fs::exists(db_location, ec) ? false : true;
 
-    if (db_mutex.tryLock()) {
-        if (!dbFileName.empty()) {
-            std::string db_location = leveldb_location(dbFileName);
-            sys::error_code ec;
-            bool doesExist;
-            doesExist = !fs::exists(db_location, ec) ? false : true;
-
-            leveldb::DB *raw_db_ptr;
-            s = leveldb::DB::Open(db_struct.options, db_location, &raw_db_ptr);
-            db_struct.db.reset(raw_db_ptr);
-            if (!s.ok()) {
-                db_mutex.unlock();
-                throw std::runtime_error(tr("Unable to open/create database! %1").arg(QString::fromStdString(s.ToString())).toStdString());
-            }
-
-            if (fs::exists(db_location, ec) && fs::is_directory(db_location) && !doesExist) {
-                std::cout << tr("Database object created. Status: ").toStdString() << s.ToString() << std::endl;
-            }
+        leveldb::DB *raw_db_ptr;
+        s = leveldb::DB::Open(db_struct.options, db_location, &raw_db_ptr);
+        db_struct.db.reset(raw_db_ptr);
+        if (!s.ok()) {
+            db_mutex.unlock();
+            throw std::runtime_error(tr("Unable to open/create database! %1").arg(QString::fromStdString(s.ToString())).toStdString());
         }
 
-        db_mutex.unlock();
+        if (fs::exists(db_location, ec) && fs::is_directory(db_location) && !doesExist) {
+            std::cout << tr("Database object created. Status: ").toStdString() << s.ToString() << std::endl;
+        }
     }
 
     return db_struct;
@@ -427,7 +427,11 @@ std::string GekkoFyre::CmnRoutines::add_download_id(const std::string &file_path
     }
 
     std::string csv_read_data;
-    s = db_struct.db->Get(read_opt, LEVELDB_STORE_UNIQUE_ID, &csv_read_data);
+
+    if (db_mutex.tryLock(-1)) {
+        s = db_struct.db->Get(read_opt, LEVELDB_STORE_UNIQUE_ID, &csv_read_data);
+        db_mutex.unlock();
+    }
 
     std::stringstream csv_out;
     if (!csv_read_data.empty() && csv_read_data.size() > CFG_CSV_MIN_PARSE_SIZE) {
@@ -453,11 +457,17 @@ std::string GekkoFyre::CmnRoutines::add_download_id(const std::string &file_path
     leveldb::WriteOptions write_options;
     write_options.sync = true;
     leveldb::WriteBatch batch;
-    batch.Delete(LEVELDB_STORE_UNIQUE_ID);
-    batch.Put(LEVELDB_STORE_UNIQUE_ID, csv_out.str());
-    s = db_struct.db->Write(write_options, &batch);
-    if (!s.ok()) {
-        throw std::runtime_error(s.ToString());
+
+    if (db_mutex.tryLock(-1)) {
+        batch.Delete(LEVELDB_STORE_UNIQUE_ID);
+        batch.Put(LEVELDB_STORE_UNIQUE_ID, csv_out.str());
+        s = db_struct.db->Write(write_options, &batch);
+        if (!s.ok()) {
+            db_mutex.unlock();
+            throw std::runtime_error(s.ToString());
+        }
+
+        db_mutex.unlock();
     }
 
     return key;
@@ -468,17 +478,12 @@ bool GekkoFyre::CmnRoutines::del_download_id(const std::string &unique_id, const
 {
     auto download_ids = extract_download_ids(db_struct, is_torrent);
     std::ostringstream csv_data;
-
-    if (db_mutex.tryLock()) {
-        for (const auto &id: download_ids.toStdMap()) {
-            if (id.first != unique_id) {
-                csv_data << id.first << ",";
-                csv_data << id.second.first << ",";
-                csv_data << id.second.second << std::endl;
-            }
+    for (const auto &id: download_ids.toStdMap()) {
+        if (id.first != unique_id) {
+            csv_data << id.first << ",";
+            csv_data << id.second.first << ",";
+            csv_data << id.second.second << std::endl;
         }
-
-        db_mutex.unlock();
     }
 
     leveldb::Status s;
@@ -486,7 +491,7 @@ bool GekkoFyre::CmnRoutines::del_download_id(const std::string &unique_id, const
     write_options.sync = true;
     leveldb::WriteBatch batch;
 
-    if (db_mutex.tryLock()) {
+    if (db_mutex.tryLock(200)) {
         batch.Delete(LEVELDB_STORE_UNIQUE_ID);
         batch.Put(LEVELDB_STORE_UNIQUE_ID, csv_data.str());
         s = db_struct.db->Write(write_options, &batch);
@@ -526,7 +531,7 @@ void GekkoFyre::CmnRoutines::add_item_db(const std::string download_id, const st
     write_options.sync = true;
     leveldb::WriteBatch batch;
 
-    if (db_mutex.tryLock()) {
+    if (db_mutex.tryLock(-1)) {
         std::string key_joined = multipart_key({download_id, key});
         batch.Delete(key_joined);
         batch.Put(key_joined, value);
@@ -550,7 +555,7 @@ void GekkoFyre::CmnRoutines::del_item_db(const std::string download_id, const st
     write_options.sync = true;
     leveldb::WriteBatch batch;
 
-    if (db_mutex.tryLock()) {
+    if (db_mutex.tryLock(200)) {
         std::string key_joined = multipart_key({download_id, key});
         batch.Delete(key_joined);
         leveldb::Status s;
@@ -578,26 +583,26 @@ void GekkoFyre::CmnRoutines::del_item_db(const std::string download_id, const st
 std::string GekkoFyre::CmnRoutines::read_item_db(const std::string download_id, const std::string &key,
                                                  const GekkoFyre::GkFile::FileDb &db_struct)
 {
+    std::string read_data;
     leveldb::ReadOptions read_opt;
     leveldb::Status s;
     read_opt.verify_checksums = true;
+    std::string key_joined = multipart_key({download_id, key});
 
-    if (db_mutex.tryLock()) {
-        std::string key_joined = multipart_key({download_id, key});
-        std::string read_data;
+    if (db_mutex.tryLock(200)) {
         s = db_struct.db->Get(read_opt, key_joined, &read_data);
         if (!s.ok()) {
             db_mutex.unlock();
             throw std::runtime_error(s.ToString());
         }
 
-        if (!read_data.empty()) {
-            db_mutex.unlock();
-            return read_data;
-        } else {
-            db_mutex.unlock();
-            return "";
-        }
+        db_mutex.unlock();
+    }
+
+    if (!read_data.empty()) {
+        return read_data;
+    } else {
+        return "";
     }
 }
 
@@ -619,16 +624,22 @@ std::pair<std::string, bool> GekkoFyre::CmnRoutines::determine_download_id(const
 
     std::string key = createId(FYREDL_UNIQUE_ID_DIGIT_COUNT);
     std::string csv_read_data;
-    s = db_struct.db->Get(read_opt, LEVELDB_STORE_UNIQUE_ID, &csv_read_data);
-    if (!s.ok()) {
-        throw std::runtime_error(s.ToString());
+
+    if (db_mutex.tryLock(-1)) {
+        s = db_struct.db->Get(read_opt, LEVELDB_STORE_UNIQUE_ID, &csv_read_data);
+        if (!s.ok()) {
+            db_mutex.unlock();
+            throw std::runtime_error(s.ToString());
+        }
+
+        db_mutex.unlock();
     }
 
     if (!csv_read_data.empty() && csv_read_data.size() > CFG_CSV_MIN_PARSE_SIZE) {
         QMap<std::string, std::pair<std::string, bool>> cache;
         GkCsvReader csv_in(3, csv_read_data, LEVELDB_CSV_UID_KEY, LEVELDB_CSV_UID_VALUE1, LEVELDB_CSV_UID_VALUE2);
         if (!csv_in.has_column(LEVELDB_CSV_UID_KEY) || !csv_in.has_column(LEVELDB_CSV_UID_VALUE1) ||
-                !csv_in.has_column(LEVELDB_CSV_UID_VALUE2)) {
+            !csv_in.has_column(LEVELDB_CSV_UID_VALUE2)) {
             throw std::invalid_argument(tr("Information provided from database is invalid!").toStdString());
         }
 
@@ -671,7 +682,10 @@ QMap<std::string, std::pair<std::string, bool>> GekkoFyre::CmnRoutines::extract_
     read_opt.verify_checksums = true;
 
     std::string csv_read_data;
-    db_struct.db->Get(read_opt, LEVELDB_STORE_UNIQUE_ID, &csv_read_data);
+    if (db_mutex.tryLock(-1)) {
+        db_struct.db->Get(read_opt, LEVELDB_STORE_UNIQUE_ID, &csv_read_data);
+        db_mutex.unlock();
+    }
 
     QMap<std::string, std::pair<std::string, bool>> cache;
     std::stringstream csv_out;
