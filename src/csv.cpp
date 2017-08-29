@@ -43,6 +43,7 @@
 #include "csv.hpp"
 #include <iostream>
 
+int GekkoFyre::GkCsvReader::cols_parsed;
 int GekkoFyre::GkCsvReader::rows_parsed;
 QMultiMap<int, int> GekkoFyre::GkCsvReader::proc_cols;
 
@@ -256,6 +257,7 @@ std::string GekkoFyre::GkCsvReader::read_row_helper(int &col_no, const int &row_
  */
 bool GekkoFyre::GkCsvReader::force_cache_reload()
 {
+    cols_parsed = 0;
     rows_parsed = 0;
     proc_cols.clear();
     key = (has_column(LEVELDB_CSV_UID_KEY) && has_column(LEVELDB_CSV_UID_VALUE1) && has_column(LEVELDB_CSV_UID_VALUE2));

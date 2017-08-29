@@ -49,6 +49,8 @@
 #include <cstdio>
 #include <exception>
 #include <stdexcept>
+#include <initializer_list>
+#include <unordered_map>
 #include <QString>
 #include <QObject>
 #include <QMutex>
@@ -56,7 +58,6 @@
 #include <QCryptographicHash>
 #include <QLayout>
 #include <QMultiMap>
-#include <initializer_list>
 
 extern "C" {
 #include <sys/stat.h>
@@ -115,7 +116,7 @@ public:
     void del_item_db(const std::string download_id, const std::string &key, const GekkoFyre::GkFile::FileDb &db_struct);
     std::string read_item_db(const std::string download_id, const std::string &key, const GekkoFyre::GkFile::FileDb &db_struct);
     std::pair<std::string, bool> determine_download_id(const std::string &file_path, const GekkoFyre::GkFile::FileDb &db_struct);
-    QMap<std::string, std::pair<std::string, bool>> extract_download_ids(const GekkoFyre::GkFile::FileDb &db_struct,
+    std::unordered_map<std::string, std::pair<std::string, bool>> extract_download_ids(const GekkoFyre::GkFile::FileDb &db_struct,
                                                                          const bool &torrentsOnly = false);
 
     std::vector<GekkoFyre::GkCurl::CurlDlInfo> readCurlItems(const bool &hashesOnly = false);

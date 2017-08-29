@@ -118,7 +118,7 @@ extern "C" {
 #define FREE_DSK_SPACE_MULTIPLIER 3
 
 // LevelDB configuration
-#define LEVELDB_CFG_CACHE_SIZE 8UL * 1024UL * 1024UL
+#define LEVELDB_CFG_CACHE_SIZE 32UL * 1024UL * 1024UL
 #define LEVELDB_CFG_LOCK_FILE_NAME "LOCK"
 
 #define LEVELDB_STORE_UNIQUE_ID "store-unique-id"

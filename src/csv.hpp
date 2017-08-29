@@ -72,6 +72,8 @@ public:
             return;
         } else {
             rows_count = 0;
+            rows_parsed = 0;
+            cols_parsed = 0;
             key = false;
         }
 
@@ -95,21 +97,30 @@ public:
     template<typename T, typename ...ColTypes>
     bool read_row(T& x, ColTypes& ...cols) {
         if (!csv_data.empty()) {
-            static int cols_parsed = 0;
+            static int col = 0;
             if ((rows_parsed + 1) <= rows_count) {
-                while (cols_parsed < (cols_count + 1)) {
-                    auto ret = read_row_helper(cols_parsed, (rows_parsed + 1));
+                while (col < (cols_count + 1)) {
+                    auto ret = read_row_helper(col, (rows_parsed + 1));
 
-                    ++cols_parsed;
+                    ++col;
                     if (!ret.empty()) {
                         x = ret;
                         read_row(cols...);
                     }
                 };
 
-                if (cols_parsed >= cols_count) {
-                    cols_parsed = 0;
-                    ++rows_parsed;
+                if (col >= cols_count) {
+                    col = 0;
+                    ++cols_parsed;
+
+                    if (cols_parsed >= cols_count) {
+                        ++rows_parsed;
+
+                        if (rows_parsed > rows_count) {
+                            return false;
+                        }
+                    }
+
                     return true;
                 }
             }
@@ -133,6 +144,7 @@ private:
     std::stringstream csv_raw_data;
     int cols_count;
     int rows_count;
+    static int cols_parsed;
     static int rows_parsed;
     std::mutex mutex;
     bool key;
@@ -150,6 +162,7 @@ private:
         headers = { to_string(args)... };
         constexpr int args_count = sizeof...(args);
         cols_count = args_count;
+        cols_parsed = 0;
         rows_parsed = 0;
         key = (has_column(LEVELDB_CSV_UID_KEY) && has_column(LEVELDB_CSV_UID_VALUE1) && has_column(LEVELDB_CSV_UID_VALUE2));
         proc_cols.clear();

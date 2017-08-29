@@ -270,7 +270,6 @@ GekkoFyre::GkFile::FileDb GekkoFyre::CmnRoutines::openDatabase(const std::string
         s = leveldb::DB::Open(db_struct.options, db_location, &raw_db_ptr);
         db_struct.db.reset(raw_db_ptr);
         if (!s.ok()) {
-            db_mutex.unlock();
             throw std::runtime_error(tr("Unable to open/create database! %1").arg(QString::fromStdString(s.ToString())).toStdString());
         }
 
@@ -435,19 +434,11 @@ std::string GekkoFyre::CmnRoutines::add_download_id(const std::string &file_path
 
     std::stringstream csv_out;
     if (!csv_read_data.empty() && csv_read_data.size() > CFG_CSV_MIN_PARSE_SIZE) {
-        QMap<std::string, std::pair<std::string, bool>> cache;
         GkCsvReader csv_reader(3, csv_read_data, LEVELDB_CSV_UID_KEY, LEVELDB_CSV_UID_VALUE1, LEVELDB_CSV_UID_VALUE2);
-
-        csv_reader.force_cache_reload();
         std::string uid_key, path, is_torrent_bool;
         while (csv_reader.read_row(uid_key, path, is_torrent_bool)) {
             if (!uid_key.empty() && !path.empty()) {
-                if (!cache.contains(uid_key)) {
-                    cache.insert(uid_key, std::make_pair(path, convertBool_fromInt(std::atoi(is_torrent_bool.c_str()))));
-                } else {
-                    std::cerr << tr("Unique ID already exists in database! Creating new Unique ID...").toStdString() << std::endl;
-                    return add_download_id(file_path, db_struct, is_torrent, override_unique_id);
-                }
+                csv_out << uid_key << "," << path << "," << is_torrent_bool << std::endl;
             }
         }
     }
@@ -478,7 +469,7 @@ bool GekkoFyre::CmnRoutines::del_download_id(const std::string &unique_id, const
 {
     auto download_ids = extract_download_ids(db_struct, is_torrent);
     std::ostringstream csv_data;
-    for (const auto &id: download_ids.toStdMap()) {
+    for (const auto &id: download_ids) {
         if (id.first != unique_id) {
             csv_data << id.first << ",";
             csv_data << id.second.first << ",";
@@ -589,7 +580,7 @@ std::string GekkoFyre::CmnRoutines::read_item_db(const std::string download_id, 
     read_opt.verify_checksums = true;
     std::string key_joined = multipart_key({download_id, key});
 
-    if (db_mutex.tryLock(200)) {
+    if (db_mutex.tryLock(-1)) {
         s = db_struct.db->Get(read_opt, key_joined, &read_data);
         if (!s.ok()) {
             db_mutex.unlock();
@@ -643,7 +634,6 @@ std::pair<std::string, bool> GekkoFyre::CmnRoutines::determine_download_id(const
             throw std::invalid_argument(tr("Information provided from database is invalid!").toStdString());
         }
 
-        csv_in.force_cache_reload();
         std::string unique_id, path, is_torrent_csv_str;
         int is_torrent_csv = 0;
         while (csv_in.read_row(unique_id, path, is_torrent_csv_str)) {
@@ -675,7 +665,7 @@ std::pair<std::string, bool> GekkoFyre::CmnRoutines::determine_download_id(const
  * @return The key is the Unique ID itself, while the value is a pair consisting of the storage path and whether it's a
  * BitTorrent item or not.
  */
-QMap<std::string, std::pair<std::string, bool>> GekkoFyre::CmnRoutines::extract_download_ids(const GekkoFyre::GkFile::FileDb &db_struct,
+std::unordered_map<std::string, std::pair<std::string, bool>> GekkoFyre::CmnRoutines::extract_download_ids(const GekkoFyre::GkFile::FileDb &db_struct,
                                                                                              const bool &torrentsOnly)
 {
     leveldb::ReadOptions read_opt;
@@ -687,12 +677,11 @@ QMap<std::string, std::pair<std::string, bool>> GekkoFyre::CmnRoutines::extract_
         db_mutex.unlock();
     }
 
-    QMap<std::string, std::pair<std::string, bool>> cache;
+    std::unordered_map<std::string, std::pair<std::string, bool>> cache;
     std::stringstream csv_out;
     if (!csv_read_data.empty() && csv_read_data.size() > CFG_CSV_MIN_PARSE_SIZE) {
         GkCsvReader csv_in(3, csv_read_data, LEVELDB_CSV_UID_KEY, LEVELDB_CSV_UID_VALUE1, LEVELDB_CSV_UID_VALUE2);
 
-        csv_in.force_cache_reload();
         std::string unique_id, path, is_torrent_csv_str;
         bool is_torrent_csv = 0;
         while (csv_in.read_row(unique_id, path, is_torrent_csv_str)) {
@@ -700,14 +689,14 @@ QMap<std::string, std::pair<std::string, bool>> GekkoFyre::CmnRoutines::extract_
             if (torrentsOnly) {
                 // Only accept download items marked as 'BitTorrent'
                 if (is_torrent_csv) {
-                    cache.insert(unique_id, std::make_pair(path, convertBool_fromInt(is_torrent_csv)));
+                    cache.insert(std::make_pair(unique_id, std::make_pair(path, convertBool_fromInt(is_torrent_csv))));
                 }
             }
 
             if (!torrentsOnly) {
                 // Only accept download items marked as 'HTTP/FTP'
                 if (!is_torrent_csv) {
-                    cache.insert(unique_id, std::make_pair(path, convertBool_fromInt(is_torrent_csv)));
+                    cache.insert(std::make_pair(unique_id, std::make_pair(path, convertBool_fromInt(is_torrent_csv))));
                 }
             }
         }
@@ -1160,7 +1149,7 @@ std::vector<GekkoFyre::GkCurl::CurlDlInfo> GekkoFyre::CmnRoutines::readCurlItems
         auto download_ids = extract_download_ids(db, false);
         if (!download_ids.empty()) {
             std::vector<GekkoFyre::GkCurl::CurlDlInfo> output;
-            for (auto const &id: download_ids.toStdMap()) {
+            for (auto const &id: download_ids) {
                 if (!id.second.second && !id.second.first.empty()) { // Therefore it's a libcurl item!
                     GekkoFyre::GkCurl::CurlDlInfo dl_info;
                     std::string curl_stat, insert_date, complt_date, stat_msg, effec_url, resp_code, cont_lgnth, hash_type,
@@ -1444,7 +1433,7 @@ std::vector<GekkoFyre::GkTorrent::TorrentInfo> GekkoFyre::CmnRoutines::readTorre
         auto download_ids = extract_download_ids(db, true);
         if (!download_ids.empty()) {
             std::vector<GekkoFyre::GkTorrent::TorrentInfo> output;
-            for (auto const &id: download_ids.toStdMap()) {
+            for (auto const &id: download_ids) {
                 if (id.second.second && !id.second.first.empty()) { // Therefore it's a BitTorrent item!
                     GekkoFyre::GkTorrent::TorrentInfo to_info;
                     GekkoFyre::GkTorrent::GeneralInfo gen_info;
@@ -1861,12 +1850,18 @@ bool GekkoFyre::CmnRoutines::write_torrent_files_addendum(std::vector<GekkoFyre:
 
             batch.Put(file_key, file_write_data.str());
             batch.Put(mapflepce_key, mapflepce_write_data.str());
-            leveldb::Status s;
-            s = db_struct.db->Write(write_options, &batch);
-            if (!s.ok()) {
-                std::cerr << tr("Error whilst processing files for BitTorrent item: \"%1\".\nError: ")
-                        .arg(QString::fromStdString(download_key)).toStdString() << s.ToString() << std::endl;
-                return false;
+
+            if (db_mutex.tryLock(-1)) {
+                leveldb::Status s;
+                s = db_struct.db->Write(write_options, &batch);
+                if (!s.ok()) {
+                    std::cerr << tr("Error whilst processing files for BitTorrent item: \"%1\".\nError: ")
+                            .arg(QString::fromStdString(download_key)).toStdString() << s.ToString() << std::endl;
+                    db_mutex.unlock();
+                    return false;
+                }
+
+                db_mutex.unlock();
             }
         }
 
@@ -1891,11 +1886,17 @@ std::vector<GekkoFyre::GkTorrent::TorrentFile> GekkoFyre::CmnRoutines::read_torr
             read_opt.verify_checksums = true;
 
             file_key = multipart_key({download_key, LEVELDB_KEY_TORRENT_TORRENT_FILES, std::to_string(counter)});
-            s = db_struct.db->Get(read_opt, file_key, &csv_file_data);
-            if (!s.ok()) {
-                std::cerr << tr("Error whilst processing files for BitTorrent item: \"%1\".\nError: ")
-                        .arg(QString::fromStdString(download_key)).toStdString() << s.ToString() << std::endl;
-                return std::vector<GekkoFyre::GkTorrent::TorrentFile>();
+
+            if (db_mutex.tryLock(-1)) {
+                s = db_struct.db->Get(read_opt, file_key, &csv_file_data);
+                if (!s.ok()) {
+                    std::cerr << tr("Error whilst processing files for BitTorrent item: \"%1\".\nError: ")
+                            .arg(QString::fromStdString(download_key)).toStdString() << s.ToString() << std::endl;
+                    db_mutex.unlock();
+                    return std::vector<GekkoFyre::GkTorrent::TorrentFile>();
+                }
+
+                db_mutex.unlock();
             }
 
             if (!csv_file_data.empty() && csv_file_data.size() > CFG_CSV_MIN_PARSE_SIZE) {
@@ -1908,7 +1909,6 @@ std::vector<GekkoFyre::GkTorrent::TorrentFile> GekkoFyre::CmnRoutines::read_torr
                             .arg(QString::fromStdString(download_key)), QMessageBox::Ok);
                 }
 
-                csv_parse.force_cache_reload();
                 std::string file_path, content_length, sha1, file_offset, mod_time, mapflepce_key, bool_dled, flags;
                 GekkoFyre::GkTorrent::TorrentFile item;
                 while (csv_parse.read_row(file_path, content_length, sha1, file_offset, mod_time, mapflepce_key, bool_dled, flags)) {
@@ -1923,11 +1923,17 @@ std::vector<GekkoFyre::GkTorrent::TorrentFile> GekkoFyre::CmnRoutines::read_torr
                         item.flags = std::atoi(flags.c_str());
 
                         std::string csv_mapflepce_data;
-                        s = db_struct.db->Get(read_opt, mapflepce_key, &csv_mapflepce_data);
-                        if (!s.ok()) {
-                            std::cerr << tr("Error whilst processing files for BitTorrent item: \"%1\".\nError: ")
-                                    .arg(QString::fromStdString(download_key)).toStdString() << s.ToString() << std::endl;
-                            return std::vector<GekkoFyre::GkTorrent::TorrentFile>();
+
+                        if (db_mutex.tryLock(-1)) {
+                            s = db_struct.db->Get(read_opt, mapflepce_key, &csv_mapflepce_data);
+                            if (!s.ok()) {
+                                std::cerr << tr("Error whilst processing files for BitTorrent item: \"%1\".\nError: ")
+                                        .arg(QString::fromStdString(download_key)).toStdString() << s.ToString() << std::endl;
+                                db_mutex.unlock();
+                                return std::vector<GekkoFyre::GkTorrent::TorrentFile>();
+                            }
+
+                            db_mutex.unlock();
                         }
 
                         GkCsvReader csv_mapflepce_parse(2, csv_mapflepce_data, LEVELDB_CSV_TORRENT_MAPFLEPCE_1, LEVELDB_CSV_TORRENT_MAPFLEPCE_2);
@@ -1976,18 +1982,24 @@ bool GekkoFyre::CmnRoutines::write_torrent_trkrs_addendum(const std::vector<Gekk
             tracker_write_data << LEVELDB_CSV_TORRENT_TRACKER_URL << "," << LEVELDB_CSV_TORRENT_TRACKER_TIER ",";
             tracker_write_data << LEVELDB_CSV_TORRENT_TRACKER_BOOL_ENABLED << std::endl;
             tracker_write_data << t.url << "," << std::to_string(t.tier) << "," << std::to_string(t.enabled);
-            batch.Put(tracker_key, tracker_write_data.str());
-            leveldb::Status s;
-            s = db_struct.db->Write(write_options, &batch);
-            if (!s.ok()) {
-                std::cerr << tr("Error whilst processing trackers for BitTorrent item: \"%1\".\nError: ")
-                        .arg(QString::fromStdString(download_key)).toStdString() << s.ToString() << std::endl;
-                return false;
+
+            if (db_mutex.tryLock(-1)) {
+                batch.Put(tracker_key, tracker_write_data.str());
+                leveldb::Status s;
+                s = db_struct.db->Write(write_options, &batch);
+                if (!s.ok()) {
+                    std::cerr << tr("Error whilst processing trackers for BitTorrent item: \"%1\".\nError: ")
+                            .arg(QString::fromStdString(download_key)).toStdString() << s.ToString() << std::endl;
+                    db_mutex.unlock();
+                    return false;
+                }
+
+                db_mutex.unlock();
             }
         }
     }
 
-    return false;
+    return true;
 }
 
 std::vector<GekkoFyre::GkTorrent::TorrentTrackers> GekkoFyre::CmnRoutines::read_torrent_trkrs_addendum(const int &num_trackers, const std::string &download_key,
@@ -2005,23 +2017,28 @@ std::vector<GekkoFyre::GkTorrent::TorrentTrackers> GekkoFyre::CmnRoutines::read_
             read_opt.verify_checksums = true;
 
             tracker_key = multipart_key({download_key, LEVELDB_KEY_TORRENT_TRACKERS, std::to_string(counter)});
-            s = db_struct.db->Get(read_opt, tracker_key, &csv_tracker_data);
-            if (!s.ok()) {
-                std::cerr << tr("Error whilst processing files for BitTorrent item: \"%1\".\nError: ")
-                        .arg(QString::fromStdString(download_key)).toStdString() << s.ToString() << std::endl;
-                return std::vector<GekkoFyre::GkTorrent::TorrentTrackers>();
+
+            if (db_mutex.tryLock(-1)) {
+                s = db_struct.db->Get(read_opt, tracker_key, &csv_tracker_data);
+                if (!s.ok()) {
+                    std::cerr << tr("Error whilst processing files for BitTorrent item: \"%1\".\nError: ")
+                            .arg(QString::fromStdString(download_key)).toStdString() << s.ToString() << std::endl;
+                    db_mutex.unlock();
+                    return std::vector<GekkoFyre::GkTorrent::TorrentTrackers>();
+                }
+
+                db_mutex.unlock();
             }
 
             if (!csv_tracker_data.empty() && csv_tracker_data.size() > CFG_CSV_MIN_PARSE_SIZE) {
                 GkCsvReader csv_parse(3, csv_tracker_data, LEVELDB_CSV_TORRENT_TRACKER_URL, LEVELDB_CSV_TORRENT_TRACKER_TIER,
                                       LEVELDB_CSV_TORRENT_TRACKER_BOOL_ENABLED);
                 if (!csv_parse.has_column(LEVELDB_CSV_TORRENT_TRACKER_URL) || !csv_parse.has_column(LEVELDB_CSV_TORRENT_TRACKER_TIER) ||
-                        !csv_parse.has_column(LEVELDB_CSV_TORRENT_TRACKER_BOOL_ENABLED)) {
+                    !csv_parse.has_column(LEVELDB_CSV_TORRENT_TRACKER_BOOL_ENABLED)) {
                     QMessageBox::warning(nullptr, tr("Error!"), tr("Missing vital data as FyreDL attempts to import BitTorrent item, \"%1\".")
                             .arg(QString::fromStdString(download_key)), QMessageBox::Ok);
                 }
 
-                csv_parse.force_cache_reload();
                 std::string tracker_url, tracker_tier, tracker_bool_enabled;
                 GekkoFyre::GkTorrent::TorrentTrackers item;
                 while (csv_parse.read_row(tracker_url, tracker_tier, tracker_bool_enabled)) {
