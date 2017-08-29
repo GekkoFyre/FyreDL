@@ -70,6 +70,9 @@ public:
             csv_raw_data << csv_data;
             add_headers(headers...);
             return;
+        } else {
+            rows_count = 0;
+            key = false;
         }
 
         return;

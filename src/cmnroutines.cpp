@@ -256,27 +256,29 @@ GekkoFyre::GkFile::FileDb GekkoFyre::CmnRoutines::openDatabase(const std::string
     std::shared_ptr<leveldb::Cache>(db_struct.options.block_cache).reset(leveldb::NewLRUCache(LEVELDB_CFG_CACHE_SIZE));
     db_struct.options.compression = leveldb::CompressionType::kSnappyCompression;
 
-    mutex.lock();
-    if (!dbFileName.empty()) {
-        std::string db_location = leveldb_location(dbFileName);
-        sys::error_code ec;
-        bool doesExist;
-        doesExist = !fs::exists(db_location, ec) ? false : true;
+    if (db_mutex.tryLock()) {
+        if (!dbFileName.empty()) {
+            std::string db_location = leveldb_location(dbFileName);
+            sys::error_code ec;
+            bool doesExist;
+            doesExist = !fs::exists(db_location, ec) ? false : true;
 
-        leveldb::DB *raw_db_ptr;
-        s = leveldb::DB::Open(db_struct.options, db_location, &raw_db_ptr);
-        db_struct.db.reset(raw_db_ptr);
-        if (!s.ok()) {
-            mutex.unlock();
-            throw std::runtime_error(tr("Unable to open/create database! %1").arg(QString::fromStdString(s.ToString())).toStdString());
+            leveldb::DB *raw_db_ptr;
+            s = leveldb::DB::Open(db_struct.options, db_location, &raw_db_ptr);
+            db_struct.db.reset(raw_db_ptr);
+            if (!s.ok()) {
+                db_mutex.unlock();
+                throw std::runtime_error(tr("Unable to open/create database! %1").arg(QString::fromStdString(s.ToString())).toStdString());
+            }
+
+            if (fs::exists(db_location, ec) && fs::is_directory(db_location) && !doesExist) {
+                std::cout << tr("Database object created. Status: ").toStdString() << s.ToString() << std::endl;
+            }
         }
 
-        if (fs::exists(db_location, ec) && fs::is_directory(db_location) && !doesExist) {
-            std::cout << tr("Database object created. Status: ").toStdString() << s.ToString() << std::endl;
-        }
+        db_mutex.unlock();
     }
 
-    mutex.unlock();
     return db_struct;
 }
 
@@ -466,26 +468,38 @@ bool GekkoFyre::CmnRoutines::del_download_id(const std::string &unique_id, const
 {
     auto download_ids = extract_download_ids(db_struct, is_torrent);
     std::ostringstream csv_data;
-    for (const auto &id: download_ids.toStdMap()) {
-        if (id.first != unique_id) {
-            csv_data << id.first << ",";
-            csv_data << id.second.first << ",";
-            csv_data << id.second.second << std::endl;
+
+    if (db_mutex.tryLock()) {
+        for (const auto &id: download_ids.toStdMap()) {
+            if (id.first != unique_id) {
+                csv_data << id.first << ",";
+                csv_data << id.second.first << ",";
+                csv_data << id.second.second << std::endl;
+            }
         }
+
+        db_mutex.unlock();
     }
 
     leveldb::Status s;
     leveldb::WriteOptions write_options;
     write_options.sync = true;
     leveldb::WriteBatch batch;
-    batch.Delete(LEVELDB_STORE_UNIQUE_ID);
-    batch.Put(LEVELDB_STORE_UNIQUE_ID, csv_data.str());
-    s = db_struct.db->Write(write_options, &batch);
-    if (!s.ok()) {
-        QMessageBox::warning(nullptr, tr("Error!"), tr("There was an issue while deleting Unique ID, \"%1\", from the "
-                                                               "database. See below.\n\n%2")
-                .arg(QString::fromStdString(unique_id)).arg(QString::fromStdString(s.ToString())), QMessageBox::Ok);
-        return false;
+
+    if (db_mutex.tryLock()) {
+        batch.Delete(LEVELDB_STORE_UNIQUE_ID);
+        batch.Put(LEVELDB_STORE_UNIQUE_ID, csv_data.str());
+        s = db_struct.db->Write(write_options, &batch);
+        if (!s.ok()) {
+            QMessageBox::warning(nullptr, tr("Error!"), tr("There was an issue while deleting Unique ID, \"%1\", from the "
+                                                                   "database. See below.\n\n%2")
+                    .arg(QString::fromStdString(unique_id)).arg(QString::fromStdString(s.ToString())), QMessageBox::Ok);
+
+            db_mutex.unlock();
+            return false;
+        }
+
+        db_mutex.unlock();
     }
 
     return true;
@@ -511,13 +525,19 @@ void GekkoFyre::CmnRoutines::add_item_db(const std::string download_id, const st
     leveldb::WriteOptions write_options;
     write_options.sync = true;
     leveldb::WriteBatch batch;
-    std::string key_joined = multipart_key({download_id, key});
-    batch.Delete(key_joined);
-    batch.Put(key_joined, value);
-    leveldb::Status s;
-    s = db_struct.db->Write(write_options, &batch);
-    if (!s.ok()) {
-        throw std::runtime_error(s.ToString());
+
+    if (db_mutex.tryLock()) {
+        std::string key_joined = multipart_key({download_id, key});
+        batch.Delete(key_joined);
+        batch.Put(key_joined, value);
+        leveldb::Status s;
+        s = db_struct.db->Write(write_options, &batch);
+        if (!s.ok()) {
+            db_mutex.unlock();
+            throw std::runtime_error(s.ToString());
+        }
+
+        db_mutex.unlock();
     }
 
     return;
@@ -529,12 +549,18 @@ void GekkoFyre::CmnRoutines::del_item_db(const std::string download_id, const st
     leveldb::WriteOptions write_options;
     write_options.sync = true;
     leveldb::WriteBatch batch;
-    std::string key_joined = multipart_key({download_id, key});
-    batch.Delete(key_joined);
-    leveldb::Status s;
-    s = db_struct.db->Write(write_options, &batch);
-    if (!s.ok()) {
-        throw std::runtime_error(s.ToString());
+
+    if (db_mutex.tryLock()) {
+        std::string key_joined = multipart_key({download_id, key});
+        batch.Delete(key_joined);
+        leveldb::Status s;
+        s = db_struct.db->Write(write_options, &batch);
+        if (!s.ok()) {
+            db_mutex.unlock();
+            throw std::runtime_error(s.ToString());
+        }
+
+        db_mutex.unlock();
     }
 
     return;
@@ -555,17 +581,23 @@ std::string GekkoFyre::CmnRoutines::read_item_db(const std::string download_id, 
     leveldb::ReadOptions read_opt;
     leveldb::Status s;
     read_opt.verify_checksums = true;
-    std::string key_joined = multipart_key({download_id, key});
-    std::string read_data;
-    s = db_struct.db->Get(read_opt, key_joined, &read_data);
-    if (!s.ok()) {
-        throw std::runtime_error(s.ToString());
-    }
 
-    if (!read_data.empty()) {
-        return read_data;
-    } else {
-        return "";
+    if (db_mutex.tryLock()) {
+        std::string key_joined = multipart_key({download_id, key});
+        std::string read_data;
+        s = db_struct.db->Get(read_opt, key_joined, &read_data);
+        if (!s.ok()) {
+            db_mutex.unlock();
+            throw std::runtime_error(s.ToString());
+        }
+
+        if (!read_data.empty()) {
+            db_mutex.unlock();
+            return read_data;
+        } else {
+            db_mutex.unlock();
+            return "";
+        }
     }
 }
 
@@ -929,7 +961,7 @@ GekkoFyre::GkTorrent::TorrentInfo GekkoFyre::CmnRoutines::torrentFileInfo(const 
     bdecode_node e;
     int pos = -1;
     std::cout << tr("Decoding! Recursion limit: %1. Total item count limit: %2.")
-            .arg(item_limit).arg(depth_limit).toStdString() << std::endl;
+            .arg(depth_limit).arg(item_limit).toStdString() << std::endl;
     ret = bdecode(&buf[0], &buf[0] + buf.size(), e, ec, &pos, depth_limit, item_limit);
 
     if (ret != 0) {
@@ -959,7 +991,7 @@ GekkoFyre::GkTorrent::TorrentInfo GekkoFyre::CmnRoutines::torrentFileInfo(const 
     std::string unique_id = createId(FYREDL_UNIQUE_ID_DIGIT_COUNT);
 
     // Trackers
-    mutex.lock();
+    to_info_mutex.lock();
     int num_trackers = 0;
     size_t bad_trackers = 0;
     for (const auto &i: t.trackers()) {
@@ -983,7 +1015,7 @@ GekkoFyre::GkTorrent::TorrentInfo GekkoFyre::CmnRoutines::torrentFileInfo(const 
         }
     }
 
-    mutex.unlock();
+    to_info_mutex.unlock();
     // std::ostringstream ih;
     // to_hex((char const*)&t.info_hash()[0], 20, ih);
     // ih << std::hex << t.info_hash();
@@ -1028,6 +1060,12 @@ GekkoFyre::GkTorrent::TorrentInfo GekkoFyre::CmnRoutines::torrentFileInfo(const 
     }
 
     if (t.num_files() >= 0) {
+        if (t.num_files() > item_limit) {
+            throw std::invalid_argument(tr("The BitTorrent item, \"%1\", contains more internal files (%2) than the maximum "
+                                                   "specified allowable amount: %3.").arg(QString::fromStdString(t.name()))
+                                                .arg(QString::number(t.num_files())).arg(QString::number(item_limit)).toStdString());
+        }
+
         gk_torrent_struct.general.num_files = t.num_files();
     } else {
         throw std::invalid_argument(tr("No downloadable items were specified for BitTorrent item, \"%1\".")
@@ -1412,6 +1450,7 @@ std::vector<GekkoFyre::GkTorrent::TorrentInfo> GekkoFyre::CmnRoutines::readTorre
                     num_pieces = read_item_db(id.first, LEVELDB_KEY_TORRENT_TORRNT_PIECES, db);
                     piece_length = read_item_db(id.first, LEVELDB_KEY_TORRENT_TORRNT_PIECE_LENGTH, db);
 
+                    gen_info.unique_id = id.first;
                     gen_info.down_dest = id.second.first;
                     gen_info.insert_timestamp = std::atoll(insert_date.c_str());
                     gen_info.complt_timestamp = std::atoll(complt_date.c_str());
@@ -1830,7 +1869,7 @@ std::vector<GekkoFyre::GkTorrent::TorrentFile> GekkoFyre::CmnRoutines::read_torr
         static int counter;
         counter = (num_files + 1);
         std::vector<GekkoFyre::GkTorrent::TorrentFile> to_files;
-        while (counter != 0) {
+        while (counter > num_files) {
             --counter;
             std::string file_key, csv_file_data;
             leveldb::ReadOptions read_opt;
@@ -1942,16 +1981,16 @@ std::vector<GekkoFyre::GkTorrent::TorrentTrackers> GekkoFyre::CmnRoutines::read_
 {
     if (num_trackers > 0) {
         static int counter;
-        counter = num_trackers;
+        counter = (num_trackers + 1);
         std::vector<GekkoFyre::GkTorrent::TorrentTrackers> to_trackers;
-        while (counter == num_trackers) {
+        while (counter > num_trackers) {
             --counter;
             std::string tracker_key, csv_tracker_data;
             leveldb::ReadOptions read_opt;
             leveldb::Status s;
             read_opt.verify_checksums = true;
 
-            tracker_key = multipart_key({download_key, LEVELDB_KEY_TORRENT_TRACKERS, std::to_string(counter + 1)});
+            tracker_key = multipart_key({download_key, LEVELDB_KEY_TORRENT_TRACKERS, std::to_string(counter)});
             s = db_struct.db->Get(read_opt, tracker_key, &csv_tracker_data);
             if (!s.ok()) {
                 std::cerr << tr("Error whilst processing files for BitTorrent item: \"%1\".\nError: ")

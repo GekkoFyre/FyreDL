@@ -154,6 +154,8 @@ private:
                                                                         const GekkoFyre::GkFile::FileDb &db_struct);
 
     GekkoFyre::GkFile::FileDb db;
+    QMutex db_mutex;
+    QMutex to_info_mutex;
     QMutex mutex;
 };
 }

@@ -206,29 +206,25 @@ std::map<int, std::string> GekkoFyre::GkCsvReader::split_values(std::stringstrea
 std::string GekkoFyre::GkCsvReader::read_row_helper(int &col_no, const int &row_no)
 {
     repeat: ;
-    try {
-        if (col_no == 0) {
-            return "";
-        }
+    if (col_no == 0) {
+        return "";
+    }
 
-        if (!csv_data.empty() && (row_no <= rows_count)) {
-            static std::string val;
-            for (auto col: csv_data) {
-                if (!proc_cols.contains(row_no, col_no)) {
-                    if ((col.first == row_no) && (col.second.first == col_no)) {
-                        if (std::strcmp(val.c_str(), col.second.second.c_str()) == 0) {
-                            return "";
-                        }
-
-                        val = col.second.second;
-                        proc_cols.insertMulti(row_no, col_no);
-                        return val;
+    if (!csv_data.empty() && (row_no <= rows_count)) {
+        static std::string val = "";
+        for (auto col: csv_data) {
+            if (!proc_cols.contains(row_no, col_no)) {
+                if ((col.first == row_no) && (col.second.first == col_no)) {
+                    if ((std::strcmp(val.c_str(), col.second.second.c_str()) == 0) && (std::strcmp(val.c_str(), "0") != 0)) {
+                        return "";
                     }
+
+                    val = col.second.second;
+                    proc_cols.insertMulti(row_no, col_no);
+                    return val;
                 }
             }
         }
-    } catch (const std::exception &e) {
-        std::cerr << e.what() << std::endl;
     }
 
     if (col_no <= cols_count) {
