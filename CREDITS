@@ -35,6 +35,10 @@ LevelDB (Windows support) patches by Netzeband
 	<https://github.com/google/leveldb/issues/475>
 		Public Domain
 
+ThreadPool by Jakob Progsch and Václav Zeman
+	<https://github.com/progschj/ThreadPool>
+		Public Domain
+
 Doxygen by Dimitri van Heesch et al.
 	<http://www.stack.nl/~dimitri/doxygen/>
 		GNU General Public License (GPL, version 2)

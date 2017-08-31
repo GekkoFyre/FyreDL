@@ -136,33 +136,36 @@ MainWindow::~MainWindow()
 
 GekkoFyre::GkFile::FileDb MainWindow::openDatabase(const std::string &dbFileName)
 {
-    leveldb::Status s;
     GekkoFyre::GkFile::FileDb db_struct;
-    db_struct.options.create_if_missing = true;
-    std::shared_ptr<leveldb::Cache>(db_struct.options.block_cache).reset(leveldb::NewLRUCache(LEVELDB_CFG_CACHE_SIZE));
-    db_struct.options.compression = leveldb::CompressionType::kSnappyCompression;
 
-    mutex.lock();
-    if (!dbFileName.empty()) {
-        std::string db_location = routines->leveldb_location(dbFileName);
-        sys::error_code ec;
-        bool doesExist;
-        doesExist = !fs::exists(db_location, ec) ? false : true;
+    try {
+        leveldb::Status s;
+        db_struct.options.create_if_missing = true;
+        std::shared_ptr<leveldb::Cache>(db_struct.options.block_cache).reset(leveldb::NewLRUCache(LEVELDB_CFG_CACHE_SIZE));
+        db_struct.options.compression = leveldb::CompressionType::kSnappyCompression;
 
-        leveldb::DB *raw_db_ptr;
-        s = leveldb::DB::Open(db_struct.options, db_location, &raw_db_ptr);
-        db_struct.db.reset(raw_db_ptr);
-        if (!s.ok()) {
-            mutex.unlock();
-            throw std::runtime_error(tr("Unable to open/create database! %1").arg(QString::fromStdString(s.ToString())).toStdString());
+        if (!dbFileName.empty()) {
+            std::string db_location = routines->leveldb_location(dbFileName);
+            sys::error_code ec;
+            bool doesExist;
+            doesExist = !fs::exists(db_location, ec) ? false : true;
+
+            leveldb::DB *raw_db_ptr;
+            s = leveldb::DB::Open(db_struct.options, db_location, &raw_db_ptr);
+            db_struct.db.reset(raw_db_ptr);
+            if (!s.ok()) {
+                throw std::runtime_error(tr("Unable to open/create database! %1").arg(QString::fromStdString(s.ToString())).toStdString());
+            }
+
+            if (fs::exists(db_location, ec) && fs::is_directory(db_location) && !doesExist) {
+                std::cout << tr("Database object created. Status: ").toStdString() << s.ToString() << std::endl;
+            }
         }
-
-        if (fs::exists(db_location, ec) && fs::is_directory(db_location) && !doesExist) {
-            std::cout << tr("Database object created. Status: ").toStdString() << s.ToString() << std::endl;
-        }
+    } catch (const std::exception &e) {
+        QMessageBox::warning(nullptr, tr("Error!"), e.what(), QMessageBox::Ok);
+        return GekkoFyre::GkFile::FileDb();
     }
 
-    mutex.unlock();
     return db_struct;
 }
 

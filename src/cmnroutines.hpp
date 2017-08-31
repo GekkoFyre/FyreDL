@@ -44,6 +44,8 @@
 #define CMNROUTINES_HPP
 
 #include "default_var.hpp"
+#include <boost/thread/locks.hpp>
+#include <boost/thread/shared_mutex.hpp>
 #include <libtorrent/entry.hpp>
 #include <string>
 #include <cstdio>
@@ -72,6 +74,10 @@ class CmnRoutines : public QObject
 public:
     CmnRoutines(const GekkoFyre::GkFile::FileDb &database, QObject *parent = 0);
     ~CmnRoutines();
+
+    typedef boost::shared_mutex lock;
+    typedef boost::unique_lock<lock> writeLock;
+    typedef boost::shared_lock<lock> readLock;
 
     QString extractFilename(const QString &url);
     QString bytesToKilobytes(const double &value);

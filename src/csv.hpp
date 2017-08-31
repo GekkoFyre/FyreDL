@@ -50,7 +50,6 @@
 #include <list>
 #include <string>
 #include <sstream>
-#include <unordered_map>
 #include <map>
 #include <array>
 #include <memory>
@@ -64,16 +63,15 @@ public:
     GkCsvReader(const GkCsvReader&) = delete;
 
     template<typename ...Headers>
-    explicit GkCsvReader(const int &column_count, const std::string &csv_data, const Headers& ...headers) {
+    explicit GkCsvReader(const int &column_count, const bool &download_ids, const std::string &csv_data, const Headers& ...headers) {
         cols_count = column_count;
+        key = download_ids;
         if (!csv_data.empty()) {
             csv_raw_data << csv_data;
             add_headers(headers...);
             return;
         } else {
             rows_count = 0;
-            rows_parsed = 0;
-            cols_parsed = 0;
             key = false;
         }
 
@@ -96,37 +94,35 @@ public:
      */
     template<typename T, typename ...ColTypes>
     bool read_row(T& x, ColTypes& ...cols) {
+        static int rows_parsed = 0;
         if (!csv_data.empty()) {
-            static int col = 0;
-            if ((rows_parsed + 1) <= rows_count) {
-                while (col < (cols_count + 1)) {
-                    auto ret = read_row_helper(col, (rows_parsed + 1));
+            static int cols_parsed = 0;
+            while ((rows_parsed + 1) <= rows_count) {
+                while (cols_parsed < (cols_count + 1)) {
+                    auto ret = read_row_helper(cols_parsed, (rows_parsed + 1));
 
-                    ++col;
+                    ++cols_parsed;
                     if (!ret.empty()) {
                         x = ret;
                         read_row(cols...);
                     }
-                };
-
-                if (col >= cols_count) {
-                    col = 0;
-                    ++cols_parsed;
-
-                    if (cols_parsed >= cols_count) {
-                        ++rows_parsed;
-
-                        if (rows_parsed > rows_count) {
-                            return false;
-                        }
-                    }
-
-                    return true;
                 }
+
+                cols_parsed = 0;
+                ++rows_parsed;
             }
         }
 
-        return false;
+        int start_row = 0;
+        if (!key) { start_row = 1; }
+        if ((rows_parsed + start_row) > rows_count) {
+            rows_parsed = 0;
+            proc_cols.clear();
+            return false;
+        }
+
+        ++rows_parsed;
+        return true;
     }
 
 private:
@@ -144,11 +140,9 @@ private:
     std::stringstream csv_raw_data;
     int cols_count;
     int rows_count;
-    static int cols_parsed;
-    static int rows_parsed;
     std::mutex mutex;
     bool key;
-    std::array<std::string, 15> headers;                      // The key is the column number, whilst the value is the header associated with that column.
+    std::list<std::string> headers;                      // The key is the column number, whilst the value is the header associated with that column.
     static QMultiMap<int, int> proc_cols;
     std::multimap<int, std::pair<int, std::string>> csv_data; // The key is the row number whilst the values are are the column number and the comma-separated-values.
 
@@ -162,16 +156,34 @@ private:
         headers = { to_string(args)... };
         constexpr int args_count = sizeof...(args);
         cols_count = args_count;
-        cols_parsed = 0;
-        rows_parsed = 0;
-        key = (has_column(LEVELDB_CSV_UID_KEY) && has_column(LEVELDB_CSV_UID_VALUE1) && has_column(LEVELDB_CSV_UID_VALUE2));
+        csv_data.clear();
         proc_cols.clear();
-        parse_csv();
+        csv_data = parse_csv();
     }
 
-    std::unordered_map<int, std::string> read_rows(std::string raw_data);
+    template<typename T, typename X>
+    std::vector<T> extract_keys(const std::map<T, X> &input_map) {
+        std::vector<T> ret_val;
+        for (const auto &element: input_map) {
+            ret_val.push_back(element.second);
+        }
+
+        return ret_val;
+    }
+
+    template<typename T, typename X>
+    std::vector<X> extract_values(const std::map<T, X> &input_map) {
+        std::vector<X> ret_val;
+        for (const auto &element: input_map) {
+            ret_val.push_back(element.second);
+        }
+
+        return ret_val;
+    }
+
+    std::map<int, std::string> read_rows(std::string raw_data);
     std::map<int, std::string> split_values(std::stringstream raw_csv_line);
-    void parse_csv();
+    std::multimap<int, std::pair<int, std::string>> parse_csv();
     std::string read_row_helper(int &col_no, const int &row_no);
 };
 }
