@@ -68,11 +68,13 @@ public:
         key = download_ids;
         if (!csv_data.empty()) {
             csv_raw_data << csv_data;
+            already_looped = false;
             add_headers(headers...);
             return;
         } else {
             rows_count = 0;
             key = false;
+            already_looped = false;
         }
 
         return;
@@ -93,19 +95,17 @@ public:
      * @return When to abort or repeat the while() loop.
      */
     template<typename T, typename ...ColTypes>
-    bool read_row(T& x, ColTypes& ...cols) {
-        static int rows_parsed = 0;
+    bool read_row(T& col, ColTypes& ...cols) {
+        static int rows_parsed;
+        static int cols_parsed;
+        rows_parsed = 0;
+        cols_parsed = 0;
         if (!csv_data.empty()) {
-            static int cols_parsed = 0;
             while ((rows_parsed + 1) <= rows_count) {
-                while (cols_parsed < (cols_count + 1)) {
-                    auto ret = read_row_helper(cols_parsed, (rows_parsed + 1));
-
+                while (cols_parsed < (cols_count + 1)) { // Unless we use a `do-loop`, then `cols_count + 1` needs to stand.
                     ++cols_parsed;
-                    if (!ret.empty()) {
-                        x = ret;
-                        read_row(cols...);
-                    }
+                    read_row_helper(cols_parsed, (rows_parsed + 1), col);
+                    read_row(cols...);
                 }
 
                 cols_parsed = 0;
@@ -113,16 +113,16 @@ public:
             }
         }
 
-        int start_row = 0;
-        if (!key) { start_row = 1; }
-        if ((rows_parsed + start_row) > rows_count) {
-            rows_parsed = 0;
+        if ((rows_parsed == rows_count) && !already_looped) {
+            ++rows_parsed;
             proc_cols.clear();
-            return false;
+            already_looped = true;
+            return true;
         }
 
-        ++rows_parsed;
-        return true;
+        rows_parsed = 0;
+        already_looped = false;
+        return false;
     }
 
 private:
@@ -140,7 +140,7 @@ private:
     std::stringstream csv_raw_data;
     int cols_count;
     int rows_count;
-    std::mutex mutex;
+    static bool already_looped;
     bool key;
     std::list<std::string> headers;                      // The key is the column number, whilst the value is the header associated with that column.
     static QMultiMap<int, int> proc_cols;
@@ -184,7 +184,7 @@ private:
     std::map<int, std::string> read_rows(std::string raw_data);
     std::map<int, std::string> split_values(std::stringstream raw_csv_line);
     std::multimap<int, std::pair<int, std::string>> parse_csv();
-    std::string read_row_helper(int &col_no, const int &row_no);
+    void read_row_helper(int col_no, int row_no, std::string &val);
 };
 }
 

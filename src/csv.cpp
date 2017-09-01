@@ -43,6 +43,7 @@
 #include "csv.hpp"
 #include <iostream>
 
+bool GekkoFyre::GkCsvReader::already_looped;
 QMultiMap<int, int> GekkoFyre::GkCsvReader::proc_cols;
 
 void GekkoFyre::GkCsvReader::read_row()
@@ -107,6 +108,10 @@ std::map<int, std::string> GekkoFyre::GkCsvReader::read_rows(std::string raw_dat
             ++rows_count;
             lines.insert(std::make_pair(rows_count, row));
         }
+
+        if (!key) {
+            rows_count = (rows_count - 1); // Remove the column containing the headers
+        }
     }
 
     return lines;
@@ -122,6 +127,7 @@ std::multimap<int, std::pair<int, std::string>> GekkoFyre::GkCsvReader::parse_cs
 {
     auto rows = read_rows(csv_raw_data.str());
     if (!rows.empty()) {
+        csv_data.clear();
         std::multimap<int, std::pair<int, std::string>> output;
         size_t start_row = 0;
         if (!key) {
@@ -199,49 +205,35 @@ std::map<int, std::string> GekkoFyre::GkCsvReader::split_values(std::stringstrea
     return output;
 }
 
-std::string GekkoFyre::GkCsvReader::read_row_helper(int &col_no, const int &row_no)
+void GekkoFyre::GkCsvReader::read_row_helper(int col_no, int row_no, std::string &val)
 {
-    repeat: ;
-    if (col_no == 0) {
-        return "";
+    if (col_no == 0 || row_no == 0) {
+        return;
     }
 
-    if (!csv_data.empty() && (row_no <= rows_count)) {
-        static std::string val = "";
-        for (auto col: csv_data) {
-            if (!proc_cols.contains(row_no, col_no)) {
-                if ((col.first == row_no) && (col.second.first == col_no)) {
-                    if ((std::strcmp(val.c_str(), col.second.second.c_str()) == 0) && (std::strcmp(val.c_str(), "0") != 0)) {
-                        return "";
-                    }
+    if (!csv_data.empty()) {
+        static std::string prev_val;
+        while (col_no <= cols_count) {
+            for (auto col: csv_data) {
+                if (!proc_cols.contains(row_no, col_no)) {
+                    if ((col.first == row_no) && (col.second.first == col_no)) {
+                        if (std::strcmp(prev_val.c_str(), col.second.second.c_str()) == 0) {
+                            return;
+                        }
 
-                    val = col.second.second;
-                    proc_cols.insertMulti(row_no, col_no);
-                    return val;
+                        prev_val = col.second.second;
+                        proc_cols.insertMulti(row_no, col_no);
+                        val = prev_val;
+                        return;
+                    }
+                } else {
+                    return;
                 }
             }
         }
     }
 
-    if (col_no <= cols_count) {
-        if (row_no >= rows_count) {
-            return "";
-        }
-
-        if (cols_count != proc_cols.size()) {
-            if (proc_cols.contains(row_no, col_no)) {
-                ++col_no;
-            }
-
-            if (col_no >= (cols_count + 1)) {
-                return "";
-            }
-
-            goto repeat;
-        }
-    }
-
-    return "";
+    return;
 }
 
 /**
@@ -252,6 +244,7 @@ std::string GekkoFyre::GkCsvReader::read_row_helper(int &col_no, const int &row_
  */
 bool GekkoFyre::GkCsvReader::force_cache_reload()
 {
+    already_looped = false;
     proc_cols.clear();
     csv_data.clear();
     csv_data = parse_csv();
