@@ -146,6 +146,7 @@ private:
     static int rows_parsed;
     static int ret_parsed_cols;                               // The amount of columns that have been parsed and returned successfully in `read_row()`
     std::recursive_mutex recur_mtx;
+    std::mutex excl_mtx;
     bool key;                                                 // Whether we are processing `CmnRoutines::extract_download_ids()` or its cousins
     std::list<std::string> headers;                           // The key is the column number, whilst the value is the header associated with that column.
     static QMultiMap<int, int> proc_cols;                     // The rows/columns we have already processed under `read_csv_helper()`

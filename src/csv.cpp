@@ -91,6 +91,7 @@ std::map<int, std::string> GekkoFyre::GkCsvReader::read_rows(std::string raw_dat
 {
     std::map<int, std::string> lines;
     if (!raw_data.empty()) {
+        std::lock_guard<std::mutex> lock(excl_mtx);
         if (search_string(raw_data, "\r\n")) {
             raw_data.erase(std::remove(raw_data.begin(), raw_data.end(), '\r'),
                                      raw_data.end());
@@ -198,6 +199,7 @@ std::map<int, std::string> GekkoFyre::GkCsvReader::split_values(std::stringstrea
     std::string csv;
     std::map<int, std::string> output;
     int col = 0;
+    std::lock_guard<std::mutex> lock(excl_mtx);
     while (std::getline(raw_csv_line, csv, ',')) {
         ++col;
         output.insert(std::make_pair(col, csv));
@@ -213,6 +215,7 @@ std::string GekkoFyre::GkCsvReader::read_csv_helper(const int &col_no, const int
     }
 
     if (!csv_data.empty()) {
+        std::lock_guard<std::mutex> lock(excl_mtx);
         if (row_no <= rows_count) {
             while (col_no <= cols_count) {
                 for (auto col: csv_data) {
