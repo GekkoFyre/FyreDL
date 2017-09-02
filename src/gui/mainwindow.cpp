@@ -1261,12 +1261,12 @@ void MainWindow::general_extraDetails()
                             gk_dl_info_cache.at(i).dl_type == GekkoFyre::DownloadType::FTP) {
                         // This is a HTTP(S) or FTP(S) download!
                         if (gk_dl_info_cache.at(i).curl_info.is_initialized()) {
-                            insert_time = gk_dl_info_cache.at(i).curl_info.get().insert_timestamp;
-                            complt_time = gk_dl_info_cache.at(i).curl_info.get().complt_timestamp;
-                            content_length = gk_dl_info_cache.at(i).curl_info.get().ext_info.content_length;
-                            hash_val_given = gk_dl_info_cache.at(i).curl_info.get().hash_val_given;
-                            hash_val_calc = gk_dl_info_cache.at(i).curl_info.get().hash_val_rtrnd;
-                            hashType = routines->convHashType_toString(gk_dl_info_cache.at(i).curl_info.get().hash_type);
+                            insert_time = gk_dl_info_cache.at(i).curl_info.value().insert_timestamp;
+                            complt_time = gk_dl_info_cache.at(i).curl_info.value().complt_timestamp;
+                            content_length = gk_dl_info_cache.at(i).curl_info.value().ext_info.content_length;
+                            hash_val_given = gk_dl_info_cache.at(i).curl_info.value().hash_val_given;
+                            hash_val_calc = gk_dl_info_cache.at(i).curl_info.value().hash_val_rtrnd;
+                            hashType = routines->convHashType_toString(gk_dl_info_cache.at(i).curl_info.value().hash_type);
                         }
 
                         break;
@@ -1274,10 +1274,10 @@ void MainWindow::general_extraDetails()
                             gk_dl_info_cache.at(i).dl_type == GekkoFyre::DownloadType::TorrentMagnetLink) {
                         // This is a BitTorrent download!
                         if (gk_dl_info_cache.at(i).to_info.is_initialized()) {
-                            insert_time = gk_dl_info_cache.at(i).to_info.get().general.insert_timestamp;
-                            complt_time = gk_dl_info_cache.at(i).to_info.get().general.complt_timestamp;
-                            content_length = ((double)gk_dl_info_cache.at(i).to_info.get().general.num_pieces *
-                                              (double)gk_dl_info_cache.at(i).to_info.get().general.piece_length);
+                            insert_time = gk_dl_info_cache.at(i).to_info.value().general.insert_timestamp;
+                            complt_time = gk_dl_info_cache.at(i).to_info.value().general.complt_timestamp;
+                            content_length = ((double)gk_dl_info_cache.at(i).to_info.value().general.num_pieces *
+                                              (double)gk_dl_info_cache.at(i).to_info.value().general.piece_length);
                             hash_val_given = tr("N/A").toStdString();
                             hash_val_calc = tr("N/A").toStdString();
                             hashType = tr("Unknown");
@@ -1925,12 +1925,12 @@ void MainWindow::recvBitTorrent_XferStats(const GekkoFyre::GkTorrent::TorrentRes
     std::time(&cur_time_temp);
     stats_temp.cur_time = cur_time_temp;
     to_ses_mutex.lock();
-    stats_temp.progress_ppm = gk_xfer_info.xfer_stats.get().progress_ppm;
-    stats_temp.upload_rate = gk_xfer_info.xfer_stats.get().ul_rate;
-    stats_temp.download_rate = gk_xfer_info.xfer_stats.get().dl_rate;
+    stats_temp.progress_ppm = gk_xfer_info.xfer_stats.value().progress_ppm;
+    stats_temp.upload_rate = gk_xfer_info.xfer_stats.value().ul_rate;
+    stats_temp.download_rate = gk_xfer_info.xfer_stats.value().dl_rate;
     stats_temp.download_total = gk_xfer_info.total_downloaded;
     stats_temp.upload_total = gk_xfer_info.total_uploaded;
-    stats_temp.num_pieces_dled = gk_xfer_info.xfer_stats.get().num_pieces_downloaded;
+    stats_temp.num_pieces_dled = gk_xfer_info.xfer_stats.value().num_pieces_downloaded;
 
     for (size_t i = 0; i < gk_dl_info_cache.size(); ++i) {
         if (gk_dl_info_cache.at(i).dl_type == GekkoFyre::DownloadType::Torrent ||
@@ -1941,14 +1941,14 @@ void MainWindow::recvBitTorrent_XferStats(const GekkoFyre::GkTorrent::TorrentRes
                     // thusly updateDlStats().
                     std::time(&gk_dl_info_cache.at(i).stats.timer_begin);
                     gk_dl_info_cache.at(i).stats.xfer_stats.push_back(stats_temp);
-                    gk_dl_info_cache.at(i).to_info.get().to_resume_info = gk_xfer_info;
+                    gk_dl_info_cache.at(i).to_info.value().to_resume_info = gk_xfer_info;
 
                     emit updateDlStats();
                     goto finish_loop;
                 } else {
                     // If it does exist, then only update certain elements instead and thusly updateDlStats() also.
                     gk_dl_info_cache.at(i).stats.xfer_stats.push_back(stats_temp);
-                    gk_dl_info_cache.at(i).to_info.get().to_resume_info = gk_xfer_info;
+                    gk_dl_info_cache.at(i).to_info.value().to_resume_info = gk_xfer_info;
 
                     emit updateDlStats();
                     goto finish_loop;

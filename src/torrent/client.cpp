@@ -66,6 +66,7 @@ using clk = std::chrono::steady_clock;
 GekkoFyre::GkTorrentClient::GkTorrentClient(const GekkoFyre::GkFile::FileDb &database, QObject *parent) : QObject(parent)
 {
     routines = std::make_shared<GekkoFyre::CmnRoutines>(database, this);
+    db_struct = database;
     async_active = false;
 
     // http://libtorrent.org/reference-Settings.html#settings_pack
@@ -152,7 +153,6 @@ void GekkoFyre::GkTorrentClient::startTorrentDl(const GekkoFyre::GkTorrent::Torr
                     if (!lt_to_handle.contains(handle_file_path) && !unique_id_cache.contains(handle_file_path)) {
                         lt_to_handle.insert(handle_file_path, at->handle);
 
-                        GekkoFyre::GkFile::FileDb db_struct = routines->openDatabase(CFG_HISTORY_DB_FILE);
                         // std::string handle_unique_id = routines->determine_download_id(handle_file_path, db_struct);
                         // TODO: Finish this section!
                         unique_id_cache.insert(handle_file_path, "handle_unique_id");

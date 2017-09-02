@@ -77,6 +77,7 @@ private:
     QMap<std::string, std::string> unique_id_cache;
     std::future<void> async_ses;
     bool async_active;
+    GekkoFyre::GkFile::FileDb db_struct;
 
 private slots:
     void recv_proc_to_stats(const std::string &save_path, const lt::torrent_status &stats);
