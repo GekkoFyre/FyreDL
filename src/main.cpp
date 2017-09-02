@@ -52,14 +52,16 @@ extern "C" {
 
 #endif
 
-#define BOOST_FILESYSTEM_NO_DEPRECATED
-
 int main(int argc, char *argv[])
 {
-    SingletonProcess singleton(37563);
-    if (!singleton()) {
-        std::cerr << "Another FyreDL instance is already open!" << std::endl;
-        return 1; // Exit with status code '1'
+    try {
+        SingletonProcess singleton(37563);
+        if (!singleton()) {
+            std::cerr << "Another FyreDL instance is already open!" << std::endl;
+            return 1; // Exit with status code '1'
+        }
+    } catch (const std::exception &e) {
+        std::cerr << e.what() << std::endl;
     }
 
     // https://github.com/notepadqq/notepadqq/issues/323
@@ -70,7 +72,7 @@ int main(int argc, char *argv[])
     int width = s->width;
     double ratio = ((double)width / FYREDL_DEFAULT_RESOLUTION_WIDTH);
     if (ratio > 1.1) {
-        qputenv("QT_DEVICE_PIXEL_RATIO", QString::number(ratio).toLatin1());
+        qputenv("QT_SCALE_FACTOR", QString::number(ratio).toLatin1());
     }
 
     #else

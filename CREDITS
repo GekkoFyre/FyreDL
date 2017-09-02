@@ -35,9 +35,9 @@ LevelDB (Windows support) patches by Netzeband
 	<https://github.com/google/leveldb/issues/475>
 		Public Domain
 
-PugiXML by Arseny Kapoulkine et al.
-	<http://pugixml.org/>
-		MIT License
+ThreadPool by Jakob Progsch and Václav Zeman
+	<https://github.com/progschj/ThreadPool>
+		Public Domain
 
 Doxygen by Dimitri van Heesch et al.
 	<http://www.stack.nl/~dimitri/doxygen/>

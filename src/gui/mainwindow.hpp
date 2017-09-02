@@ -52,6 +52,7 @@
 #include <vector>
 #include <string>
 #include <memory>
+#include <mutex>
 #include <QMainWindow>
 #include <QString>
 #include <QThread>
@@ -59,6 +60,7 @@
 #include <QStandardItem>
 #include <QPointer>
 
+using namespace GekkoFyre;
 namespace Ui {
 class MainWindow;
 }
@@ -72,6 +74,8 @@ public:
     ~MainWindow();
 
 private:
+    GekkoFyre::GkFile::FileDb openDatabase(const std::string &dbFileName = CFG_HISTORY_DB_FILE);
+
     void addDownload();
     void readFromHistoryFile();
     void modifyHistoryFile();
@@ -88,7 +92,7 @@ private:
     void delCharts(const std::string &file_dest);
     void updateChart();
 
-    std::unique_ptr<QStandardItemModel> cV_model;
+    QPointer<QStandardItemModel> cV_model;
     void contentsView_update();
     void cV_addItems(QStandardItem *parent, const QStringList &elements);
 
@@ -109,11 +113,12 @@ private:
     void transfer_extraDetails();
 
     QPointer<downloadModel> dlModel;
-    std::unique_ptr<GekkoFyre::CmnRoutines> routines;
+    std::shared_ptr<GekkoFyre::CmnRoutines> routines;
     QPointer<GekkoFyre::CurlMulti> curl_multi;
     QPointer<GekkoFyre::GkTorrentClient> gk_torrent_client;
     std::vector<GekkoFyre::Global::DownloadInfo> gk_dl_info_cache;
-    QString curr_shown_graphs;
+    std::mutex mutex;
+    GekkoFyre::GkFile::FileDb database;
 
     // http://stackoverflow.com/questions/10121560/stdthread-naming-your-thread
     QPointer<QThread> curl_multi_thread;
@@ -124,6 +129,7 @@ signals:
     void sendStopDownload(const QString &fileLoc);
     void sendStartDownload(const QString &url, const QString &file_loc, const bool &resumeDl);
     void finish_curl_multi_thread();
+    void terminate_xfers();
 
 private slots:
     void on_action_Open_a_File_triggered();
@@ -168,9 +174,10 @@ private slots:
                      const GekkoFyre::DownloadType &down_type);
 
     // Libcurl specific slots
-    void recvXferStats(const GekkoFyre::GkCurl::CurlProgressPtr &info);
+    void recvCurl_XferStats(const GekkoFyre::GkCurl::CurlProgressPtr &info);
     void manageDlStats();
     void recvDlFinished(const GekkoFyre::GkCurl::DlStatusMsg &status);
+    void terminate_curl_downloads();
 
     // Libtorrent specific slots
     void recvBitTorrent_XferStats(const GekkoFyre::GkTorrent::TorrentResumeInfo &gk_xfer_info);

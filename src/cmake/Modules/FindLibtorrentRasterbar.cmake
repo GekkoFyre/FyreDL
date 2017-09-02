@@ -63,7 +63,6 @@ set(LibtorrentRasterbar_LIBRARIES ${LibtorrentRasterbar_LIBRARY} ${CMAKE_THREAD_
 set(LibtorrentRasterbar_INCLUDE_DIRS ${LibtorrentRasterbar_INCLUDE_DIR})
 
 if(NOT Boost_SYSTEM_FOUND OR NOT Boost_CHRONO_FOUND OR NOT Boost_RANDOM_FOUND)
-    find_package(Boost REQUIRED COMPONENTS system chrono random)
     set(LibtorrentRasterbar_LIBRARIES
         ${LibtorrentRasterbar_LIBRARIES} ${Boost_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT})
     set(LibtorrentRasterbar_INCLUDE_DIRS

@@ -48,14 +48,13 @@
 
 #include "./../default_var.hpp"
 #include "./../cmnroutines.hpp"
-#include "session.hpp"
 #include "misc.hpp"
 #include <libtorrent/session_handle.hpp>
 #include <libtorrent/torrent_handle.hpp>
 #include <string>
 #include <memory>
+#include <future>
 #include <QObject>
-#include <QThread>
 #include <QPointer>
 
 namespace GekkoFyre {
@@ -63,27 +62,29 @@ class GkTorrentClient: public QObject {
     Q_OBJECT
 
 public:
-    GkTorrentClient();
+    GkTorrentClient(const GekkoFyre::GkFile::FileDb &database, QObject *parent = 0);
     ~GkTorrentClient();
 
     void startTorrentDl(const GekkoFyre::GkTorrent::TorrentInfo &item);
 
 private:
     int rand_port() const;
+    void run_session_bckgrnd();
 
-    std::unique_ptr<GekkoFyre::CmnRoutines> routines;
-    QPointer<GekkoFyre::GkTorrentSession> gk_to_ses;
-    std::shared_ptr<lt::session_handle> lt_ses;
-    QPointer<QThread> gk_ses_thread;
+    std::shared_ptr<GekkoFyre::CmnRoutines> routines;
+    lt::session_handle *lt_ses;
+    QMap<std::string, lt::torrent_handle> lt_to_handle;
+    QMap<std::string, std::string> unique_id_cache;
+    std::future<void> async_ses;
+    bool async_active;
 
 private slots:
     void recv_proc_to_stats(const std::string &save_path, const lt::torrent_status &stats);
 
 signals:
-    void update_ses_hash(const std::string &save_dir, const lt::torrent_handle &lt_th);
     void xfer_torrent_info(const GekkoFyre::GkTorrent::TorrentResumeInfo &xfer_stats);
+    void xfer_internal_stats(const std::string &save_path, const lt::torrent_status &stats);
 };
 }
-
 
 #endif // FYREDL_TORRENT_CLIENT_HPP

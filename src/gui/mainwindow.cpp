@@ -45,6 +45,9 @@
 #include "settings.hpp"
 #include "./../curl_easy.hpp"
 #include "about.hpp"
+#include <leveldb/db.h>
+#include <leveldb/write_batch.h>
+#include <leveldb/cache.h>
 #include <boost/filesystem.hpp>
 #include <boost/exception/all.hpp>
 #include <boost/system/error_code.hpp>
@@ -73,14 +76,15 @@ namespace fs = boost::filesystem;
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
-    routines = std::make_unique<GekkoFyre::CmnRoutines>(this);
+    database = openDatabase();
+    routines = std::make_shared<GekkoFyre::CmnRoutines>(database, this);
 
     QMessageBox::warning(this, tr("FyreDL"), tr("FyreDL is currently under intense development at this "
                                                 "time! Please only use at your own risk."),
                          QMessageBox::Ok);
 
     curl_multi = new GekkoFyre::CurlMulti();
-    gk_torrent_client = new GekkoFyre::GkTorrentClient();
+    gk_torrent_client = new GekkoFyre::GkTorrentClient(database, this);
 
     // http://wiki.qt.io/QThreads_general_usage
     // https://mayaposch.wordpress.com/2011/11/01/how-to-really-truly-use-qthreads-the-full-explanation/
@@ -93,7 +97,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
     QObject::connect(curl_multi_thread, SIGNAL(finished()), curl_multi_thread, SLOT(deleteLater()));
     curl_multi_thread->start();
 
-    dlModel = new downloadModel();
+    dlModel = new downloadModel(this);
     ui->downloadView->setModel(dlModel);
     ui->downloadView->setSelectionBehavior(QAbstractItemView::SelectRows);
     ui->downloadView->setSelectionMode(QAbstractItemView::SingleSelection);
@@ -101,7 +105,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
     ui->downloadView->setContextMenuPolicy(Qt::CustomContextMenu);
     ui->downloadView->setColumnHidden(MN_HIDDEN_UNIQUE_ID, true);
 
-    QPointer<downloadDelegate> dlDel = new downloadDelegate();
+    QPointer<downloadDelegate> dlDel = new downloadDelegate(dlModel);
     ui->downloadView->setItemDelegate(dlDel);
 
     QObject::connect(ui->downloadView, SIGNAL(customContextMenuRequested(QPoint)), this, SLOT(on_downloadView_customContextMenuRequested(QPoint)));
@@ -113,25 +117,60 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
         QMessageBox::warning(this, tr("Error!"), QString("%1").arg(e.what()), QMessageBox::Ok);
     }
 
+    QObject::connect(this, SIGNAL(terminate_xfers()), this, SLOT(terminate_curl_downloads()));
+
     QPointer<QShortcut> upKeyOverride = new QShortcut(QKeySequence(Qt::Key_Up), ui->downloadView);
     QPointer<QShortcut> downKeyOverride = new QShortcut(QKeySequence(Qt::Key_Down), ui->downloadView);
     QObject::connect(upKeyOverride, SIGNAL(activated()), this, SLOT(keyUpDlModelSlot()));
     QObject::connect(downKeyOverride, SIGNAL(activated()), this, SLOT(keyDownDlModelSlot()));
 
-    curr_shown_graphs = "";
     resetDlStateStartup();
 }
 
 MainWindow::~MainWindow()
 {
     delete ui;
-    emit finish_curl_multi_thread();
+    emit terminate_xfers();
     gk_dl_info_cache.clear();
 }
 
+GekkoFyre::GkFile::FileDb MainWindow::openDatabase(const std::string &dbFileName)
+{
+    GekkoFyre::GkFile::FileDb db_struct;
+
+    try {
+        leveldb::Status s;
+        db_struct.options.create_if_missing = true;
+        std::shared_ptr<leveldb::Cache>(db_struct.options.block_cache).reset(leveldb::NewLRUCache(LEVELDB_CFG_CACHE_SIZE));
+        db_struct.options.compression = leveldb::CompressionType::kSnappyCompression;
+
+        if (!dbFileName.empty()) {
+            std::string db_location = routines->leveldb_location(dbFileName);
+            sys::error_code ec;
+            bool doesExist;
+            doesExist = !fs::exists(db_location, ec) ? false : true;
+
+            leveldb::DB *raw_db_ptr;
+            s = leveldb::DB::Open(db_struct.options, db_location, &raw_db_ptr);
+            db_struct.db.reset(raw_db_ptr);
+            if (!s.ok()) {
+                throw std::runtime_error(tr("Unable to open/create database! %1").arg(QString::fromStdString(s.ToString())).toStdString());
+            }
+
+            if (fs::exists(db_location, ec) && fs::is_directory(db_location) && !doesExist) {
+                std::cout << tr("Database object created. Status: ").toStdString() << s.ToString() << std::endl;
+            }
+        }
+    } catch (const std::exception &e) {
+        QMessageBox::warning(nullptr, tr("Error!"), e.what(), QMessageBox::Ok);
+        return GekkoFyre::GkFile::FileDb();
+    }
+
+    return db_struct;
+}
+
 /**
- * @brief MainWindow::addDownload adds a URL and its properties/information to the 'downloadView' TableView
- * widget.
+ * @brief MainWindow::addDownload adds a URL and its properties/information to the 'downloadView' TableView widget.
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
  * @note   <http://doc.qt.io/qt-5/qtwidgets-itemviews-addressbook-example.html#addresswidget-class-implementation>
  *         <https://en.wikipedia.org/wiki/List_of_HTTP_status_codes#2xx_Success>
@@ -141,7 +180,7 @@ MainWindow::~MainWindow()
  */
 void MainWindow::addDownload()
 {
-    QPointer<AddURL> add_url = new AddURL(this);
+    QPointer<AddURL> add_url = new AddURL(database, this);
     QObject::connect(add_url, SIGNAL(sendDetails(std::string,double,int,double,int,int,GekkoFyre::DownloadStatus,std::string,std::string,GekkoFyre::HashType,std::string,long long,bool,std::string,std::string,GekkoFyre::DownloadType)),
                      this, SLOT(sendDetails(std::string,double,int,double,int,int,GekkoFyre::DownloadStatus,std::string,std::string,GekkoFyre::HashType,std::string,long long,bool,std::string,std::string,GekkoFyre::DownloadType)));
     add_url->setAttribute(Qt::WA_DeleteOnClose, true);
@@ -158,8 +197,8 @@ void MainWindow::readFromHistoryFile()
 {
     std::vector<GekkoFyre::GkCurl::CurlDlInfo> dl_history;
     std::vector<GekkoFyre::GkTorrent::TorrentInfo> gk_torrent_history;
-    dl_history = routines->readDownloadInfo();
-    gk_torrent_history = routines->readTorrentInfo(true);
+    dl_history = routines->readCurlItems();
+    gk_torrent_history = routines->readTorrentItems(true);
 
     dlModel->removeRows(0, (int)dl_history.size(), QModelIndex());
     for (size_t i = 0; i < dl_history.size(); ++i) {
@@ -181,7 +220,7 @@ void MainWindow::readFromHistoryFile()
                                                                 "an attempt is being made at deleting this from the database.")
                     .arg(QUrl(QString::fromStdString(dl_history.at(i).ext_info.effective_url)).fileName()), QMessageBox::Ok);
             if (!dl_history.at(i).unique_id.empty()) {
-                routines->delDownloadItem("", dl_history.at(i).unique_id);
+                routines->delCurlItem("", dl_history.at(i).unique_id);
             }
         }
     }
@@ -319,7 +358,7 @@ void MainWindow::removeSelRows()
                     if (gk_dl_info_cache.at(i).unique_id == sel_row_unique_id) {
                         if (gk_dl_info_cache.at(i).dl_type == GekkoFyre::DownloadType::HTTP || gk_dl_info_cache.at(i).dl_type == GekkoFyre::DownloadType::FTP) {
                             // Remove the downloadable object from the Google LevelDB database
-                            routines->delDownloadItem(file_dest);
+                            routines->delCurlItem(file_dest);
 
                             // Remove the downloadable object from the memory cache and then break the while-loop
                             gk_dl_info_cache.erase(gk_dl_info_cache.begin() + i);
@@ -361,6 +400,7 @@ void MainWindow::removeSelRows()
  */
 void MainWindow::resetDlStateStartup()
 {
+    bool alreadyMentioned = false;
     for (int i = 0; i < dlModel->getList().size(); ++i) {
         QModelIndex find_index = dlModel->index(i, MN_STATUS_COL);
         if (find_index.isValid()) {
@@ -368,12 +408,32 @@ void MainWindow::resetDlStateStartup()
             if (stat_string == routines->convDlStat_toString(GekkoFyre::DownloadStatus::Downloading)) {
                 QModelIndex file_dest_index = dlModel->index(i, MN_DESTINATION_COL);
                 const QString file_dest_string = ui->downloadView->model()->data(file_dest_index).toString();
+                QModelIndex unique_id_index = dlModel->index(i, MN_HIDDEN_UNIQUE_ID);
+                const QString unique_id_string = ui->downloadView->model()->data(unique_id_index).toString();
 
                 try {
-                    bool ret_state = routines->modifyDlState(file_dest_string.toStdString(), GekkoFyre::DownloadStatus::Paused);
-                    bool ret_update_col = dlModel->updateCol(find_index, routines->convDlStat_toString(GekkoFyre::DownloadStatus::Paused), MN_STATUS_COL);
-                    if (!ret_state || !ret_update_col) {
-                        throw std::runtime_error(tr("There has been an error at startup. FyreDL was unable to correctly reset the state of some columns, either due to a GUI or database error.").toStdString());
+                    for (const auto &item: gk_dl_info_cache) {
+                        if (item.unique_id == unique_id_string) {
+                            if (item.dl_type == GekkoFyre::DownloadType::HTTP || item.dl_type == GekkoFyre::DownloadType::FTP) {
+                                bool ret_state = routines->modifyCurlItem(file_dest_string.toStdString(),
+                                                                          GekkoFyre::DownloadStatus::Paused);
+                                bool ret_update_col = dlModel->updateCol(find_index, routines->convDlStat_toString(GekkoFyre::DownloadStatus::Paused), MN_STATUS_COL);
+                                if ((!ret_state || !ret_update_col) && !alreadyMentioned) {
+                                    QMessageBox::warning(this, ("Problem!"), tr("There has been an error at startup. FyreDL was unable to correctly reset the state of some columns, either due to a GUI or database error."), QMessageBox::Ok);
+                                    alreadyMentioned = true;
+                                }
+                            } else if (item.dl_type == GekkoFyre::DownloadType::Torrent || item.dl_type == GekkoFyre::DownloadType::TorrentMagnetLink) {
+                                bool ret_state = routines->modifyTorrentItem(item.unique_id.toStdString(),
+                                                                             GekkoFyre::DownloadStatus::Stopped);
+                                bool ret_update_col = dlModel->updateCol(find_index, routines->convDlStat_toString(GekkoFyre::DownloadStatus::Stopped), MN_STATUS_COL);
+                                if ((!ret_state || !ret_update_col) && !alreadyMentioned) {
+                                    QMessageBox::warning(this, ("Problem!"), tr("There has been an error at startup. FyreDL was unable to correctly reset the state of some columns, either due to a GUI or database error."), QMessageBox::Ok);
+                                    alreadyMentioned = true;
+                                }
+                            } else {
+                                break;
+                            }
+                        }
                     }
                 } catch (const std::exception &e) {
                     QMessageBox::warning(this, tr("Error!"), e.what(), QMessageBox::Ok);
@@ -425,7 +485,7 @@ void MainWindow::initCharts(const QString &unique_id, const QString &down_dest,
 
         if (download_type == GekkoFyre::DownloadType::HTTP || download_type == GekkoFyre::DownloadType::FTP) {
             // Download type is either HTTP or FTP
-            std::vector<GekkoFyre::GkCurl::CurlDlInfo> curl_dl_info = routines->readDownloadInfo();
+            std::vector<GekkoFyre::GkCurl::CurlDlInfo> curl_dl_info = routines->readCurlItems();
             for (size_t j = 0; j < curl_dl_info.size(); ++j) {
                 if (curl_dl_info.at(j).unique_id == unique_id.toStdString()) {
                     graph_info.curl_info = curl_dl_info.at(j);
@@ -436,7 +496,7 @@ void MainWindow::initCharts(const QString &unique_id, const QString &down_dest,
         } else if (download_type == GekkoFyre::DownloadType::Torrent ||
                 download_type == GekkoFyre::DownloadType::TorrentMagnetLink) {
             // Download type is BitTorrent
-            std::vector<GekkoFyre::GkTorrent::TorrentInfo> gk_torrent_info = routines->readTorrentInfo(false);
+            std::vector<GekkoFyre::GkTorrent::TorrentInfo> gk_torrent_info = routines->readTorrentItems(false);
             for (size_t j = 0; j < gk_torrent_info.size(); ++j) {
                 if (gk_torrent_info.at(j).general.unique_id == graph_info.unique_id.toStdString()) {
                     graph_info.to_info = gk_torrent_info.at(j);
@@ -521,7 +581,7 @@ void MainWindow::contentsView_update()
                                     gk_dl_info_cache.at(k).dl_type == GekkoFyre::DownloadType::TorrentMagnetLink) {
 
                                 // Read the XML data into memory
-                                std::vector<GekkoFyre::GkTorrent::TorrentInfo> gk_ti = routines->readTorrentInfo(false);
+                                std::vector<GekkoFyre::GkTorrent::TorrentInfo> gk_ti = routines->readTorrentItems(false);
                                 std::ostringstream oss_data;
                                 for (size_t i = 0; i < gk_ti.size(); ++i) {
                                     if (gk_ti.at(i).general.unique_id == unique_id.toStdString()) {
@@ -557,7 +617,7 @@ void MainWindow::contentsView_update()
 
                                         QList<QString> dirs_pair = files_toProc.values();
 
-                                        cV_model = std::make_unique<QStandardItemModel>();
+                                        cV_model = new QStandardItemModel();
                                         QStandardItem *topLevelItem = cV_model->invisibleRootItem();
 
                                         // Iterate over each directory string
@@ -583,7 +643,7 @@ void MainWindow::contentsView_update()
                                         QStringList headers;
                                         headers << tr("Dir/File");
                                         cV_model->setHorizontalHeaderLabels(headers);
-                                        ui->contentsView->setModel(cV_model.get());
+                                        ui->contentsView->setModel(cV_model);
                                     }
                                 }
                             } else {
@@ -753,28 +813,26 @@ void MainWindow::startHttpDownload(const QString &file_dest, const QString &uniq
                         if (gk_dl_info_cache.at(k).dl_type == GekkoFyre::DownloadType::HTTP ||
                                 gk_dl_info_cache.at(k).dl_type == GekkoFyre::DownloadType::FTP) {
                             // TODO: QFutureWatcher<GekkoFyre::CurlMulti::CurlInfo> *verifyFileFutWatch;
-                            GekkoFyre::GkCurl::CurlInfo verify = GekkoFyre::CurlEasy::verifyFileExists(url);
-                            if (verify.response_code == 200) {
-                                if (status != GekkoFyre::DownloadStatus::Downloading) {
-                                    double freeDiskSpace = (double)routines->freeDiskSpace(QDir(file_dest).absolutePath());
-                                    GekkoFyre::GkCurl::CurlInfoExt extended_info = GekkoFyre::CurlEasy::curlGrabInfo(url);
-                                    if ((unsigned long int)((extended_info.content_length * FREE_DSK_SPACE_MULTIPLIER) < freeDiskSpace)) {
-                                        routines->modifyDlState(file_dest.toStdString(), GekkoFyre::DownloadStatus::Downloading);
-                                        dlModel->updateCol(index, routines->convDlStat_toString(GekkoFyre::DownloadStatus::Downloading), MN_STATUS_COL);
+                            if (status != GekkoFyre::DownloadStatus::Downloading) {
+                                double freeDiskSpace = (double)routines->freeDiskSpace(QDir(file_dest).absolutePath());
+                                GekkoFyre::GkCurl::CurlInfoExt extended_info = GekkoFyre::CurlEasy::curlGrabInfo(url);
+                                if ((unsigned long int)((extended_info.content_length * FREE_DSK_SPACE_MULTIPLIER) < freeDiskSpace)) {
+                                    routines->modifyCurlItem(file_dest.toStdString(),
+                                                             GekkoFyre::DownloadStatus::Downloading);
+                                    dlModel->updateCol(index, routines->convDlStat_toString(GekkoFyre::DownloadStatus::Downloading), MN_STATUS_COL);
 
-                                        QObject::connect(GekkoFyre::routine_singleton::instance(), SIGNAL(sendXferStats(GekkoFyre::GkCurl::CurlProgressPtr)), this, SLOT(recvXferStats(GekkoFyre::GkCurl::CurlProgressPtr)));
-                                        QObject::connect(GekkoFyre::routine_singleton::instance(), SIGNAL(sendDlFinished(GekkoFyre::GkCurl::DlStatusMsg)), this, SLOT(recvDlFinished(GekkoFyre::GkCurl::DlStatusMsg)));
+                                    QObject::connect(GekkoFyre::routine_singleton::instance(), SIGNAL(sendXferStats(GekkoFyre::GkCurl::CurlProgressPtr)), this, SLOT(recvCurl_XferStats(GekkoFyre::GkCurl::CurlProgressPtr)));
+                                    QObject::connect(GekkoFyre::routine_singleton::instance(), SIGNAL(sendDlFinished(GekkoFyre::GkCurl::DlStatusMsg)), this, SLOT(recvDlFinished(GekkoFyre::GkCurl::DlStatusMsg)));
 
-                                        // This is required for signaling, otherwise QVariant does not know the type.
-                                        qRegisterMetaType<GekkoFyre::GkCurl::CurlProgressPtr>("curlProgressPtr");
-                                        qRegisterMetaType<GekkoFyre::GkCurl::DlStatusMsg>("DlStatusMsg");
+                                    // This is required for signaling, otherwise QVariant does not know the type.
+                                    qRegisterMetaType<GekkoFyre::GkCurl::CurlProgressPtr>("curlProgressPtr");
+                                    qRegisterMetaType<GekkoFyre::GkCurl::DlStatusMsg>("DlStatusMsg");
 
-                                        // Emit the signal data necessary to initiate a download
-                                        emit sendStartDownload(url, file_dest, resumeDl);
-                                        return;
-                                    } else {
-                                        throw std::runtime_error(tr("Not enough free disk space!").toStdString());
-                                    }
+                                    // Emit the signal data necessary to initiate a download
+                                    emit sendStartDownload(url, file_dest, resumeDl);
+                                    return;
+                                } else {
+                                    throw std::runtime_error(tr("Not enough free disk space!").toStdString());
                                 }
                             }
                         }
@@ -800,11 +858,15 @@ void MainWindow::startHttpDownload(const QString &file_dest, const QString &uniq
  */
 void MainWindow::startTorrentDl(const QString &unique_id, const bool &resumeDl)
 {
-    std::vector<GekkoFyre::GkTorrent::TorrentInfo> gk_ti = routines->readTorrentInfo(false);
+    QModelIndexList indexes = ui->downloadView->selectionModel()->selectedRows();
+    QModelIndex index = dlModel->index(indexes.at(0).row(), MN_STATUS_COL, QModelIndex());
+    std::vector<GekkoFyre::GkTorrent::TorrentInfo> gk_ti = routines->readTorrentItems(false);
     for (auto const &indice: gk_ti) {
         if (indice.general.unique_id == unique_id.toStdString()) {
             QObject::connect(gk_torrent_client, SIGNAL(xfer_torrent_info(GekkoFyre::GkTorrent::TorrentResumeInfo)), this, SLOT(recvBitTorrent_XferStats(GekkoFyre::GkTorrent::TorrentResumeInfo)));
             gk_torrent_client->startTorrentDl(indice);
+            routines->modifyTorrentItem(unique_id.toStdString(), GekkoFyre::DownloadStatus::Downloading);
+            dlModel->updateCol(index, routines->convDlStat_toString(GekkoFyre::DownloadStatus::Downloading), MN_STATUS_COL);
             break;
         }
     }
@@ -835,7 +897,8 @@ void MainWindow::haltDownload()
                                         if (status != GekkoFyre::DownloadStatus::Invalid) {
                                             QObject::connect(this, SIGNAL(sendStopDownload(QString)), GekkoFyre::routine_singleton::instance(), SLOT(recvStopDl(QString)));
                                             emit sendStopDownload(dest);
-                                            routines->modifyDlState(dest.toStdString(), GekkoFyre::DownloadStatus::Stopped);
+                                            routines->modifyCurlItem(dest.toStdString(),
+                                                                     GekkoFyre::DownloadStatus::Stopped);
                                             dlModel->updateCol(index, routines->convDlStat_toString(GekkoFyre::DownloadStatus::Stopped), MN_STATUS_COL);
                                             askDeleteHttpItem(dest, unique_id, true);
                                         }
@@ -876,15 +939,12 @@ void MainWindow::resumeDownload()
     QModelIndexList indexes = ui->downloadView->selectionModel()->selectedRows();
     if (indexes.size() > 0) {
         if (indexes.at(0).isValid()) {
-            const QString dest = ui->downloadView->model()->data(
-                    ui->downloadView->model()->index(indexes.at(0).row(), MN_DESTINATION_COL)).toString();
+            const QString dest = ui->downloadView->model()->data(ui->downloadView->model()->index(indexes.at(0).row(), MN_DESTINATION_COL)).toString();
             fs::path dest_boost_path(dest.toStdString());
             QModelIndex index = dlModel->index(indexes.at(0).row(), MN_STATUS_COL, QModelIndex());
-            const GekkoFyre::DownloadStatus status = routines->convDlStat_StringToEnum(
-                    ui->downloadView->model()->data(index).toString());
+            const GekkoFyre::DownloadStatus status = routines->convDlStat_StringToEnum(ui->downloadView->model()->data(index).toString());
             for (size_t k = 0; k < gk_dl_info_cache.size(); ++k) {
-                const QString unique_id = ui->downloadView->model()->data(
-                        ui->downloadView->model()->index(indexes.at(0).row(), MN_HIDDEN_UNIQUE_ID)).toString();
+                const QString unique_id = ui->downloadView->model()->data(ui->downloadView->model()->index(indexes.at(0).row(), MN_HIDDEN_UNIQUE_ID)).toString();
                 if (gk_dl_info_cache.at(k).unique_id == unique_id) {
                     if (gk_dl_info_cache.at(k).dl_type == GekkoFyre::DownloadType::HTTP ||
                             gk_dl_info_cache.at(k).dl_type == GekkoFyre::DownloadType::FTP) {
@@ -895,33 +955,12 @@ void MainWindow::resumeDownload()
                                         // The file still exists, so resume downloading since it's from a paused state!
                                         startHttpDownload(dest, unique_id, true);
                                     } else {
-                                        // We have NO existing file... notify the user.
-                                        QMessageBox file_ask;
-                                        file_ask.setIcon(QMessageBox::Information);
-                                        file_ask.setWindowTitle(tr("Problem!"));
-                                        file_ask.setText(tr("The file no longer exists! Should I clear the history for this item?").arg(dest));
-                                        file_ask.setStandardButtons(QMessageBox::Yes | QMessageBox::No | QMessageBox::Cancel);
-                                        file_ask.setDefaultButton(QMessageBox::Yes);
-                                        file_ask.setModal(false);
-                                        int ret = file_ask.exec();
-
-                                        switch (ret) {
-                                            case QMessageBox::Yes:
-                                                removeSelRows();
-                                                return;
-                                            case QMessageBox::No:
-                                                routines->modifyDlState(dest.toStdString(), GekkoFyre::DownloadStatus::Failed);
-                                                dlModel->updateCol(index, routines->convDlStat_toString(GekkoFyre::DownloadStatus::Failed), MN_STATUS_COL);
-                                                return;
-                                            case QMessageBox::Cancel:
-                                                return;
-                                            default:
-                                                return;
-                                        }
+                                        startHttpDownload(dest, unique_id, false);
                                     }
 
                                     return;
                                 case GekkoFyre::DownloadStatus::Unknown:
+                                    // TODO: Fill out the code for this!
                                 case GekkoFyre::DownloadStatus::Stopped:
                                     if (fs::exists(dest_boost_path) && fs::is_regular_file(dest_boost_path)) {
                                         // We have an existing file!
@@ -930,7 +969,8 @@ void MainWindow::resumeDownload()
                                         file_ask.setWindowTitle(tr("Pre-existing file!"));
                                         file_ask.setText(
                                                 tr("A pre-existing file, \"%1\", with the same name has been detected. "
-                                                           "Delete to continue? Press 'No' to deal with manually.").arg(dest));
+                                                           "Would you like to continue with the download? Press 'No' to delete or "
+                                                           "'Cancel' to deal with manually on your own.").arg(dest));
                                         file_ask.setStandardButtons(QMessageBox::Yes | QMessageBox::No | QMessageBox::Cancel);
                                         file_ask.setDefaultButton(QMessageBox::Yes);
                                         file_ask.setModal(false);
@@ -938,8 +978,11 @@ void MainWindow::resumeDownload()
 
                                         switch (ret) {
                                             case QMessageBox::Yes:
-                                                if (fs::exists(dest_boost_path) &&
-                                                    fs::is_regular_file(dest_boost_path)) {
+                                                // TODO: Add smarts to see if the pre-existing file is the same size as the download in question!
+                                                startHttpDownload(dest, unique_id, true);
+                                                return;
+                                            case QMessageBox::No:
+                                                if (fs::exists(dest_boost_path) && fs::is_regular_file(dest_boost_path)) {
                                                     sys::error_code ec;
                                                     fs::remove(dest_boost_path, ec);
                                                     if (ec != sys::errc::success) {
@@ -953,12 +996,6 @@ void MainWindow::resumeDownload()
                                                                     .toStdString());
                                                 }
 
-                                                return;
-                                            case QMessageBox::No:
-                                                QMessageBox::information(this, tr("Pre-existing file"), tr("You must deal with the file "
-                                                                                                                   "manually in order to "
-                                                                                                                   "continue the download."),
-                                                                         QMessageBox::Ok);
                                                 return;
                                             case QMessageBox::Cancel:
                                                 return;
@@ -978,8 +1015,10 @@ void MainWindow::resumeDownload()
                         } catch (const std::exception &e) {
                             QMessageBox::warning(this, tr("Error!"), QString("%1").arg(e.what()), QMessageBox::Ok);
                         }
-                    } else if (gk_dl_info_cache.at(k).dl_type == GekkoFyre::DownloadType::Torrent) {
+                    } else if (gk_dl_info_cache.at(k).dl_type == GekkoFyre::DownloadType::Torrent ||
+                            gk_dl_info_cache.at(k).dl_type == GekkoFyre::DownloadType::TorrentMagnetLink) {
                         // Torrent
+                        startTorrentDl(gk_dl_info_cache.at(k).unique_id, false);
                         return;
                     }
                 }
@@ -1010,30 +1049,25 @@ void MainWindow::pauseDownload()
                 QModelIndex index = dlModel->index(indexes.at(0).row(), MN_STATUS_COL, QModelIndex());
                 const GekkoFyre::DownloadStatus status = routines->convDlStat_StringToEnum(ui->downloadView->model()->data(index).toString());
 
-                for (size_t k = 0; k < gk_dl_info_cache.size(); ++k) {
-                    if (gk_dl_info_cache.at(k).unique_id == unique_id) {
-                        if (gk_dl_info_cache.at(k).dl_type == GekkoFyre::DownloadType::HTTP ||
+                if (status != GekkoFyre::DownloadStatus::Paused) {
+                    for (size_t k = 0; k < gk_dl_info_cache.size(); ++k) {
+                        if (gk_dl_info_cache.at(k).unique_id == unique_id) {
+                            if (gk_dl_info_cache.at(k).dl_type == GekkoFyre::DownloadType::HTTP ||
                                 gk_dl_info_cache.at(k).dl_type == GekkoFyre::DownloadType::FTP) {
-                            if (status != GekkoFyre::DownloadStatus::Paused) {
-                                if (status != GekkoFyre::DownloadStatus::Completed) {
-                                    if (status != GekkoFyre::DownloadStatus::Stopped) {
-                                        if (status != GekkoFyre::DownloadStatus::Failed) {
-                                            if (status != GekkoFyre::DownloadStatus::Invalid) {
-                                                QObject::connect(this, SIGNAL(sendStopDownload(QString)), GekkoFyre::routine_singleton::instance(), SLOT(recvStopDl(QString)));
-                                                emit sendStopDownload(dest);
-                                                routines->modifyDlState(dest.toStdString(), GekkoFyre::DownloadStatus::Paused);
-                                                dlModel->updateCol(index, routines->convDlStat_toString(GekkoFyre::DownloadStatus::Paused), MN_STATUS_COL);
-                                            }
-                                        } else {
-                                            QMessageBox::warning(this, tr("Error!"), tr("Please delete the download before re-adding the information once more!"), QMessageBox::Ok);
-                                            return;
-                                        }
-                                    }
+                                if (status != GekkoFyre::DownloadStatus::Completed && status != GekkoFyre::DownloadStatus::Stopped &&
+                                    status != GekkoFyre::DownloadStatus::Failed && status != GekkoFyre::DownloadStatus::Invalid) {
+                                    QObject::connect(this, SIGNAL(sendStopDownload(QString)), GekkoFyre::routine_singleton::instance(), SLOT(recvStopDl(QString)));
+                                    emit sendStopDownload(dest);
+                                    routines->modifyCurlItem(dest.toStdString(), GekkoFyre::DownloadStatus::Paused);
+                                    dlModel->updateCol(index, routines->convDlStat_toString(GekkoFyre::DownloadStatus::Paused), MN_STATUS_COL);
+                                } else {
+                                    QMessageBox::warning(this, tr("Error!"), tr("Please delete the download before re-adding the information once more!"), QMessageBox::Ok);
+                                    return;
                                 }
+                            } else if (gk_dl_info_cache.at(k).dl_type == GekkoFyre::DownloadType::Torrent) {
+                                // Torrent
+                                return;
                             }
-                        } else if (gk_dl_info_cache.at(k).dl_type == GekkoFyre::DownloadType::Torrent) {
-                            // Torrent
-                            return;
                         }
                     }
                 }
@@ -1043,6 +1077,8 @@ void MainWindow::pauseDownload()
             }
         }
     }
+
+    return;
 }
 
 /**
@@ -1152,7 +1188,7 @@ void MainWindow::clearOldHistory()
                     try {
                         if (!fs::is_directory(boost_file_dest) && fs::is_regular_file(boost_file_dest)) {
                             delCharts(file_dest_string.toStdString());
-                            routines->delDownloadItem(file_dest_string);
+                            routines->delCurlItem(file_dest_string);
                         } else {
                             QModelIndex serial_col_index = dlModel->index(i, MN_HIDDEN_UNIQUE_ID);
                             const std::string serial_col_string = ui->downloadView->model()->data(serial_col_index).toString().toStdString();
@@ -1676,14 +1712,14 @@ void MainWindow::sendDetails(const std::string &fileName, const double &fileSize
         dl_info.hash_type = hash_type;
         dl_info.hash_val_given = hash_val;
         dl_info.unique_id = unique_id;
-        routines->writeDownloadItem(dl_info);
+        routines->addCurlItem(dl_info);
     }
 
     return;
 }
 
 /**
- * @brief MainWindow::recvXferStats receives the statistics regarding a HTTP(S)/FTP(S) download.
+ * @brief MainWindow::recvCurl_XferStats receives the statistics regarding a HTTP(S)/FTP(S) download.
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
  * @date   2016-10-23
  * @note   <http://stackoverflow.com/questions/9086372/how-to-compare-pointers>
@@ -1692,7 +1728,7 @@ void MainWindow::sendDetails(const std::string &fileName, const double &fileSize
  * @param info is the struct related to the download info.
  * @see MainWindow::manageDlStats()
  */
-void MainWindow::recvXferStats(const GekkoFyre::GkCurl::CurlProgressPtr &info)
+void MainWindow::recvCurl_XferStats(const GekkoFyre::GkCurl::CurlProgressPtr &info)
 {
     QMutex curl_multi_mutex;
     GekkoFyre::GkGraph::GkXferStats stats_temp;
@@ -1703,7 +1739,7 @@ void MainWindow::recvXferStats(const GekkoFyre::GkCurl::CurlProgressPtr &info)
 
     stats_temp.download_rate = info.stat.back().dlnow;
     stats_temp.upload_rate = info.stat.back().upnow;
-    stats_temp.download_total = info.stat.back().dltotal;
+    stats_temp.download_total = info.stat.back().dltotal; // TODO: Modify this value to be the file-size of the download instead.
     stats_temp.upload_total = info.stat.back().uptotal;
 
     for (size_t i = 0; i < gk_dl_info_cache.size(); ++i) {
@@ -1733,12 +1769,11 @@ void MainWindow::recvXferStats(const GekkoFyre::GkCurl::CurlProgressPtr &info)
 }
 
 /**
- * @brief MainWindow::manageDlStats manages the statistics regarding a HTTP(S)/FTP(S)/Torrent download and updates the
- * relevant columns.
+ * @brief MainWindow::manageDlStats is central to managing the statistics of a HTTP(S)/FTP(S)/BitTorrent download, updating
+ * the relevant columns on the GUI, and if needed, updating the database also.
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
  * @date 2016-10-23
- * @note <http://www.qtcentre.org/threads/18082-Hot-to-get-a-QModelIndexList-from-a-model>
- * @see MainWindow::recvXferStats(), MainWindow::recvBitTorrent_XferStats()
+ * @see MainWindow::recvCurl_XferStats(), MainWindow::recvBitTorrent_XferStats()
  */
 void MainWindow::manageDlStats()
 {
@@ -1825,7 +1860,7 @@ void MainWindow::recvDlFinished(const GekkoFyre::GkCurl::DlStatusMsg &status)
                     GekkoFyre::DownloadStatus::Downloading) {
 
                     GekkoFyre::GkFile::FileHash file_hash;
-                    std::vector<GekkoFyre::GkCurl::CurlDlInfo> dl_mini_info_vec = routines->readDownloadInfo(true);
+                    std::vector<GekkoFyre::GkCurl::CurlDlInfo> dl_mini_info_vec = routines->readCurlItems(true);
                     for (size_t j = 0; j < dl_mini_info_vec.size(); ++j) {
                         if (dl_mini_info_vec.at(j).file_loc == status.file_loc) {
                             switch (dl_mini_info_vec.at(j).hash_type) {
@@ -1845,8 +1880,9 @@ void MainWindow::recvDlFinished(const GekkoFyre::GkCurl::DlStatusMsg &status)
                         }
                     }
 
-                    routines->modifyDlState(status.file_loc, GekkoFyre::DownloadStatus::Completed, QDateTime::currentDateTime().toTime_t(),
-                                            file_hash.checksum.toStdString(), file_hash.hash_type);
+                    routines->modifyCurlItem(status.file_loc, GekkoFyre::DownloadStatus::Completed,
+                                             QDateTime::currentDateTime().toTime_t(),
+                                             file_hash.checksum.toStdString(), file_hash.hash_type);
                     dlModel->updateCol(stat_index, routines->convDlStat_toString(GekkoFyre::DownloadStatus::Completed),
                                        MN_STATUS_COL);
 
@@ -1867,12 +1903,19 @@ void MainWindow::recvDlFinished(const GekkoFyre::GkCurl::DlStatusMsg &status)
     return;
 }
 
+void MainWindow::terminate_curl_downloads()
+{
+    emit finish_curl_multi_thread();
+    curl_multi_thread->quit();
+    curl_multi_thread->wait();
+}
+
 /**
  * @brief MainWindow::recvBitTorrent_XferStats receives the processed statistics from the built-in BitTorrent client.
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
  * @date 2016-12-22
- * @param gk_xfer_stats is the statistics in question, in the form of a struct.
- * @see MainWindow::manageDlSotats()
+ * @param gk_xfer_info is the statistics in question, in the form of a struct.
+ * @see MainWindow::manageDlStats()
  */
 void MainWindow::recvBitTorrent_XferStats(const GekkoFyre::GkTorrent::TorrentResumeInfo &gk_xfer_info)
 {

@@ -45,7 +45,6 @@
 
 #include "default_var.hpp"
 #include "singleton_emit.hpp"
-#include <pugixml.hpp>
 #include <boost/exception/all.hpp>
 #include <boost/asio.hpp>
 #include <boost/bind.hpp>

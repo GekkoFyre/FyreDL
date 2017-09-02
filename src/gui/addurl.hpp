@@ -57,7 +57,7 @@ class AddURL : public QDialog
     Q_OBJECT
 
 public:
-    explicit AddURL(QWidget *parent = 0);
+    explicit AddURL(const GekkoFyre::GkFile::FileDb &database, QWidget *parent = 0);
     ~AddURL();
 
 private slots:
@@ -78,7 +78,7 @@ signals:
 
 private:
     Ui::AddURL *ui;
-    std::unique_ptr<GekkoFyre::CmnRoutines> routines;
+    std::shared_ptr<GekkoFyre::CmnRoutines> routines;
 
     QString browseForDir();
 };

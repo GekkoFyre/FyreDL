@@ -45,11 +45,13 @@
 
 #include "default_var.hpp"
 #include <libtorrent/entry.hpp>
-#include <pugixml.hpp>
 #include <string>
 #include <cstdio>
+#include <mutex>
 #include <exception>
 #include <stdexcept>
+#include <initializer_list>
+#include <unordered_map>
 #include <QString>
 #include <QObject>
 #include <QMutex>
@@ -57,7 +59,6 @@
 #include <QCryptographicHash>
 #include <QLayout>
 #include <QMultiMap>
-#include <initializer_list>
 
 extern "C" {
 #include <sys/stat.h>
@@ -70,7 +71,7 @@ class CmnRoutines : public QObject
     Q_OBJECT
 
 public:
-    CmnRoutines(QObject *parent = 0);
+    CmnRoutines(const GekkoFyre::GkFile::FileDb &database, QObject *parent = 0);
     ~CmnRoutines();
 
     QString extractFilename(const QString &url);
@@ -82,9 +83,6 @@ public:
     double estimatedTimeLeft(const double &content_length, const double &amountDl,
                              const double &down_speed);
     QString timeBeautify(const double &secondsToConvert);
-
-    void print_exception(const std::exception &e, int level = 0);
-    static std::string createId(const size_t &id_length);
 
     int convDlStat_toInt(const GekkoFyre::DownloadStatus &status);
     int convHashType_toInt(const GekkoFyre::HashType &hash_type);
@@ -109,49 +107,58 @@ public:
                                                       const int &item_limit = 500000,
                                                       const int &depth_limit = 1000);
 
+    std::string createId(const size_t &id_length = FYREDL_UNIQUE_ID_DIGIT_COUNT);
     GekkoFyre::GkFile::FileDb openDatabase(const std::string &dbFile = CFG_HISTORY_DB_FILE);
-    std::string leveldb_location(const std::string &dbFile = CFG_HISTORY_DB_FILE);
-    void leveldb_lock_remove(const std::string &dbFile = CFG_HISTORY_DB_FILE);
-    bool batch_write_single_db(const std::string &key, const std::string &value, const std::string &unique_id,
-                               const GekkoFyre::DownloadType &dl_type, const GekkoFyre::GkFile::FileDb &file_db_struct);
-    std::vector<GekkoFyre::GkFile::FileDbVal> read_db_vec(const std::string &key, const GekkoFyre::GkFile::FileDb &file_db_struct);
-    std::pair<std::string, std::string> read_db_min(const std::string &key, const GekkoFyre::GkFile::FileDb &file_db_struct);
+    void leveldb_lock_remove(const std::string &dbFile = CFG_HISTORY_DB_FILE) noexcept;
 
-    void clearLayout(QLayout *layout);
+    std::string leveldb_location(const std::string &dbFile = CFG_HISTORY_DB_FILE) noexcept;
+    void add_item_db(const std::string download_id, const std::string &key, std::string value,
+                     const GekkoFyre::GkFile::FileDb &db_struct);
+    void del_item_db(const std::string download_id, const std::string &key, const GekkoFyre::GkFile::FileDb &db_struct);
+    std::string read_item_db(const std::string download_id, const std::string &key, const GekkoFyre::GkFile::FileDb &db_struct);
+    std::pair<std::string, bool> determine_download_id(const std::string &file_path, const GekkoFyre::GkFile::FileDb &db_struct);
+    std::unordered_map<std::string, std::pair<std::string, bool>> extract_download_ids(const GekkoFyre::GkFile::FileDb &db_struct,
+                                                                         const bool &torrentsOnly = false);
 
-    std::vector<GekkoFyre::GkCurl::CurlDlInfo> readDownloadInfo(const bool &hashesOnly = false);
-    bool writeDownloadItem(GekkoFyre::GkCurl::CurlDlInfo &dl_info_list);
-    pugi::xml_node createNewXmlFile();
-    bool delDownloadItem(const QString &file_dest, const std::string &unique_id_backup = "");
-    bool modifyDlState(const std::string &file_loc, const GekkoFyre::DownloadStatus &status, const long long &complt_timestamp = 0,
-                       const std::string &hash_given = "", const GekkoFyre::HashType &hash_type = GekkoFyre::HashType::None,
-                       const std::string &hash_rtrnd = "", const GekkoFyre::HashVerif &ret_succ_type = GekkoFyre::HashVerif::NotApplicable);
+    std::vector<GekkoFyre::GkCurl::CurlDlInfo> readCurlItems(const bool &hashesOnly = false);
+    bool addCurlItem(GekkoFyre::GkCurl::CurlDlInfo &dl_info_list);
+    bool delCurlItem(const QString &file_dest, const std::string &unique_id_backup = "");
+    bool modifyCurlItem(const std::string &file_loc, const GekkoFyre::DownloadStatus &status,
+                        const long long &complt_timestamp = 0,
+                        const std::string &hash_given = "",
+                        const GekkoFyre::HashType &hash_type = GekkoFyre::HashType::None,
+                        const std::string &hash_rtrnd = "",
+                        const GekkoFyre::HashVerif &ret_succ_type = GekkoFyre::HashVerif::NotApplicable);
+    bool modifyTorrentItem(const std::string &unique_id, const GekkoFyre::DownloadStatus &dl_status);
 
-    bool writeTorrentItem(GekkoFyre::GkTorrent::TorrentInfo &gk_ti);
-    std::vector<GekkoFyre::GkTorrent::TorrentInfo> readTorrentInfo(const bool &minimal_readout = false);
+    bool addTorrentItem(GekkoFyre::GkTorrent::TorrentInfo &gk_ti);
+    std::vector<GekkoFyre::GkTorrent::TorrentInfo> readTorrentItems(const bool &minimal_readout = false);
     bool delTorrentItem(const std::string &unique_id);
 
 private:
     int load_file(const std::string &filename, std::vector<char> &v,
                   libtorrent::error_code &ec, int limit = 8000000);
+
+    bool convertBool_fromInt(const int &value) noexcept;
     std::string multipart_key(const std::initializer_list<std::string> &args);
+    std::string add_download_id(const std::string &file_path, const GekkoFyre::GkFile::FileDb &db_struct,
+                                const bool &is_torrent = false, const std::string &override_unique_id = "");
+    bool del_download_id(const std::string &unique_id, const GekkoFyre::GkFile::FileDb &db_struct,
+                         const bool &is_torrent = false);
 
-    bool writeTorrent_extra_data(const GekkoFyre::GkTorrent::TorrentInfo &gk_ti, const GekkoFyre::GkFile::FileDb &ext_db_struct);
-    void batch_write_to_file_db(const std::vector<GekkoFyre::GkTorrent::TorrentFile> &to_files_vec,
-                                const GekkoFyre::GkFile::FileDb &ext_db_struct);
+    bool write_torrent_files_addendum(std::vector<GekkoFyre::GkTorrent::TorrentFile> &to_files_vec,
+                                      const std::string &download_key, const GekkoFyre::GkFile::FileDb &db_struct) noexcept;
+    std::vector<GkTorrent::TorrentFile> read_torrent_files_addendum(const int &num_files, const std::string &download_key,
+                                                                    const GekkoFyre::GkFile::FileDb &db_struct);
+    bool write_torrent_trkrs_addendum(const std::vector<GekkoFyre::GkTorrent::TorrentTrackers> &to_trackers_vec,
+                                      const std::string &download_key, const GekkoFyre::GkFile::FileDb &db_struct) noexcept;
+    std::vector<GkTorrent::TorrentTrackers> read_torrent_trkrs_addendum(const int &num_trackers, const std::string &download_key,
+                                                                        const GekkoFyre::GkFile::FileDb &db_struct);
 
-    QMap<std::string, std::string> process_db(std::initializer_list<std::tuple<std::string, std::string>> args);
-    GekkoFyre::Global::ProcessDbMap process_db_map(const QMap<std::string, std::string> &map,
-                                                   std::initializer_list<std::string> args);
-    std::vector<GekkoFyre::GkFile::FileDbVal> process_db_xml(const std::string &xml_input);
-    bool modify_db_write(const std::string &unique_id, const std::string &new_val, const std::vector<GekkoFyre::GkFile::FileDbVal> &db_vals,
-                         const GekkoFyre::GkFile::FileDb &file_db);
-    bool delete_db_write(const std::string &unique_id, const GekkoFyre::GkFile::FileDb &file_db,
-                         const std::initializer_list<std::string> &keys);
-    std::string determine_unique_id(const std::vector<GekkoFyre::GkFile::FileDbVal> &db_vals,
-                                    const std::string &file_path,
-                                    const GekkoFyre::GkFile::FileDb &file_db);
-
+    // https://geidav.wordpress.com/2014/01/09/mutex-lock-guards-in-c11/
+    GekkoFyre::GkFile::FileDb db;
+    std::mutex db_mutex;
+    QMutex to_info_mutex;
     QMutex mutex;
 };
 }

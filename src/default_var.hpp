@@ -84,12 +84,10 @@ extern "C" {
 #define FYREDL_USER_AGENT "FyreDL/0.0.1"                 // The user-agent displayed externally by FyreDL, along with the application version.
 #define FYREDL_FINGERPRINT "FyreDL"                      // Fingerprint for the client. Has to be no longer than 20-bytes or will be truncated otherwise.
 #define FYREDL_TORRENT_RESUME_FILE_EXT ".fyredl"         // The file extension used for 'resume data' by the BitTorrent side of the FyreDL application
-#define CFG_HISTORY_FILE "fyredl_history.xml"            // The history file-name used by FyreDL. Location is also set within the application's GUI.
 #define CFG_HISTORY_DB_FILE "history.db"
 #define CFG_FILES_DIR_LINUX ".fyredl"                    // The name of the settings directory under Linux systems. This can be found in the users home directory.
 #define CFG_FILES_DIR_WNDWS "FyreDL"                     // The name of the settings directory under Microsoft Windows. This can be found in the users home directory.
-#define CFG_SETTINGS_FILE "fyredl_settings.xml"          // The configuration file-name used by FyreDL. Location is also set within the application's GUI.
-#define CFG_XML_MIN_PARSE_SIZE 12
+#define CFG_CSV_MIN_PARSE_SIZE 12                        // DO NOT MODIFY! Unless you specifically know what you are doing!
 #define ENBL_GUI_CHARTS false                            // Whether to enable charts/graphs within the GUI, to chart the progress of downloads.
 #define ENBL_GUI_CONTENTS_VIEW true                      // Whether to enable the contents view of inside BitTorrents (located at the bottom) within the GUI.
 #define FYREDL_LIBCURL_VERBOSE 1L                        // Set to '1L' if you want libcurl to tell you what it's up to!
@@ -120,19 +118,11 @@ extern "C" {
 #define FREE_DSK_SPACE_MULTIPLIER 3
 
 // LevelDB configuration
-#define LEVELDB_CFG_CACHE_SIZE 8UL * 1024UL * 1024UL
+#define LEVELDB_CFG_CACHE_SIZE 32UL * 1024UL * 1024UL
 #define LEVELDB_CFG_LOCK_FILE_NAME "LOCK"
 
-#define LEVELDB_PARENT_NODE "fyredl-db"
-#define LEVELDB_CHILD_NODE_VERS "fyredl-xml"
-#define LEVELDB_CHILD_ITEM_VERS "version"
-#define LEVELDB_ITEM_ATTR_VERS_NO "supported"                 // The supported XML file version for this particular FyreDL build
-#define LEVELDB_XML_CHILD_NODE "item"
-#define LEVELDB_XML_ATTR_DL_TYPE "dl-type"
-#define LEVELDB_XML_ATTR_ITEM_VALUE "value"
-#define LEVELDB_ITEM_ATTR_UNIQUE_ID "unique-id"
+#define LEVELDB_STORE_UNIQUE_ID "store-unique-id"
 
-#define LEVELDB_KEY_CURL_FLOC "curl-floc"                     // Location of the file on user's storage disk
 #define LEVELDB_KEY_CURL_STAT "curl-stat"                     // The download status (i.e., downloading, completed, unknown, etc.)
 #define LEVELDB_KEY_CURL_INSERT_DATE "curl-insrt-date"        // Date and time upon which the download was added to the XML history file
 #define LEVELDB_KEY_CURL_COMPLT_DATE "curl-complt-date"       // Date and time upon which the download was completed
@@ -145,7 +135,6 @@ extern "C" {
 #define LEVELDB_KEY_CURL_HASH_VAL_RTRND "curl-hash-val-rtrnd" // The hash-value that was calculated after the download (presumably) succeeded
 #define LEVELDB_KEY_CURL_HASH_SUCC_TYPE "curl-hash-succ-type" // Whether the calculated hash of the download matched the given hash or not
 
-#define LEVELDB_KEY_TORRENT_FLOC "to-dest"
 #define LEVELDB_KEY_TORRENT_INSERT_DATE "to-insert-date"
 #define LEVELDB_KEY_TORRENT_COMPLT_DATE "to-complt-date"
 #define LEVELDB_KEY_TORRENT_CREATN_DATE "to-creatn-date"
@@ -155,23 +144,11 @@ extern "C" {
 #define LEVELDB_KEY_TORRENT_MAGNET_URI "to-magnet-uri"
 #define LEVELDB_KEY_TORRENT_TORRNT_NAME "to-name"
 #define LEVELDB_KEY_TORRENT_NUM_FILES "num-files"
+#define LEVELDB_KEY_TORRENT_NUM_TRACKERS "num-trackers"
 #define LEVELDB_KEY_TORRENT_TORRNT_PIECES "num-pieces"
 #define LEVELDB_KEY_TORRENT_TORRNT_PIECE_LENGTH "piece-length"
 #define LEVELDB_KEY_TORRENT_TORRENT_FILES "to-files"
-#define LEVELDB_CHILD_FILES_PATH_TORRENT "path"
-#define LEVELDB_CHILD_FILES_HASH_TORRENT "hash"
-#define LEVELDB_CHILD_FILES_CONTLNGTH_TORRENT "size"
-#define LEVELDB_CHILD_FILES_MTIME_TORRENT "mtime"
 #define LEVELDB_CHILD_NODE_TORRENT_FILES_MAPFLEPCE "map-file-piece"
-#define LEVELDB_CHILD_NODE_TORRENT_TRACKERS "to-trackers"
-#define LEVELDB_CHILD_TRACKERS_URL_TORRENT "url"
-#define LEVELDB_CHILD_TRACKERS_AVAILABLE_TORRENT "enabled"
-#define LEVELDB_CHILD_FILES_FLAGS_TORRENT "flags"
-#define LEVELDB_CHILD_FILES_FILEOFFST_TORRENT "offset"
-#define LEVELDB_CHILD_FILES_MAPFLEPCE_1_TORRENT "first"
-#define LEVELDB_CHILD_FILES_MAPFLEPCE_2_TORRENT "second"
-#define LEVELDB_CHILD_FILES_DOWNBOOL_TORRENT "dled"
-#define LEVELDB_CHILD_TRACKERS_TIER_TORRENT "tier"
 #define LEVELDB_KEY_TORRENT_TRACKERS "to-extra-trackers"
 
 // XML configuration
@@ -204,10 +181,34 @@ extern "C" {
 #define TAB_INDEX_LOG 4
 
 // Comma Separated Value related information
-#define CSV_NUM_COLS 3
-#define CSV_FIELD_URL "url"
-#define CSV_FIELD_DEST "destination"
-#define CSV_FIELD_HASH "hash"
+#define URL_ADD_CSV_NUM_COLS 3
+#define URL_ADD_CSV_FIELD_URL "url"
+#define URL_ADD_CSV_FIELD_DEST "destination"
+#define URL_ADD_CSV_FIELD_HASH "hash"
+
+#define LEVELDB_CSV_UNIQUE_ID_COLS 3
+#define LEVELDB_CSV_UID_KEY "unique-id"
+#define LEVELDB_CSV_UID_VALUE1 "file-loc"
+#define LEVELDB_CSV_UID_VALUE2 "is-torrent"
+
+#define LEVELDB_CSV_TORRENT_FILE_COLS 8
+#define LEVELDB_CSV_TORRENT_FILE_PATH "file-path"
+#define LEVELDB_CSV_TORRENT_FILE_SHA1 "sha1-hash"
+#define LEVELDB_CSV_TORRENT_FILE_FLAGS "flags"
+#define LEVELDB_CSV_TORRENT_FILE_CONTENT_LENGTH "content-length"
+#define LEVELDB_CSV_TORRENT_FILE_FILE_OFFSET "file-offset"
+#define LEVELDB_CSV_TORRENT_FILE_MTIME "mod-time"
+#define LEVELDB_CSV_TORRENT_FILE_MAPFLEPCE_KEY "mapflepce-key"
+#define LEVELDB_CSV_TORRENT_FILE_BOOL_DLED "downloaded-bool"
+
+#define LEVELDB_CSV_TORRENT_MAPFLEPCE_COLS 2
+#define LEVELDB_CSV_TORRENT_MAPFLEPCE_1 "mapflepce-1"
+#define LEVELDB_CSV_TORRENT_MAPFLEPCE_2 "mapflepce-2"
+
+#define LEVELDB_CSV_TORRENT_TRACKER_COLS 3
+#define LEVELDB_CSV_TORRENT_TRACKER_TIER "tier"
+#define LEVELDB_CSV_TORRENT_TRACKER_URL "url"
+#define LEVELDB_CSV_TORRENT_TRACKER_BOOL_ENABLED "bool-enabled"
 
 // [ Enum values ]
 // Download Types
@@ -278,15 +279,8 @@ namespace GekkoFyre {
         };
 
         struct FileDb {
-            std::unique_ptr<leveldb::DB> db;
+            std::shared_ptr<leveldb::DB> db;
             leveldb::Options options;
-        };
-
-        struct FileDbVal {
-            std::string key;
-            std::string value;
-            std::string unique_id;
-            DownloadType dl_type;
         };
     }
 
@@ -308,7 +302,7 @@ namespace GekkoFyre {
             std::time_t last_seen_cmplte;    // The time when we, or one of our peers, last saw a complete copy of this torrent.
             std::time_t last_scrape;         // The number of seconds since this torrent acquired scrape data. If it has never done that, this value is -1.
             std::time_t time_started;
-            boost::optional<GekkoFyre::GkTorrent::TorrentXferStats> xfer_stats;
+            boost::optional<GkTorrent::TorrentXferStats> xfer_stats;
         };
 
         struct TorrentFile {
@@ -342,6 +336,7 @@ namespace GekkoFyre {
             std::string magnet_uri;                 // The 'BitTorrent Magnet Link' URI
             std::string torrent_name;               // Name of the torrent
             int num_files;                          // How many files are contained within this torrent
+            int num_trackers;                       // How many trackers are contained within this torrent
             int num_pieces;                         // How many pieces are contained within this torrent
             int piece_length;                       // The length of each piece
         };
@@ -481,12 +476,6 @@ namespace GekkoFyre {
             GkGraph::DownSpeedGraph xfer_graph;              // The 'download speed' graph
             boost::optional<GkTorrent::TorrentInfo> to_info; // Information relating to BitTorrent downloads
             boost::optional<GkCurl::CurlDlInfo> curl_info;   // Information relating to HTTP(S) or FTP(S) downloads
-        };
-
-        struct ProcessDbMap {
-            std::string unique_id;
-            boost::optional<std::vector<GekkoFyre::GkTorrent::GeneralInfo>> tor_gen_info;
-            boost::optional<std::vector<GekkoFyre::GkCurl::CurlDlInfo>> curl_dl_info;
         };
     }
 }

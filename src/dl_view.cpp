@@ -43,55 +43,58 @@
 #include "dl_view.hpp"
 #include "default_var.hpp"
 
-downloadModel::downloadModel(QObject *parent) : QAbstractTableModel(parent)
+GekkoFyre::downloadModel::downloadModel(QObject *parent) : QAbstractTableModel(parent)
 {}
 
 /**
- * @brief downloadModel::downloadModel
- * @author       Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @brief GekkoFyre::downloadModel::GekkoFyre::downloadModel
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
  * @param vector
  * @param parent
  */
-downloadModel::downloadModel(QList<std::vector<QString>> vector, QObject *parent) :
+GekkoFyre::downloadModel::downloadModel(QList<std::vector<QString>> vector, QObject *parent) :
     QAbstractTableModel(parent)
 {
     vectorList = vector;
 }
 
+GekkoFyre::downloadModel::~downloadModel()
+{}
+
 /**
- * @brief downloadModel::rowCount returns the number of rows within the model.
- * @author       Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @brief GekkoFyre::downloadModel::rowCount returns the number of rows within the model.
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
  * @param parent
  * @return
  */
-int downloadModel::rowCount(const QModelIndex &parent) const
+int GekkoFyre::downloadModel::rowCount(const QModelIndex &parent) const
 {
     Q_UNUSED(parent);
     return vectorList.size();
 }
 
 /**
- * @brief downloadModel::columnCount returns the number of columns within the model.
- * @author       Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @brief GekkoFyre::downloadModel::columnCount returns the number of columns within the model.
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
  * @param parent
  * @return
  */
-int downloadModel::columnCount(const QModelIndex &parent) const
+int GekkoFyre::downloadModel::columnCount(const QModelIndex &parent) const
 {
     Q_UNUSED(parent);
     return MN_COL_COUNT;
 }
 
 /**
- * @brief downloadModel::data returns either a "File name", "File size", "Downloaded",
+ * @brief GekkoFyre::downloadModel::data returns either a "File name", "File size", "Downloaded",
  * "Progress", "Upload speed", "Download speed", "Status", or "Destination" , based on
  * the contents of the model index supplied.
- * @author      Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
  * @param index
  * @param role
  * @return
  */
-QVariant downloadModel::data(const QModelIndex &index, int role) const
+QVariant GekkoFyre::downloadModel::data(const QModelIndex &index, int role) const
 {
     if (!index.isValid()) {
         return QVariant();
@@ -115,14 +118,14 @@ QVariant downloadModel::data(const QModelIndex &index, int role) const
 }
 
 /**
- * @brief downloadModel::headerData contains the label information for each individual column.
- * @author            Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @brief GekkoFyre::downloadModel::headerData contains the label information for each individual column.
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
  * @param section
  * @param orientation
  * @param role
  * @return
  */
-QVariant downloadModel::headerData(int section, Qt::Orientation orientation, int role) const
+QVariant GekkoFyre::downloadModel::headerData(int section, Qt::Orientation orientation, int role) const
 {
     if (role != Qt::DisplayRole) {
         return QVariant();
@@ -161,12 +164,12 @@ QVariant downloadModel::headerData(int section, Qt::Orientation orientation, int
 }
 
 /**
- * @brief downloadModel::flags
- * @author      Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @brief GekkoFyre::downloadModel::flags
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
  * @param index
  * @return
  */
-Qt::ItemFlags downloadModel::flags(const QModelIndex &index) const
+Qt::ItemFlags GekkoFyre::downloadModel::flags(const QModelIndex &index) const
 {
     if (!index.isValid()) {
         return Qt::ItemIsEnabled;
@@ -176,14 +179,14 @@ Qt::ItemFlags downloadModel::flags(const QModelIndex &index) const
 }
 
 /**
- * @brief downloadModel::setData
- * @author      Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @brief GekkoFyre::downloadModel::setData
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
  * @param index
  * @param value
  * @param role
  * @return
  */
-bool downloadModel::setData(const QModelIndex &index, const QVariant &value, int role)
+bool GekkoFyre::downloadModel::setData(const QModelIndex &index, const QVariant &value, int role)
 {
     // This inserts data into the table, item-by-item and not row-by-row. This means that to fill a row,
     // setData() must be called several times, as there are several columns in total for each row. It is
@@ -230,14 +233,14 @@ bool downloadModel::setData(const QModelIndex &index, const QVariant &value, int
 }
 
 /**
- * @brief downloadModel::insertRows
- * @author         Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @brief GekkoFyre::downloadModel::insertRows
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
  * @param position
  * @param rows
  * @param index
  * @return
  */
-bool downloadModel::insertRows(int position, int rows, const QModelIndex &index)
+bool GekkoFyre::downloadModel::insertRows(int position, int rows, const QModelIndex &index)
 {
     Q_UNUSED(index);
     beginInsertRows(QModelIndex(), position, (position + rows - 1));
@@ -252,7 +255,7 @@ bool downloadModel::insertRows(int position, int rows, const QModelIndex &index)
 }
 
 /**
- * @brief downloadModel::removeRows
+ * @brief GekkoFyre::downloadModel::removeRows
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
  * @date 2016-10
  * @param position
@@ -260,7 +263,7 @@ bool downloadModel::insertRows(int position, int rows, const QModelIndex &index)
  * @param index
  * @return
  */
-bool downloadModel::removeRows(int position, int rows, const QModelIndex &index)
+bool GekkoFyre::downloadModel::removeRows(int position, int rows, const QModelIndex &index)
 {
     Q_UNUSED(index);
     beginRemoveRows(QModelIndex(), position, (position + rows - 1));
@@ -274,7 +277,7 @@ bool downloadModel::removeRows(int position, int rows, const QModelIndex &index)
 }
 
 /**
- * @brief downloadModel::updateCol updates the column, within a row, to visually reflect the new data given by 'value'.
+ * @brief GekkoFyre::downloadModel::updateCol updates the column, within a row, to visually reflect the new data given by 'value'.
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
  * @date 2016-11
  * @param index The QModelIndex to be updated, specifically, the row and column.
@@ -282,7 +285,7 @@ bool downloadModel::removeRows(int position, int rows, const QModelIndex &index)
  * @param col Used for verification purposes. Kind of redundant.
  * @return Whether the operation was a success or not.
  */
-bool downloadModel::updateCol(const QModelIndex &index, const QVariant &value, const int &col)
+bool GekkoFyre::downloadModel::updateCol(const QModelIndex &index, const QVariant &value, const int &col)
 {
     if (index.isValid()) {
         if (col >= 0) {
@@ -306,11 +309,11 @@ bool downloadModel::updateCol(const QModelIndex &index, const QVariant &value, c
 }
 
 /**
- * @brief downloadModel::getList
+ * @brief GekkoFyre::downloadModel::getList
  * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
  * @return
  */
-QList<std::vector<QString>> downloadModel::getList()
+QList<std::vector<QString>> GekkoFyre::downloadModel::getList()
 {
     return vectorList;
 }
@@ -321,10 +324,10 @@ QList<std::vector<QString>> downloadModel::getList()
  * @date 2017-07-06
  * @param parent
  */
-downloadDelegate::downloadDelegate(QObject *parent) : QAbstractItemDelegate(parent)
+GekkoFyre::downloadDelegate::downloadDelegate(QObject *parent) : QStyledItemDelegate(parent)
 {}
 
-downloadDelegate::~downloadDelegate()
+GekkoFyre::downloadDelegate::~downloadDelegate()
 {}
 
 /**
@@ -336,7 +339,7 @@ downloadDelegate::~downloadDelegate()
  * @param option
  * @param index
  */
-void downloadDelegate::paint(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index) const
+void GekkoFyre::downloadDelegate::paint(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index) const
 {
     if (index.column() == MN_PROGRESS_COL) {
         int progress = index.data().toInt();
@@ -386,7 +389,25 @@ void downloadDelegate::paint(QPainter *painter, const QStyleOptionViewItem &opti
  * @param index
  * @return
  */
-QSize downloadDelegate::sizeHint(const QStyleOptionViewItem &option, const QModelIndex &index) const
+QSize GekkoFyre::downloadDelegate::sizeHint(const QStyleOptionViewItem &option, const QModelIndex &index) const
 {
     return QSize();
+}
+
+bool GekkoFyre::downloadDelegate::helpEvent(QHelpEvent *event, QAbstractItemView *view, const QStyleOptionViewItem &option,
+                                            const QModelIndex &index)
+{
+    if (!event || !view) {
+        return false;
+    }
+
+    if (event->type() == QEvent::ToolTip) {
+        QVariant tooltip = index.data(Qt::DisplayRole);
+        if (tooltip.canConvert<QString>()) {
+            QToolTip::showText(event->globalPos(), QString("<div>%1</div>").arg(QString(tooltip.toString()).toHtmlEscaped()), view);
+            return true;
+        }
+    }
+
+    return QStyledItemDelegate::helpEvent(event, view, option, index);
 }

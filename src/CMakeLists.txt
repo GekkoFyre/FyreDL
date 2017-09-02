@@ -27,7 +27,7 @@
  ##
  #################################################################################
 
-cmake_minimum_required(VERSION 3.6.0 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.4.0 FATAL_ERROR)
 project(FyreDL C CXX) # http://stackoverflow.com/questions/15193785/how-to-get-cmake-to-recognize-pthread-on-ubuntu
 
 set(CMAKE_VERBOSE_MAKEFILE ON)
@@ -85,6 +85,8 @@ set(SOURCE_FILES
         curl_easy.cpp
         curl_multi.hpp
         curl_multi.cpp
+        csv.hpp
+        csv.cpp
         default_var.hpp
         dl_view.hpp
         dl_view.cpp
@@ -98,9 +100,7 @@ set(SOURCE_FILES
         torrent/client.hpp
         torrent/client.cpp
         torrent/misc.hpp
-        torrent/misc.cpp
-        torrent/session.hpp
-        torrent/session.cpp)
+        torrent/misc.cpp)
 
 set(EXTERNAL_SOURCE_FILES
     ./../utils/fast-cpp-csv-parser/csv.h)
@@ -127,35 +127,6 @@ add_executable("${EXE_NAME}" ${SOURCE_FILES} ${EXTERNAL_SOURCE_FILES} ${UI_HEADE
 set_property(TARGET ${EXE_NAME} PROPERTY CXX_STANDARD 14)
 set_property(TARGET ${EXE_NAME} PROPERTY CXX_STANDARD_REQUIRED ON)
 
-# http://stackoverflow.com/questions/10851247/how-to-activate-c-11-in-cmake
-# https://cmake.org/cmake/help/v3.1/command/target_compile_features.html
-# https://cmake.org/cmake/help/v3.1/prop_gbl/CMAKE_CXX_KNOWN_FEATURES.html#prop_gbl:CMAKE_CXX_KNOWN_FEATURES
-# http://stackoverflow.com/questions/10984442/how-to-detect-c11-support-of-a-compiler-with-cmake/20165220#20165220
-message(STATUS "Your C++ compiler supports the following features: ")
-get_property(known_features GLOBAL PROPERTY CMAKE_CXX_KNOWN_FEATURES)
-foreach(i ${known_features})
-    message(STATUS "${i}")
-endforeach()
-
-# https://cmake.org/cmake/help/v3.1/prop_gbl/CMAKE_CXX_KNOWN_FEATURES.html
-set(GK_NEEDED_FEATURES cxx_auto_type
-                       cxx_decltype
-                       cxx_decltype_auto
-                       cxx_digit_separators
-                       cxx_explicit_conversions
-                       cxx_inline_namespaces
-                       cxx_lambdas
-                       cxx_long_long_type
-                       cxx_nullptr
-                       cxx_range_for
-                       cxx_raw_string_literals
-                       cxx_return_type_deduction
-                       cxx_sizeof_member
-                       cxx_strong_enums
-                       cxx_static_assert
-                       cxx_unicode_literals)
-target_compile_features("${EXE_NAME}" PRIVATE ${GK_NEEDED_FEATURES})
-
 #
 # Find the correct Boost C++ packages
 #
@@ -164,6 +135,8 @@ set(Boost_USE_STATIC_LIBS FALSE CACHE BOOL "Whether to use static libraries with
 set(Boost_USE_STATIC_RUNTIME FALSE CACHE BOOL "Whether to use Boost C++ libraries that are compiled with a static run-time or not.")
 find_package(Boost 1.54.0 REQUIRED COMPONENTS "iostreams"
                                               "filesystem"
+                                              "chrono"
+                                              "random"
                                               "system")
 if (Boost_FOUND)
     include_directories(${Boost_INCLUDE_DIRS})
@@ -225,38 +198,6 @@ else()
 endif(LEVELDB_FOUND)
 
 #
-# Find 'pugixml'
-#
-find_package(PugiXML REQUIRED)
-if (PUGIXML_FOUND)
-    include_directories(${PUGIXML_INCLUDE_DIR})
-    set(LIBS ${LIBS} ${PUGIXML_LIBRARIES})
-else()
-    message(SEND_ERROR "The 'pugixml' library could not be found!")
-endif(PUGIXML_FOUND)
-
-#
-# Detect if we are using X11 or the Wayland compositing system, if we are running under Linux
-# https://stackoverflow.com/questions/45135228/effective-way-of-detecting-x11-vs-wayland-preferrably-with-cmake
-#
-# TODO: Finish coding this!
-if(${CMAKE_SYSTEM_NAME} MATCHES "Linux") # Check if we are on Linux
-    find_package(Systemd)
-    if(SYSTEMD_FOUND)
-        execute_process(COMMAND "loginctl show-session $(loginctl | grep $(whoami) | awk '{print $1}') -p Type" OUTPUT_VARIABLE result_display_server)
-        if ("${result_display_server}" MATCHES "Type=x11")
-            set(display_server_x11 TRUE)
-            message(STATUS "Using the X11 display compositor!")
-        else()
-            set(display_server_x11 FALSE)
-            message(STATUS "Using something other than X11 as the display compositor.")
-        endif()
-    else()
-        message(STATUS "Systemd was not found! Resuming without the functionality provided by this...")
-    endif(SYSTEMD_FOUND)
-endif()
-
-#
 # Qt5 translation routines
 # http://stackoverflow.com/questions/19193121/automated-translation-management-with-cmake-and-qt5
 # http://stackoverflow.com/questions/24095800/qt-internationalization-and-cmake-how-to-update-ts-and-dont-lose-them
@@ -283,21 +224,30 @@ if (BUILD_API_DOC)
     endif(DOXYGEN_FOUND)
 endif(BUILD_API_DOC)
 
+set(FYREDL_INSTALL_DIR "${CMAKE_INSTALL_PREFIX}/bin" CACHE STRING "The installation directory for the binary.")
+set(FYREDL_LIB_DIR "${CMAKE_INSTALL_PREFIX}/lib" CACHE STRING "The installation directory for the library.")
+set(FYREDL_ARCHIVE_DIR "${CMAKE_BINARY_DIR}/archive" CACHE STRING "The compilation directory for the archives (i.e. *.deb, etc.).")
 IF(CMAKE_BUILD_TYPE MATCHES "Debug")
-    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "./debug/bin")
-    set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "./debug/lib")
-    set(LIB_INSTALL_DIR "${CMAKE_INSTALL_PREFIX}/lib/debug")
-    set(BIN_INSTALL_DIR "${CMAKE_INSTALL_PREFIX}/bin/debug")
+    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${FYREDL_INSTALL_DIR}")
+    set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${FYREDL_LIB_DIR}")
+    message(STATUS "FyreDL will be installed towards the directory: \"${FYREDL_INSTALL_DIR}\"")
+
+    set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${FYREDL_ARCHIVE_DIR}")
+    message(STATUS "Archive directory has been set to: \"${FYREDL_ARCHIVE_DIR}\"")
 elseif(CMAKE_BUILD_TYPE MATCHES "Release")
-    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "./release/bin")
-    set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "./release/lib")
-    set(LIB_INSTALL_DIR "${CMAKE_INSTALL_PREFIX}/lib")
-    set(BIN_INSTALL_DIR "${CMAKE_INSTALL_PREFIX}/bin")
+    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${FYREDL_INSTALL_DIR}")
+    set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${FYREDL_LIB_DIR}")
+    message(STATUS "FyreDL will be installed towards the directory: \"${FYREDL_INSTALL_DIR}\"")
+
+    set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${FYREDL_ARCHIVE_DIR}")
+    message(STATUS "Archive directory has been set to: \"${FYREDL_ARCHIVE_DIR}\"")
 else()
-    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "./other-build/bin")
-    set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "./other-build/lib")
-    set(LIB_INSTALL_DIR "${CMAKE_INSTALL_PREFIX}/lib")
-    set(BIN_INSTALL_DIR "${CMAKE_INSTALL_PREFIX}/bin")
+    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${FYREDL_INSTALL_DIR}")
+    set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${FYREDL_LIB_DIR}")
+    message(STATUS "FyreDL will be installed towards the directory: \"${FYREDL_INSTALL_DIR}\"")
+
+    set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${FYREDL_ARCHIVE_DIR}")
+    message(STATUS "Archive directory has been set to: \"${FYREDL_ARCHIVE_DIR}\"")
 ENDIF()
 
 target_link_libraries(fyredl Qt5::Core Qt5::Widgets Qt5::Gui Qt5::Charts ${LIBS})
@@ -338,9 +288,10 @@ elseif(${CMAKE_SYSTEM_NAME} MATCHES "Linux") # Check if we are on Linux
             if(GK_MEM_SANITIZE)
                 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O1 -fno-omit-frame-pointer -fno-optimize-sibling-calls -fsanitize=memory")
             endif(GK_MEM_SANITIZE)
-
             set(GK_THREAD_SANITIZE FALSE CACHE BOOL "See the Clang ThreadSanitizer documentation for more details.")
             if(GK_THREAD_SANITIZE)
+                # https://github.com/google/sanitizers/wiki/ThreadSanitizerFlags
+                set(CMAKE_POSITION_INDEPENDENT_CODE FALSE)
                 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O1 -fsanitize=thread")
             endif(GK_THREAD_SANITIZE)
         elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
