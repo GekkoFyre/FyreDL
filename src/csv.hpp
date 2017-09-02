@@ -68,13 +68,13 @@ public:
         key = download_ids;
         if (!csv_data.empty()) {
             csv_raw_data << csv_data;
-            already_looped = false;
+            ret_parsed = 0;
             add_headers(headers...);
             return;
         } else {
             rows_count = 0;
+            ret_parsed = 0;
             key = false;
-            already_looped = false;
         }
 
         return;
@@ -120,21 +120,14 @@ public:
             }
         }
 
-        if ((rows_parsed == rows_count) && !already_looped) {
-            already_looped = true;
-            excl_lock.unlock();
-            return true;
-        }
-
-        if ((cols_count % 2) == 0 && already_looped) { // This is an absolute hack, I know...
-            already_looped = false;
-            excl_lock.unlock();
+        if (ret_parsed == (cols_count - 1)) {
+            ret_parsed = 0;
             return true;
         }
 
         rows_parsed = 0;
-        already_looped = false;
         excl_lock.unlock();
+        ++ret_parsed;
         return false;
     }
 
@@ -154,7 +147,7 @@ private:
     int cols_count;
     int rows_count;
     static int rows_parsed;
-    static bool already_looped;
+    static int ret_parsed;
     std::recursive_mutex excl_lock;
     bool key;
     std::list<std::string> headers;                      // The key is the column number, whilst the value is the header associated with that column.
