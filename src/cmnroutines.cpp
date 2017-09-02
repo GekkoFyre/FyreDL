@@ -1835,18 +1835,18 @@ std::vector<GekkoFyre::GkTorrent::TorrentFile> GekkoFyre::CmnRoutines::read_torr
                                                                                                    const GekkoFyre::GkFile::FileDb &db_struct)
 {
     if (num_files > 0) {
+        std::lock_guard<std::mutex> locker(db_mutex);
         static int counter;
-        counter = (num_files + 1);
+        counter = 0;
         std::vector<GekkoFyre::GkTorrent::TorrentFile> to_files;
-        while (counter > num_files) {
-            --counter;
+        while (counter < num_files) {
+            ++counter;
             std::string file_key, csv_file_data;
             leveldb::ReadOptions read_opt;
             leveldb::Status s;
             read_opt.verify_checksums = true;
 
             file_key = multipart_key({download_key, LEVELDB_KEY_TORRENT_TORRENT_FILES, std::to_string(counter)});
-            std::lock_guard<std::mutex> locker(db_mutex);
             s = db_struct.db->Get(read_opt, file_key, &csv_file_data);
             if (!s.ok()) {
                 std::cerr << tr("Error whilst processing files for BitTorrent item: \"%1\".\nError: ")
