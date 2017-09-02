@@ -52,8 +52,6 @@ extern "C" {
 
 #endif
 
-#define BOOST_FILESYSTEM_NO_DEPRECATED
-
 int main(int argc, char *argv[])
 {
     try {

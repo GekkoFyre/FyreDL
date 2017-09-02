@@ -43,8 +43,8 @@
 #include "csv.hpp"
 #include <iostream>
 
-int GekkoFyre::GkCsvReader::ret_parsed;
 int GekkoFyre::GkCsvReader::rows_parsed;
+int GekkoFyre::GkCsvReader::ret_parsed_cols;
 QMultiMap<int, int> GekkoFyre::GkCsvReader::proc_cols;
 
 bool GekkoFyre::GkCsvReader::read_row()
@@ -206,7 +206,7 @@ std::map<int, std::string> GekkoFyre::GkCsvReader::split_values(std::stringstrea
     return output;
 }
 
-std::string GekkoFyre::GkCsvReader::read_row_helper(const int &col_no, const int &row_no)
+std::string GekkoFyre::GkCsvReader::read_csv_helper(const int &col_no, const int &row_no)
 {
     if (col_no == 0 || row_no == 0) {
         return "";
@@ -246,7 +246,8 @@ bool GekkoFyre::GkCsvReader::force_cache_reload()
 {
     proc_cols.clear();
     csv_data.clear();
-    ret_parsed = 0;
+    ret_parsed_cols = 0;
+    rows_parsed = 0;
     csv_data = parse_csv();
     return !csv_data.empty();
 }

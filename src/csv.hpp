@@ -51,8 +51,6 @@
 #include <string>
 #include <sstream>
 #include <map>
-#include <array>
-#include <memory>
 #include <mutex>
 #include <QMultiMap>
 
@@ -68,12 +66,14 @@ public:
         key = download_ids;
         if (!csv_data.empty()) {
             csv_raw_data << csv_data;
-            ret_parsed = 0;
+            rows_parsed = 0;
+            ret_parsed_cols = 0;
             add_headers(headers...);
             return;
         } else {
             rows_count = 0;
-            ret_parsed = 0;
+            rows_parsed = 0;
+            ret_parsed_cols = 0;
             key = false;
         }
 
@@ -97,37 +97,34 @@ public:
     template<typename T, typename ...ColTypes>
     bool read_row(T& col, ColTypes& ...cols) {
         static int cols_parsed;
-        rows_parsed = 0;
-        cols_parsed = 0;
         static bool ret_val;
+        cols_parsed = 0;
         if (!csv_data.empty()) {
-            while ((rows_parsed + 1) <= rows_count) {
-                while (cols_parsed <= (cols_count - 1)) { // Keep this at `(cols_count - 1)`!.
-                    ++cols_parsed;
-                    std::string col_data;
-                    col_data = read_row_helper(cols_parsed, (rows_parsed + 1));
-                    if (!col_data.empty()) {
-                        col = col_data;
-                        ret_val = read_row(cols...);
+            if (rows_parsed <= rows_count) {
+                if (recur_mtx.try_lock()) {
+                    while (cols_parsed <= (cols_count - 1)) { // Keep this at `(cols_count - 1)`!.
+                        ++cols_parsed;
+                        std::string col_data;
+                        col_data = read_csv_helper(cols_parsed, (rows_parsed + 1));
+                        if (!col_data.empty()) {
+                            col = col_data;
+                            ret_val = read_row(cols...);
+                        }
                     }
-                }
 
-                cols_parsed = 0;
-
-                if (excl_lock.try_lock()) {
-                    ++rows_parsed;
+                    cols_parsed = 0;
+                    if (ret_parsed_cols == (cols_count - 1)) {
+                        ret_parsed_cols = 0;
+                        ++rows_parsed;
+                        recur_mtx.unlock();
+                        return true;
+                    }
                 }
             }
         }
 
-        if (ret_parsed == (cols_count - 1)) {
-            ret_parsed = 0;
-            return true;
-        }
-
-        rows_parsed = 0;
-        excl_lock.unlock();
-        ++ret_parsed;
+        ++ret_parsed_cols;
+        recur_mtx.unlock();
         return false;
     }
 
@@ -147,11 +144,11 @@ private:
     int cols_count;
     int rows_count;
     static int rows_parsed;
-    static int ret_parsed;
-    std::recursive_mutex excl_lock;
-    bool key;
-    std::list<std::string> headers;                      // The key is the column number, whilst the value is the header associated with that column.
-    static QMultiMap<int, int> proc_cols;
+    static int ret_parsed_cols;                               // The amount of columns that have been parsed and returned successfully in `read_row()`
+    std::recursive_mutex recur_mtx;
+    bool key;                                                 // Whether we are processing `CmnRoutines::extract_download_ids()` or its cousins
+    std::list<std::string> headers;                           // The key is the column number, whilst the value is the header associated with that column.
+    static QMultiMap<int, int> proc_cols;                     // The rows/columns we have already processed under `read_csv_helper()`
     std::multimap<int, std::pair<int, std::string>> csv_data; // The key is the row number whilst the values are are the column number and the comma-separated-values.
 
     template<typename Container>
@@ -192,7 +189,7 @@ private:
     std::map<int, std::string> read_rows(std::string raw_data);
     std::map<int, std::string> split_values(std::stringstream raw_csv_line);
     std::multimap<int, std::pair<int, std::string>> parse_csv();
-    std::string read_row_helper(const int &col_no, const int &row_no);
+    std::string read_csv_helper(const int &col_no, const int &row_no);
 };
 }
 
