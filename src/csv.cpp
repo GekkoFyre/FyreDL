@@ -43,12 +43,13 @@
 #include "csv.hpp"
 #include <iostream>
 
+int GekkoFyre::GkCsvReader::rows_parsed;
 bool GekkoFyre::GkCsvReader::already_looped;
 QMultiMap<int, int> GekkoFyre::GkCsvReader::proc_cols;
 
-void GekkoFyre::GkCsvReader::read_row()
+bool GekkoFyre::GkCsvReader::read_row()
 {
-    return;
+    return false;
 }
 
 bool GekkoFyre::GkCsvReader::has_column(const std::string &name)
@@ -205,35 +206,34 @@ std::map<int, std::string> GekkoFyre::GkCsvReader::split_values(std::stringstrea
     return output;
 }
 
-void GekkoFyre::GkCsvReader::read_row_helper(int col_no, int row_no, std::string &val)
+std::string GekkoFyre::GkCsvReader::read_row_helper(const int &col_no, const int &row_no)
 {
     if (col_no == 0 || row_no == 0) {
-        return;
+        return "";
     }
 
     if (!csv_data.empty()) {
-        static std::string prev_val;
-        while (col_no <= cols_count) {
-            for (auto col: csv_data) {
-                if (!proc_cols.contains(row_no, col_no)) {
-                    if ((col.first == row_no) && (col.second.first == col_no)) {
-                        if (std::strcmp(prev_val.c_str(), col.second.second.c_str()) == 0) {
-                            return;
+        if (row_no <= rows_count) {
+            while (col_no <= cols_count) {
+                for (auto col: csv_data) {
+                    if (!proc_cols.contains(row_no, col_no)) {
+                        if ((col.first == row_no) && (col.second.first == col_no)) {
+                            if (!col.second.second.empty()) {
+                                proc_cols.insertMulti(row_no, col_no);
+                                return col.second.second;
+                            } else {
+                                return "";
+                            }
                         }
-
-                        prev_val = col.second.second;
-                        proc_cols.insertMulti(row_no, col_no);
-                        val = prev_val;
-                        return;
+                    } else {
+                        return "";
                     }
-                } else {
-                    return;
                 }
             }
         }
     }
 
-    return;
+    return "";
 }
 
 /**

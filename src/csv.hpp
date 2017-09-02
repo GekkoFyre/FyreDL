@@ -83,7 +83,7 @@ public:
     virtual bool has_column(const std::string &name);
     virtual int determine_column(const std::string &header);
     virtual bool force_cache_reload();
-    void read_row();
+    bool read_row();
 
     /**
      * @brief GekkoFyre::GkCsvReader::read_row will output the CSV data via the arguments in a variadic fashion, and is intended
@@ -96,32 +96,45 @@ public:
      */
     template<typename T, typename ...ColTypes>
     bool read_row(T& col, ColTypes& ...cols) {
-        static int rows_parsed;
         static int cols_parsed;
         rows_parsed = 0;
         cols_parsed = 0;
+        static bool ret_val;
         if (!csv_data.empty()) {
             while ((rows_parsed + 1) <= rows_count) {
-                while (cols_parsed < (cols_count + 1)) { // Unless we use a `do-loop`, then `cols_count + 1` needs to stand.
+                while (cols_parsed <= (cols_count - 1)) { // Keep this at `(cols_count - 1)`!.
                     ++cols_parsed;
-                    read_row_helper(cols_parsed, (rows_parsed + 1), col);
-                    read_row(cols...);
+                    std::string col_data;
+                    col_data = read_row_helper(cols_parsed, (rows_parsed + 1));
+                    if (!col_data.empty()) {
+                        col = col_data;
+                        ret_val = read_row(cols...);
+                    }
                 }
 
                 cols_parsed = 0;
-                ++rows_parsed;
+
+                if (excl_lock.try_lock()) {
+                    ++rows_parsed;
+                }
             }
         }
 
         if ((rows_parsed == rows_count) && !already_looped) {
-            ++rows_parsed;
-            proc_cols.clear();
             already_looped = true;
+            excl_lock.unlock();
+            return true;
+        }
+
+        if ((cols_count % 2) == 0 && already_looped) { // This is an absolute hack, I know...
+            already_looped = false;
+            excl_lock.unlock();
             return true;
         }
 
         rows_parsed = 0;
         already_looped = false;
+        excl_lock.unlock();
         return false;
     }
 
@@ -140,7 +153,9 @@ private:
     std::stringstream csv_raw_data;
     int cols_count;
     int rows_count;
+    static int rows_parsed;
     static bool already_looped;
+    std::recursive_mutex excl_lock;
     bool key;
     std::list<std::string> headers;                      // The key is the column number, whilst the value is the header associated with that column.
     static QMultiMap<int, int> proc_cols;
@@ -184,7 +199,7 @@ private:
     std::map<int, std::string> read_rows(std::string raw_data);
     std::map<int, std::string> split_values(std::stringstream raw_csv_line);
     std::multimap<int, std::pair<int, std::string>> parse_csv();
-    void read_row_helper(int col_no, int row_no, std::string &val);
+    std::string read_row_helper(const int &col_no, const int &row_no);
 };
 }
 
