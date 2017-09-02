@@ -426,11 +426,8 @@ std::string GekkoFyre::CmnRoutines::add_download_id(const std::string &file_path
     }
 
     std::string csv_read_data;
-
-    if (db_mutex.tryLock(-1)) {
-        s = db_struct.db->Get(read_opt, LEVELDB_STORE_UNIQUE_ID, &csv_read_data);
-        db_mutex.unlock();
-    }
+    std::lock_guard<std::mutex> locker(db_mutex);
+    s = db_struct.db->Get(read_opt, LEVELDB_STORE_UNIQUE_ID, &csv_read_data);
 
     std::stringstream csv_out;
     if (!csv_read_data.empty() && csv_read_data.size() > CFG_CSV_MIN_PARSE_SIZE) {
@@ -448,17 +445,11 @@ std::string GekkoFyre::CmnRoutines::add_download_id(const std::string &file_path
     leveldb::WriteOptions write_options;
     write_options.sync = true;
     leveldb::WriteBatch batch;
-
-    if (db_mutex.tryLock(-1)) {
-        batch.Delete(LEVELDB_STORE_UNIQUE_ID);
-        batch.Put(LEVELDB_STORE_UNIQUE_ID, csv_out.str());
-        s = db_struct.db->Write(write_options, &batch);
-        if (!s.ok()) {
-            db_mutex.unlock();
-            throw std::runtime_error(s.ToString());
-        }
-
-        db_mutex.unlock();
+    batch.Delete(LEVELDB_STORE_UNIQUE_ID);
+    batch.Put(LEVELDB_STORE_UNIQUE_ID, csv_out.str());
+    s = db_struct.db->Write(write_options, &batch);
+    if (!s.ok()) {
+        throw std::runtime_error(s.ToString());
     }
 
     return key;
@@ -481,21 +472,15 @@ bool GekkoFyre::CmnRoutines::del_download_id(const std::string &unique_id, const
     leveldb::WriteOptions write_options;
     write_options.sync = true;
     leveldb::WriteBatch batch;
-
-    if (db_mutex.tryLock(200)) {
-        batch.Delete(LEVELDB_STORE_UNIQUE_ID);
-        batch.Put(LEVELDB_STORE_UNIQUE_ID, csv_data.str());
-        s = db_struct.db->Write(write_options, &batch);
-        if (!s.ok()) {
-            QMessageBox::warning(nullptr, tr("Error!"), tr("There was an issue while deleting Unique ID, \"%1\", from the "
-                                                                   "database. See below.\n\n%2")
-                    .arg(QString::fromStdString(unique_id)).arg(QString::fromStdString(s.ToString())), QMessageBox::Ok);
-
-            db_mutex.unlock();
-            return false;
-        }
-
-        db_mutex.unlock();
+    std::lock_guard<std::mutex> locker(db_mutex);
+    batch.Delete(LEVELDB_STORE_UNIQUE_ID);
+    batch.Put(LEVELDB_STORE_UNIQUE_ID, csv_data.str());
+    s = db_struct.db->Write(write_options, &batch);
+    if (!s.ok()) {
+        QMessageBox::warning(nullptr, tr("Error!"), tr("There was an issue while deleting Unique ID, \"%1\", from the "
+                                                               "database. See below.\n\n%2")
+                .arg(QString::fromStdString(unique_id)).arg(QString::fromStdString(s.ToString())), QMessageBox::Ok);
+        return false;
     }
 
     return true;
@@ -521,19 +506,14 @@ void GekkoFyre::CmnRoutines::add_item_db(const std::string download_id, const st
     leveldb::WriteOptions write_options;
     write_options.sync = true;
     leveldb::WriteBatch batch;
-
-    if (db_mutex.tryLock(-1)) {
-        std::string key_joined = multipart_key({download_id, key});
-        batch.Delete(key_joined);
-        batch.Put(key_joined, value);
-        leveldb::Status s;
-        s = db_struct.db->Write(write_options, &batch);
-        if (!s.ok()) {
-            db_mutex.unlock();
-            throw std::runtime_error(s.ToString());
-        }
-
-        db_mutex.unlock();
+    std::lock_guard<std::mutex> locker(db_mutex);
+    std::string key_joined = multipart_key({download_id, key});
+    batch.Delete(key_joined);
+    batch.Put(key_joined, value);
+    leveldb::Status s;
+    s = db_struct.db->Write(write_options, &batch);
+    if (!s.ok()) {
+        throw std::runtime_error(s.ToString());
     }
 
     return;
@@ -545,18 +525,13 @@ void GekkoFyre::CmnRoutines::del_item_db(const std::string download_id, const st
     leveldb::WriteOptions write_options;
     write_options.sync = true;
     leveldb::WriteBatch batch;
-
-    if (db_mutex.tryLock(200)) {
-        std::string key_joined = multipart_key({download_id, key});
-        batch.Delete(key_joined);
-        leveldb::Status s;
-        s = db_struct.db->Write(write_options, &batch);
-        if (!s.ok()) {
-            db_mutex.unlock();
-            throw std::runtime_error(s.ToString());
-        }
-
-        db_mutex.unlock();
+    std::lock_guard<std::mutex> locker(db_mutex);
+    std::string key_joined = multipart_key({download_id, key});
+    batch.Delete(key_joined);
+    leveldb::Status s;
+    s = db_struct.db->Write(write_options, &batch);
+    if (!s.ok()) {
+        throw std::runtime_error(s.ToString());
     }
 
     return;
@@ -580,14 +555,10 @@ std::string GekkoFyre::CmnRoutines::read_item_db(const std::string download_id, 
     read_opt.verify_checksums = true;
     std::string key_joined = multipart_key({download_id, key});
 
-    if (db_mutex.tryLock(-1)) {
-        s = db_struct.db->Get(read_opt, key_joined, &read_data);
-        if (!s.ok()) {
-            db_mutex.unlock();
-            throw std::runtime_error(s.ToString());
-        }
-
-        db_mutex.unlock();
+    std::lock_guard<std::mutex> locker(db_mutex);
+    s = db_struct.db->Get(read_opt, key_joined, &read_data);
+    if (!s.ok()) {
+        throw std::runtime_error(s.ToString());
     }
 
     if (!read_data.empty()) {
@@ -615,15 +586,10 @@ std::pair<std::string, bool> GekkoFyre::CmnRoutines::determine_download_id(const
 
     std::string key = createId(FYREDL_UNIQUE_ID_DIGIT_COUNT);
     std::string csv_read_data;
-
-    if (db_mutex.tryLock(-1)) {
-        s = db_struct.db->Get(read_opt, LEVELDB_STORE_UNIQUE_ID, &csv_read_data);
-        if (!s.ok()) {
-            db_mutex.unlock();
-            throw std::runtime_error(s.ToString());
-        }
-
-        db_mutex.unlock();
+    std::lock_guard<std::mutex> locker(db_mutex);
+    s = db_struct.db->Get(read_opt, LEVELDB_STORE_UNIQUE_ID, &csv_read_data);
+    if (!s.ok()) {
+        throw std::runtime_error(s.ToString());
     }
 
     if (!csv_read_data.empty() && csv_read_data.size() > CFG_CSV_MIN_PARSE_SIZE) {
@@ -672,10 +638,8 @@ std::unordered_map<std::string, std::pair<std::string, bool>> GekkoFyre::CmnRout
     read_opt.verify_checksums = true;
 
     std::string csv_read_data;
-    if (db_mutex.tryLock(-1)) {
-        db_struct.db->Get(read_opt, LEVELDB_STORE_UNIQUE_ID, &csv_read_data);
-        db_mutex.unlock();
-    }
+    std::lock_guard<std::mutex> locker(db_mutex);
+    db_struct.db->Get(read_opt, LEVELDB_STORE_UNIQUE_ID, &csv_read_data);
 
     std::unordered_map<std::string, std::pair<std::string, bool>> cache;
     std::stringstream csv_out;
@@ -1851,17 +1815,13 @@ bool GekkoFyre::CmnRoutines::write_torrent_files_addendum(std::vector<GekkoFyre:
             batch.Put(file_key, file_write_data.str());
             batch.Put(mapflepce_key, mapflepce_write_data.str());
 
-            if (db_mutex.tryLock(-1)) {
-                leveldb::Status s;
-                s = db_struct.db->Write(write_options, &batch);
-                if (!s.ok()) {
-                    std::cerr << tr("Error whilst processing files for BitTorrent item: \"%1\".\nError: ")
-                            .arg(QString::fromStdString(download_key)).toStdString() << s.ToString() << std::endl;
-                    db_mutex.unlock();
-                    return false;
-                }
-
-                db_mutex.unlock();
+            std::lock_guard<std::mutex> locker(db_mutex);
+            leveldb::Status s;
+            s = db_struct.db->Write(write_options, &batch);
+            if (!s.ok()) {
+                std::cerr << tr("Error whilst processing files for BitTorrent item: \"%1\".\nError: ")
+                        .arg(QString::fromStdString(download_key)).toStdString() << s.ToString() << std::endl;
+                return false;
             }
         }
 
@@ -1886,17 +1846,12 @@ std::vector<GekkoFyre::GkTorrent::TorrentFile> GekkoFyre::CmnRoutines::read_torr
             read_opt.verify_checksums = true;
 
             file_key = multipart_key({download_key, LEVELDB_KEY_TORRENT_TORRENT_FILES, std::to_string(counter)});
-
-            if (db_mutex.tryLock(-1)) {
-                s = db_struct.db->Get(read_opt, file_key, &csv_file_data);
-                if (!s.ok()) {
-                    std::cerr << tr("Error whilst processing files for BitTorrent item: \"%1\".\nError: ")
-                            .arg(QString::fromStdString(download_key)).toStdString() << s.ToString() << std::endl;
-                    db_mutex.unlock();
-                    return std::vector<GekkoFyre::GkTorrent::TorrentFile>();
-                }
-
-                db_mutex.unlock();
+            std::lock_guard<std::mutex> locker(db_mutex);
+            s = db_struct.db->Get(read_opt, file_key, &csv_file_data);
+            if (!s.ok()) {
+                std::cerr << tr("Error whilst processing files for BitTorrent item: \"%1\".\nError: ")
+                        .arg(QString::fromStdString(download_key)).toStdString() << s.ToString() << std::endl;
+                return std::vector<GekkoFyre::GkTorrent::TorrentFile>();
             }
 
             if (!csv_file_data.empty() && csv_file_data.size() > CFG_CSV_MIN_PARSE_SIZE) {
@@ -1923,17 +1878,16 @@ std::vector<GekkoFyre::GkTorrent::TorrentFile> GekkoFyre::CmnRoutines::read_torr
                         item.flags = std::atoi(flags.c_str());
 
                         std::string csv_mapflepce_data;
-
-                        if (db_mutex.tryLock(-1)) {
+                        if (!mapflepce_key.empty()) {
                             s = db_struct.db->Get(read_opt, mapflepce_key, &csv_mapflepce_data);
                             if (!s.ok()) {
-                                std::cerr << tr("Error whilst processing files for BitTorrent item: \"%1\".\nError: ")
-                                        .arg(QString::fromStdString(download_key)).toStdString() << s.ToString() << std::endl;
-                                db_mutex.unlock();
-                                return std::vector<GekkoFyre::GkTorrent::TorrentFile>();
+                                throw std::runtime_error(tr("Error whilst processing files for BitTorrent item: \"%1\".\nError: %2")
+                                                                 .arg(QString::fromStdString(download_key)).arg(QString::fromStdString(s.ToString()))
+                                                                 .toStdString());
                             }
-
-                            db_mutex.unlock();
+                        } else {
+                            throw std::invalid_argument(tr("Invalid key provided whilst processing files for BitTorrent item: \"%1\".")
+                                                                .arg(QString::fromStdString(download_key)).toStdString());
                         }
 
                         GkCsvReader csv_mapflepce_parse(2, false, csv_mapflepce_data, LEVELDB_CSV_TORRENT_MAPFLEPCE_1, LEVELDB_CSV_TORRENT_MAPFLEPCE_2);
@@ -1950,9 +1904,9 @@ std::vector<GekkoFyre::GkTorrent::TorrentFile> GekkoFyre::CmnRoutines::read_torr
                             break;
                         }
                     }
-                }
 
-                to_files.push_back(item);
+                    to_files.push_back(item);
+                }
             }
         }
 
@@ -1983,18 +1937,14 @@ bool GekkoFyre::CmnRoutines::write_torrent_trkrs_addendum(const std::vector<Gekk
             tracker_write_data << LEVELDB_CSV_TORRENT_TRACKER_BOOL_ENABLED << std::endl;
             tracker_write_data << t.url << "," << std::to_string(t.tier) << "," << std::to_string(t.enabled);
 
-            if (db_mutex.tryLock(-1)) {
-                batch.Put(tracker_key, tracker_write_data.str());
-                leveldb::Status s;
-                s = db_struct.db->Write(write_options, &batch);
-                if (!s.ok()) {
-                    std::cerr << tr("Error whilst processing trackers for BitTorrent item: \"%1\".\nError: ")
-                            .arg(QString::fromStdString(download_key)).toStdString() << s.ToString() << std::endl;
-                    db_mutex.unlock();
-                    return false;
-                }
-
-                db_mutex.unlock();
+            std::lock_guard<std::mutex> locker(db_mutex);
+            batch.Put(tracker_key, tracker_write_data.str());
+            leveldb::Status s;
+            s = db_struct.db->Write(write_options, &batch);
+            if (!s.ok()) {
+                std::cerr << tr("Error whilst processing trackers for BitTorrent item: \"%1\".\nError: ")
+                        .arg(QString::fromStdString(download_key)).toStdString() << s.ToString() << std::endl;
+                return false;
             }
         }
     }
@@ -2017,17 +1967,12 @@ std::vector<GekkoFyre::GkTorrent::TorrentTrackers> GekkoFyre::CmnRoutines::read_
             read_opt.verify_checksums = true;
 
             tracker_key = multipart_key({download_key, LEVELDB_KEY_TORRENT_TRACKERS, std::to_string(counter)});
-
-            if (db_mutex.tryLock(-1)) {
-                s = db_struct.db->Get(read_opt, tracker_key, &csv_tracker_data);
-                if (!s.ok()) {
-                    std::cerr << tr("Error whilst processing files for BitTorrent item: \"%1\".\nError: ")
-                            .arg(QString::fromStdString(download_key)).toStdString() << s.ToString() << std::endl;
-                    db_mutex.unlock();
-                    return std::vector<GekkoFyre::GkTorrent::TorrentTrackers>();
-                }
-
-                db_mutex.unlock();
+            std::lock_guard<std::mutex> locker(db_mutex);
+            s = db_struct.db->Get(read_opt, tracker_key, &csv_tracker_data);
+            if (!s.ok()) {
+                std::cerr << tr("Error whilst processing files for BitTorrent item: \"%1\".\nError: ")
+                        .arg(QString::fromStdString(download_key)).toStdString() << s.ToString() << std::endl;
+                return std::vector<GekkoFyre::GkTorrent::TorrentTrackers>();
             }
 
             if (!csv_tracker_data.empty() && csv_tracker_data.size() > CFG_CSV_MIN_PARSE_SIZE) {

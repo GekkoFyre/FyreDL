@@ -47,6 +47,7 @@
 #include <libtorrent/entry.hpp>
 #include <string>
 #include <cstdio>
+#include <mutex>
 #include <exception>
 #include <stdexcept>
 #include <initializer_list>
@@ -154,8 +155,9 @@ private:
     std::vector<GkTorrent::TorrentTrackers> read_torrent_trkrs_addendum(const int &num_trackers, const std::string &download_key,
                                                                         const GekkoFyre::GkFile::FileDb &db_struct);
 
+    // https://geidav.wordpress.com/2014/01/09/mutex-lock-guards-in-c11/
     GekkoFyre::GkFile::FileDb db;
-    QMutex db_mutex;
+    std::mutex db_mutex;
     QMutex to_info_mutex;
     QMutex mutex;
 };
