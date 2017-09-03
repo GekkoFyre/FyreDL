@@ -158,7 +158,12 @@ private:
     // https://geidav.wordpress.com/2014/01/09/mutex-lock-guards-in-c11/
     GekkoFyre::GkFile::FileDb db;
     std::mutex db_mutex;
-    QMutex to_info_mutex;
+    std::mutex create_id_mutex;
+    std::mutex to_info_mutex;
+    std::mutex r_curl_mtx;
+    std::mutex w_curl_mtx;
+    std::mutex r_torrent_mtx;
+    std::mutex w_torrent_mtx;
     QMutex mutex;
 };
 }

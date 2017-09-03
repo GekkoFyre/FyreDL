@@ -58,6 +58,7 @@ public:
     ~GkTorrentMisc();
 
     QString state(lt::torrent_status::state_t s);
+    int rand_port() const;
 };
 }
 

@@ -56,6 +56,7 @@
 #include <future>
 #include <QObject>
 #include <QPointer>
+#include <QMap>
 
 namespace GekkoFyre {
 class GkTorrentClient: public QObject {
@@ -68,7 +69,6 @@ public:
     void startTorrentDl(const GekkoFyre::GkTorrent::TorrentInfo &item);
 
 private:
-    int rand_port() const;
     void run_session_bckgrnd();
 
     std::shared_ptr<GekkoFyre::CmnRoutines> routines;
@@ -76,7 +76,6 @@ private:
     QMap<std::string, lt::torrent_handle> lt_to_handle;
     QMap<std::string, std::string> unique_id_cache;
     std::future<void> async_ses;
-    bool async_active;
     GekkoFyre::GkFile::FileDb db_struct;
 
 private slots:
@@ -87,5 +86,8 @@ signals:
     void xfer_internal_stats(const std::string &save_path, const lt::torrent_status &stats);
 };
 }
+
+// This is required for signaling, otherwise QVariant does not know the type.
+Q_DECLARE_METATYPE(lt::torrent_status);
 
 #endif // FYREDL_TORRENT_CLIENT_HPP

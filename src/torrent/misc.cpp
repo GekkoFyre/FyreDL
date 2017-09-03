@@ -42,6 +42,7 @@
 
 #include "misc.hpp"
 #include <libtorrent/torrent_status.hpp>
+#include <random>
 
 GekkoFyre::GkTorrentMisc::GkTorrentMisc()
 {}
@@ -76,4 +77,19 @@ QString GekkoFyre::GkTorrentMisc::state(lt::torrent_status::state_t s)
         default:
             return QString("<N/A>");
     }
+}
+
+/**
+ * @brief GekkoFyre::GkTorrentMisc::rand_port does as the name says; it will create a random port number for you!
+ * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
+ * @date 2017-06-27
+ * @return A random port number in the range of TORRENT_MIN_PORT_LISTEN <= TORRENT_MAX_PORT_LISTEN
+ */
+int GekkoFyre::GkTorrentMisc::rand_port() const
+{
+    std::random_device rd;
+    std::mt19937 rng(rd());
+    std::uniform_int_distribution<int> uni(TORRENT_MIN_PORT_LISTEN, TORRENT_MAX_PORT_LISTEN);
+
+    return uni(rng);
 }

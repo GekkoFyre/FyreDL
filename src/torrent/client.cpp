@@ -50,7 +50,6 @@
 #include <boost/filesystem.hpp>
 #include <boost/exception/all.hpp>
 #include <QString>
-#include <random>
 
 namespace sys = boost::system;
 namespace fs = boost::filesystem;
@@ -67,7 +66,6 @@ GekkoFyre::GkTorrentClient::GkTorrentClient(const GekkoFyre::GkFile::FileDb &dat
 {
     routines = std::make_shared<GekkoFyre::CmnRoutines>(database, this);
     db_struct = database;
-    async_active = false;
 
     // http://libtorrent.org/reference-Settings.html#settings_pack
     // http://www.libtorrent.org/include/libtorrent/session_settings.hpp
@@ -143,39 +141,38 @@ void GekkoFyre::GkTorrentClient::startTorrentDl(const GekkoFyre::GkTorrent::Torr
         atp.save_path = tor_dest.string();
         lt_ses->async_add_torrent(atp);
 
+        // http://blog.libtorrent.org/2015/04/libtorrent-alert-queue/
+        // http://www.libtorrent.org/reference-Alerts.html
         std::vector<lt::alert*> alerts;
-        do {
-            lt_ses->pop_alerts(&alerts);
-            for (lt::alert const *a: alerts) {
-                std::cout << a->message() << std::endl;
-                if (auto at = lt::alert_cast<lt::add_torrent_alert>(a)) {
-                    std::string handle_file_path = at->handle.save_path();
-                    if (!lt_to_handle.contains(handle_file_path) && !unique_id_cache.contains(handle_file_path)) {
-                        lt_to_handle.insert(handle_file_path, at->handle);
+        lt_ses->pop_alerts(&alerts);
+        for (lt::alert const *a: alerts) {
+            std::cout << a->message() << std::endl;
+            if (auto at = lt::alert_cast<lt::add_torrent_alert>(a)) {
+                std::string handle_file_path = at->handle.save_path();
+                if (!lt_to_handle.contains(handle_file_path) && !unique_id_cache.contains(handle_file_path)) {
+                    lt_to_handle.insert(handle_file_path, at->handle);
 
-                        // std::string handle_unique_id = routines->determine_download_id(handle_file_path, db_struct);
-                        // TODO: Finish this section!
-                        unique_id_cache.insert(handle_file_path, "handle_unique_id");
-                    }
-
-                    if (!async_active) {
-                        // async_ses = std::async(std::launch::async, &GkTorrentClient::run_session_bckgrnd, this);
-                        // TODO: Finish this section!
-                        async_active = true;
-                        goto terminate;
-                    }
-                }
-
-                if (lt::alert_cast<lt::torrent_error_alert>(a)) {
-                    std::cerr << a->message() << std::endl;
-                    goto terminate;
+                    // std::string handle_unique_id = routines->determine_download_id(handle_file_path, db_struct);
+                    // TODO: Finish this section!
+                    assert(!item.general.unique_id.empty());
+                    unique_id_cache.insert(handle_file_path, item.general.unique_id);
                 }
             }
 
-            std::this_thread::sleep_for(std::chrono::milliseconds(200));
-        } while (alerts.size() > 0);
+            // This is a base class for alerts that are associated with a
+            // specific torrent. It contains a handle to the torrent.
+            if (auto at = lt::alert_cast<lt::add_torrent_alert>(a)) {
+                std::cout << QString("\"%1\":\n").arg(at->torrent_name()).toStdString();
+                std::cout << a->message() << std::endl;
+            }
 
-        terminate: ;
+            if (lt::alert_cast<lt::torrent_error_alert>(a)) {
+                std::cerr << a->message() << std::endl;
+            }
+        }
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(200));
+
         return;
     } catch (const std::exception &e) {
         QMessageBox::warning(nullptr, tr("Error!"), tr("An issue has occured with torrent, \"%1\".\n\n%2")
@@ -222,21 +219,6 @@ void GekkoFyre::GkTorrentClient::recv_proc_to_stats(const std::string &save_path
 
     emit xfer_torrent_info(to_xfer_stats);
     return;
-}
-
-/**
- * @brief GekkoFyre::GkTorrentClient::rand_port does as the name says; it will create a random port number for you!
- * @author Phobos Aryn'dythyrn D'thorga <phobos.gekko@gmail.com>
- * @date 2017-06-27
- * @return A random port number in the range of TORRENT_MIN_PORT_LISTEN <= TORRENT_MAX_PORT_LISTEN
- */
-int GekkoFyre::GkTorrentClient::rand_port() const
-{
-    std::random_device rd;
-    std::mt19937 rng(rd());
-    std::uniform_int_distribution<int> uni(TORRENT_MIN_PORT_LISTEN, TORRENT_MAX_PORT_LISTEN);
-
-    return uni(rng);
 }
 
 /**
